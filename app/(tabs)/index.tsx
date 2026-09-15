@@ -6,6 +6,9 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAppData } from "@/lib/app-data";
 import { PAYROLL_RULES } from "@/lib/payroll";
+import { trpc } from "@/lib/trpc";
+import { useRouter } from "expo-router";
+import * as Auth from "@/lib/_core/auth";
 
 function distanceBetween(lat1: number, lon1: number, lat2: number, lon2: number) {
   const radius = 6371000;
@@ -28,7 +31,9 @@ function lateMinutesFromNow() {
 }
 
 export default function HomeScreen() {
-  const { employee, branch, shift, payroll, payrollInputs, records, checkedIn, todayRecord, checkIn, checkOut, role, setRole } = useAppData();
+  const { employee, branch, shift, payroll, payrollInputs, records, checkedIn, todayRecord, checkIn, checkOut } = useAppData();
+  const router = useRouter();
+  const logoutMutation = trpc.auth.logout.useMutation();
   const [working, setWorking] = useState(false);
   const [gpsMessage, setGpsMessage] = useState("جاهز للتحقق من موقعك");
   const isCheckedOut = Boolean(todayRecord?.checkOut);
@@ -79,7 +84,7 @@ export default function HomeScreen() {
             <Text style={styles.title}>صباح الخير، {employee.name.split(" ")[0]}</Text>
             <Text style={styles.subtitle}>{employee.title} · {employee.department}</Text>
           </View>
-          <Pressable onPress={() => setRole(role === "employee" ? "manager" : "employee")} style={styles.avatar}>
+          <Pressable onPress={async () => { await logoutMutation.mutateAsync(); await Auth.removeSessionToken(); await Auth.clearUserInfo(); router.replace("/login" as never); }} style={styles.avatar}>
             <Text style={styles.avatarText}>{employee.initials}</Text>
           </Pressable>
         </View>

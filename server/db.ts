@@ -1,11 +1,19 @@
-import { eq } from "drizzle-orm";
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { and, desc, eq, gt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import {
+  attendanceRecords,
+  type AttendanceRecord,
+  type InsertUser,
+  staffAccounts,
+  staffRequests,
+  staffSessions,
+  users,
+} from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -19,74 +27,195 @@ export async function getDb() {
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) {
-    throw new Error("User openId is required for upsert");
-  }
-
+  if (!user.openId) throw new Error("User openId is required for upsert");
   const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot upsert user: database not available");
-    return;
+  if (!db) return;
+  const values: InsertUser = { openId: user.openId };
+  const updateSet: Record<string, unknown> = {};
+  for (const field of ["name", "email", "loginMethod"] as const) {
+    if (user[field] !== undefined) {
+      values[field] = user[field] ?? null;
+      updateSet[field] = user[field] ?? null;
+    }
   }
-
-  try {
-    const values: InsertUser = {
-      openId: user.openId,
-    };
-    const updateSet: Record<string, unknown> = {};
-
-    const textFields = ["name", "email", "loginMethod"] as const;
-    type TextField = (typeof textFields)[number];
-
-    const assignNullable = (field: TextField) => {
-      const value = user[field];
-      if (value === undefined) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
-
-    textFields.forEach(assignNullable);
-
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = "admin";
-      updateSet.role = "admin";
-    }
-
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
-    }
-
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
-
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
-  } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
-    throw error;
-  }
+  if (user.lastSignedIn !== undefined) { values.lastSignedIn = user.lastSignedIn; updateSet.lastSignedIn = user.lastSignedIn; }
+  if (user.role !== undefined) { values.role = user.role; updateSet.role = user.role; }
+  else if (user.openId === ENV.ownerOpenId) { values.role = "admin"; updateSet.role = "admin"; }
+  if (!values.lastSignedIn) values.lastSignedIn = new Date();
+  if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
+  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
 }
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
-    return undefined;
-  }
-
+  if (!db) return undefined;
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-
-  return result.length > 0 ? result[0] : undefined;
+  return result[0];
 }
 
-// TODO: add feature queries here as your schema grows.
+export function hashPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+export function verifyPassword(password: string, stored: string) {
+  const [salt, hash] = stored.split(":");
+  if (!salt || !hash) return false;
+  const derived = scryptSync(password, salt, 64);
+  const expected = Buffer.from(hash, "hex");
+  return expected.length === derived.length && timingSafeEqual(expected, derived);
+}
+
+function hashSessionToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+export async function countStaffAccounts() {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.select({ id: staffAccounts.id }).from(staffAccounts).limit(1);
+  return result.length;
+}
+
+export async function createStaffAccount(input: {
+  phone: string;
+  password: string;
+  name: string;
+  title?: string;
+  department?: string;
+  role: "manager" | "employee";
+  baseSalary?: number;
+  shiftStart?: string;
+  shiftEnd?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(staffAccounts).values({
+    phone: input.phone.trim(),
+    passwordHash: hashPassword(input.password),
+    name: input.name.trim(),
+    title: input.title?.trim() || null,
+    department: input.department?.trim() || null,
+    role: input.role,
+    baseSalary: input.baseSalary ?? 0,
+    shiftStart: input.shiftStart ?? "09:00",
+    shiftEnd: input.shiftEnd ?? "18:00",
+  });
+  return getStaffAccountById(Number(result[0].insertId));
+}
+
+export async function getStaffAccountById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(staffAccounts).where(eq(staffAccounts.id, id)).limit(1);
+  return result[0];
+}
+
+export async function listStaffAccounts() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: staffAccounts.id,
+    phone: staffAccounts.phone,
+    name: staffAccounts.name,
+    title: staffAccounts.title,
+    department: staffAccounts.department,
+    role: staffAccounts.role,
+    baseSalary: staffAccounts.baseSalary,
+    shiftStart: staffAccounts.shiftStart,
+    shiftEnd: staffAccounts.shiftEnd,
+    active: staffAccounts.active,
+    createdAt: staffAccounts.createdAt,
+  }).from(staffAccounts).orderBy(desc(staffAccounts.createdAt));
+}
+
+export async function authenticateStaff(phone: string, password: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.select().from(staffAccounts).where(and(eq(staffAccounts.phone, phone.trim()), eq(staffAccounts.active, true))).limit(1);
+  const staff = result[0];
+  if (!staff || !verifyPassword(password, staff.passwordHash)) return null;
+  return staff;
+}
+
+export async function createStaffSession(staffAccountId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const token = randomBytes(32).toString("hex");
+  await db.insert(staffSessions).values({
+    staffAccountId,
+    tokenHash: hashSessionToken(token),
+    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+  });
+  return token;
+}
+
+export async function getStaffBySessionToken(token: string | null | undefined) {
+  const db = await getDb();
+  if (!db || !token) return undefined;
+  const sessions = await db.select().from(staffSessions).where(and(eq(staffSessions.tokenHash, hashSessionToken(token)), gt(staffSessions.expiresAt, new Date()))).limit(1);
+  const session = sessions[0];
+  if (!session) return undefined;
+  return getStaffAccountById(session.staffAccountId);
+}
+
+export async function deleteStaffSession(token: string | null | undefined) {
+  const db = await getDb();
+  if (!db || !token) return;
+  await db.delete(staffSessions).where(eq(staffSessions.tokenHash, hashSessionToken(token)));
+}
+
+export async function listAttendance(staffAccountId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(attendanceRecords).where(eq(attendanceRecords.staffAccountId, staffAccountId)).orderBy(desc(attendanceRecords.date));
+}
+
+export async function upsertAttendance(input: Omit<AttendanceRecord, "id" | "createdAt" | "updatedAt">) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await db.select().from(attendanceRecords).where(and(eq(attendanceRecords.staffAccountId, input.staffAccountId), eq(attendanceRecords.date, input.date))).limit(1);
+  if (existing[0]) {
+    await db.update(attendanceRecords).set({ ...input, updatedAt: new Date() }).where(eq(attendanceRecords.id, existing[0].id));
+    return getAttendanceById(existing[0].id);
+  }
+  const result = await db.insert(attendanceRecords).values(input);
+  return getAttendanceById(Number(result[0].insertId));
+}
+
+export async function getAttendanceById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(attendanceRecords).where(eq(attendanceRecords.id, id)).limit(1);
+  return result[0];
+}
+
+export async function listRequests(staffAccountId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return staffAccountId === undefined
+    ? db.select().from(staffRequests).orderBy(desc(staffRequests.createdAt))
+    : db.select().from(staffRequests).where(eq(staffRequests.staffAccountId, staffAccountId)).orderBy(desc(staffRequests.createdAt));
+}
+
+export async function createRequest(input: { staffAccountId: number; type: string; fromDate: string; toDate: string; reason: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(staffRequests).values(input);
+  return getRequestById(Number(result[0].insertId));
+}
+
+export async function approveRequest(id: number, managerId: number, status: "مقبول" | "مرفوض") {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(staffRequests).set({ status, reviewedBy: managerId, reviewedAt: new Date() }).where(eq(staffRequests.id, id));
+  return getRequestById(id);
+}
+
+async function getRequestById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(staffRequests).where(eq(staffRequests.id, id)).limit(1);
+  return result[0];
+}
