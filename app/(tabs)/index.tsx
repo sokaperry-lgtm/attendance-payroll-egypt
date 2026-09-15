@@ -117,6 +117,7 @@ export default function HomeScreen() {
           <View style={styles.metricCard}><Text style={styles.metricValue}>{payrollInputs.lateMinutes?.toLocaleString("ar-EG") ?? "٠"}</Text><Text style={styles.metricLabel}>دقيقة تأخير</Text><Text style={styles.metricUnit}>بعد السماح</Text></View>
         </View>
         <View style={styles.notice}><IconSymbol name="wallet" size={20} color="#B45309" /><Text style={styles.noticeText}>الحساب مبدئي حتى اعتماد المرتب من المدير آخر الشهر.</Text></View>
+        {Platform.OS === "web" && <View style={styles.installCard}><IconSymbol name="plus" size={20} color="#0E7490" /><View style={styles.installCopy}><Text style={styles.installTitle}>ثبّت حاضر على الآيفون</Text><Text style={styles.installText}>من Safari اضغط مشاركة ثم «إضافة إلى الشاشة الرئيسية» ليظهر كتطبيق.</Text></View></View>}
       </ScrollView>
     </ScreenContainer>
   );
@@ -162,4 +163,8 @@ const styles = StyleSheet.create({
   metricUnit: { color: "#94A3B8", fontSize: 10, marginTop: 2, textAlign: "right" },
   notice: { backgroundColor: "#FFFBEB", borderRadius: 14, padding: 13, flexDirection: "row-reverse", alignItems: "center", gap: 8 },
   noticeText: { color: "#92400E", fontSize: 12, flex: 1, lineHeight: 18, textAlign: "right" },
+  installCard: { backgroundColor: "#F0FDFA", borderRadius: 14, padding: 13, flexDirection: "row-reverse", alignItems: "center", gap: 9, borderWidth: 1, borderColor: "#99F6E4" },
+  installCopy: { flex: 1 },
+  installTitle: { color: "#115E59", fontSize: 12, fontWeight: "800", textAlign: "right" },
+  installText: { color: "#0F766E", fontSize: 11, lineHeight: 17, marginTop: 3, textAlign: "right" },
 });

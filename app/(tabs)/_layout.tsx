@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Platform } from "react-native";
@@ -11,6 +12,12 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 58 + bottomPadding;
+
+  useEffect(() => {
+    if (Platform.OS === "web" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/service-worker.js").catch(() => undefined);
+    }
+  }, []);
 
   return (
     <AppDataProvider>
