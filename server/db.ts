@@ -3,6 +3,7 @@ import { and, desc, eq, gt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   attendanceRecords,
+  companySettings,
   type AttendanceRecord,
   type InsertUser,
   staffAccounts,
@@ -128,6 +129,39 @@ export async function listStaffAccounts() {
     active: staffAccounts.active,
     createdAt: staffAccounts.createdAt,
   }).from(staffAccounts).orderBy(desc(staffAccounts.createdAt));
+}
+
+export async function updateStaffAccount(id: number, input: { phone?: string; name?: string; title?: string; department?: string; baseSalary?: number; shiftStart?: string; shiftEnd?: string; active?: boolean; password?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const values: Record<string, unknown> = {};
+  if (input.phone !== undefined) values.phone = input.phone.trim();
+  if (input.name !== undefined) values.name = input.name.trim();
+  if (input.title !== undefined) values.title = input.title.trim() || null;
+  if (input.department !== undefined) values.department = input.department.trim() || null;
+  if (input.baseSalary !== undefined) values.baseSalary = input.baseSalary;
+  if (input.shiftStart !== undefined) values.shiftStart = input.shiftStart;
+  if (input.shiftEnd !== undefined) values.shiftEnd = input.shiftEnd;
+  if (input.active !== undefined) values.active = input.active;
+  if (input.password) values.passwordHash = hashPassword(input.password);
+  if (Object.keys(values).length) await db.update(staffAccounts).set({ ...values, updatedAt: new Date() }).where(eq(staffAccounts.id, id));
+  return getStaffAccountById(id);
+}
+
+export async function getCompanySettings() {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(companySettings).limit(1);
+  return result[0];
+}
+
+export async function updateCompanySettings(input: { name: string; address: string; latitude: string; longitude: string; radiusMeters: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const current = await getCompanySettings();
+  if (current) await db.update(companySettings).set({ ...input, updatedAt: new Date() }).where(eq(companySettings.id, current.id));
+  else await db.insert(companySettings).values(input);
+  return getCompanySettings();
 }
 
 export async function authenticateStaff(phone: string, password: string) {

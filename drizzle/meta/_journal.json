@@ -15,6 +15,13 @@
       "when": 1789476883372,
       "tag": "0001_right_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1789562126912,
+      "tag": "0002_famous_warstar",
+      "breakpoints": true
     }
   ]
 }

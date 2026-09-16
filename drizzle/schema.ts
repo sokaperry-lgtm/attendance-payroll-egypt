@@ -63,9 +63,20 @@ export const staffRequests = mysqlTable("staff_requests", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const companySettings = mysqlTable("company_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 160 }).notNull(),
+  address: varchar("address", { length: 255 }).notNull(),
+  latitude: varchar("latitude", { length: 32 }).notNull(),
+  longitude: varchar("longitude", { length: 32 }).notNull(),
+  radiusMeters: int("radiusMeters").default(200).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type StaffAccount = typeof staffAccounts.$inferSelect;
 export type InsertStaffAccount = typeof staffAccounts.$inferInsert;
 export type StaffRequest = typeof staffRequests.$inferSelect;
 export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
+export type CompanySettings = typeof companySettings.$inferSelect;

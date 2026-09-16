@@ -40,6 +40,8 @@ export type AppDataContext = {
   submitRequest: (request: Omit<LeaveRequest, "id" | "status">) => Promise<void>;
   approveRequest: (id: string, status: RequestStatus) => Promise<void>;
   createStaffAccount: (input: { phone: string; password: string; name: string; title?: string; department?: string; baseSalary: number }) => Promise<void>;
+  updateStaffAccount: (input: { id: number; phone?: string; password?: string; name?: string; title?: string; department?: string; baseSalary?: number; shiftStart?: string; shiftEnd?: string; active?: boolean }) => Promise<void>;
+  updateBranch: (input: { name: string; address: string; latitude: string; longitude: string; radiusMeters: number }) => Promise<void>;
 };
 
 const AppData = createContext<AppDataContext | null>(null);
@@ -55,8 +57,12 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const requestMutation = trpc.requests.create.useMutation();
   const reviewMutation = trpc.requests.review.useMutation();
   const createStaffMutation = trpc.staff.create.useMutation();
+  const updateStaffMutation = trpc.staff.update.useMutation();
+  const companyQuery = trpc.company.settings.useQuery(undefined, { enabled: Boolean(meQuery.data), retry: false });
+  const updateCompanyMutation = trpc.company.updateSettings.useMutation();
 
   const employee = meQuery.data ? mapEmployee(meQuery.data) : { id: "", name: "", title: "", department: "", baseSalary: 0, initials: "" };
+  const branch: Branch = companyQuery.data ? { name: companyQuery.data.name, address: companyQuery.data.address, latitude: Number(companyQuery.data.latitude), longitude: Number(companyQuery.data.longitude), radiusMeters: companyQuery.data.radiusMeters } : defaultBranch;
   const records: AttendanceRecord[] = (attendanceQuery.data ?? []).map((record) => ({ id: String(record.id), date: record.date, checkIn: record.checkIn, checkOut: record.checkOut, status: record.status as AttendanceState, lateMinutes: record.lateMinutes, distanceMeters: record.distanceMeters, note: record.note }));
   const requests: LeaveRequest[] = (requestsQuery.data ?? []).map((request) => ({ id: String(request.id), type: request.type as RequestType, from: request.fromDate, to: request.toDate, reason: request.reason, status: request.status as RequestStatus, staffAccountId: request.staffAccountId }));
   const staffMembers: Employee[] = (staffQuery.data ?? []).map((staff) => mapEmployee(staff));
@@ -67,13 +73,15 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
   const invalidateAll = () => { void queryClient.invalidateQueries(); };
   const value = useMemo<AppDataContext>(() => ({
-    role, employee, branch: defaultBranch, shift: { name: "وردية صباحية", start: meQuery.data?.shiftStart ?? "09:00", end: meQuery.data?.shiftEnd ?? "18:00", days: "السبت — الخميس" }, records, requests, staffMembers, payrollInputs, payroll, todayRecord, checkedIn: Boolean(todayRecord?.checkIn && !todayRecord?.checkOut), loading: meQuery.isLoading || attendanceQuery.isLoading, refresh: invalidateAll,
+    role, employee, branch, shift: { name: "وردية صباحية", start: meQuery.data?.shiftStart ?? "09:00", end: meQuery.data?.shiftEnd ?? "18:00", days: "السبت — الخميس" }, records, requests, staffMembers, payrollInputs, payroll, todayRecord, checkedIn: Boolean(todayRecord?.checkIn && !todayRecord?.checkOut), loading: meQuery.isLoading || attendanceQuery.isLoading, refresh: invalidateAll,
     checkIn: async (payload) => { await checkInMutation.mutateAsync({ date: todayKey(), time: payload.time, status: payload.status, lateMinutes: payload.lateMinutes, distanceMeters: payload.distanceMeters }); invalidateAll(); },
     checkOut: async (time) => { await checkOutMutation.mutateAsync({ date: todayKey(), time }); invalidateAll(); },
     submitRequest: async (request) => { await requestMutation.mutateAsync({ type: request.type, fromDate: request.from, toDate: request.to, reason: request.reason }); invalidateAll(); },
     approveRequest: async (id, status) => { await reviewMutation.mutateAsync({ id: Number(id), status: status as "مقبول" | "مرفوض" }); invalidateAll(); },
     createStaffAccount: async (input) => { await createStaffMutation.mutateAsync({ ...input, shiftStart: "09:00", shiftEnd: "18:00" }); invalidateAll(); },
-  }), [role, employee, meQuery.data?.shiftStart, meQuery.data?.shiftEnd, records, requests, staffMembers, payrollInputs, payroll, todayRecord, meQuery.isLoading, attendanceQuery.isLoading, checkInMutation, checkOutMutation, requestMutation, reviewMutation, createStaffMutation]);
+    updateStaffAccount: async (input) => { await updateStaffMutation.mutateAsync(input); invalidateAll(); },
+    updateBranch: async (input) => { await updateCompanyMutation.mutateAsync(input); invalidateAll(); },
+  }), [role, employee, branch, meQuery.data?.shiftStart, meQuery.data?.shiftEnd, records, requests, staffMembers, payrollInputs, payroll, todayRecord, meQuery.isLoading, attendanceQuery.isLoading, checkInMutation, checkOutMutation, requestMutation, reviewMutation, createStaffMutation, updateStaffMutation, updateCompanyMutation]);
   return <AppData.Provider value={value}>{children}</AppData.Provider>;
 }
 
