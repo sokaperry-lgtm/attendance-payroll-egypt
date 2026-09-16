@@ -15,7 +15,7 @@ export default function TabLayout() {
 
   useEffect(() => {
     if (Platform.OS === "web" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/service-worker.js").catch(() => undefined);
+      navigator.serviceWorker.register("/service-worker.js").then((registration) => registration.update()).catch(() => undefined);
     }
   }, []);
 

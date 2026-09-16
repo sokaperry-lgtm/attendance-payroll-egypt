@@ -34,7 +34,7 @@ export type AppDataContext = {
   todayRecord?: AttendanceRecord;
   checkedIn: boolean;
   loading: boolean;
-  refresh: () => void;
+  refresh: () => Promise<void>;
   checkIn: (payload: { time: string; distanceMeters: number; status: AttendanceState; lateMinutes: number }) => Promise<void>;
   checkOut: (time: string) => Promise<void>;
   submitRequest: (request: Omit<LeaveRequest, "id" | "status">) => Promise<void>;
@@ -71,16 +71,16 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const payroll = useMemo(() => calculatePayroll(payrollInputs), [payrollInputs]);
   const role: Role = meQuery.data?.role === "manager" ? "manager" : "employee";
 
-  const invalidateAll = () => { void queryClient.invalidateQueries(); };
+  const invalidateAll = () => queryClient.invalidateQueries();
   const value = useMemo<AppDataContext>(() => ({
     role, employee, branch, shift: { name: "وردية صباحية", start: meQuery.data?.shiftStart ?? "09:00", end: meQuery.data?.shiftEnd ?? "18:00", days: "السبت — الخميس" }, records, requests, staffMembers, payrollInputs, payroll, todayRecord, checkedIn: Boolean(todayRecord?.checkIn && !todayRecord?.checkOut), loading: meQuery.isLoading || attendanceQuery.isLoading, refresh: invalidateAll,
-    checkIn: async (payload) => { await checkInMutation.mutateAsync({ date: todayKey(), time: payload.time, status: payload.status, lateMinutes: payload.lateMinutes, distanceMeters: payload.distanceMeters }); invalidateAll(); },
-    checkOut: async (time) => { await checkOutMutation.mutateAsync({ date: todayKey(), time }); invalidateAll(); },
-    submitRequest: async (request) => { await requestMutation.mutateAsync({ type: request.type, fromDate: request.from, toDate: request.to, reason: request.reason }); invalidateAll(); },
-    approveRequest: async (id, status) => { await reviewMutation.mutateAsync({ id: Number(id), status: status as "مقبول" | "مرفوض" }); invalidateAll(); },
-    createStaffAccount: async (input) => { await createStaffMutation.mutateAsync({ ...input, shiftStart: "09:00", shiftEnd: "18:00" }); invalidateAll(); },
-    updateStaffAccount: async (input) => { await updateStaffMutation.mutateAsync(input); invalidateAll(); },
-    updateBranch: async (input) => { await updateCompanyMutation.mutateAsync(input); invalidateAll(); },
+    checkIn: async (payload) => { await checkInMutation.mutateAsync({ date: todayKey(), time: payload.time, status: payload.status, lateMinutes: payload.lateMinutes, distanceMeters: payload.distanceMeters }); await invalidateAll(); },
+    checkOut: async (time) => { await checkOutMutation.mutateAsync({ date: todayKey(), time }); await invalidateAll(); },
+    submitRequest: async (request) => { await requestMutation.mutateAsync({ type: request.type, fromDate: request.from, toDate: request.to, reason: request.reason }); await invalidateAll(); },
+    approveRequest: async (id, status) => { await reviewMutation.mutateAsync({ id: Number(id), status: status as "مقبول" | "مرفوض" }); await invalidateAll(); },
+    createStaffAccount: async (input) => { await createStaffMutation.mutateAsync({ ...input, shiftStart: "09:00", shiftEnd: "18:00" }); await invalidateAll(); },
+    updateStaffAccount: async (input) => { await updateStaffMutation.mutateAsync(input); await invalidateAll(); },
+    updateBranch: async (input) => { await updateCompanyMutation.mutateAsync(input); await invalidateAll(); },
   }), [role, employee, branch, meQuery.data?.shiftStart, meQuery.data?.shiftEnd, records, requests, staffMembers, payrollInputs, payroll, todayRecord, meQuery.isLoading, attendanceQuery.isLoading, checkInMutation, checkOutMutation, requestMutation, reviewMutation, createStaffMutation, updateStaffMutation, updateCompanyMutation]);
   return <AppData.Provider value={value}>{children}</AppData.Provider>;
 }

@@ -13,9 +13,14 @@ export default function RequestsScreen() {
   const [to, setTo] = useState("2026-09-20");
   const [reason, setReason] = useState("");
 
-  function saveRequest() {
+  async function saveRequest() {
     if (!reason.trim()) { Alert.alert("بيانات ناقصة", "اكتب سبب الطلب أولًا."); return; }
-    submitRequest({ type, from, to, reason });
+    try {
+      await submitRequest({ type, from, to, reason });
+    } catch (error) {
+      Alert.alert("تعذر إرسال الطلب", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
+      return;
+    }
     setReason(""); setModalOpen(false);
     Alert.alert("تم إرسال الطلب", "سيظهر للمدير للمراجعة والاعتماد.");
   }

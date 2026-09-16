@@ -55,7 +55,7 @@ export default function HomeScreen() {
       }
       if (distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الفرع بـ ${distanceMeters} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`);
       const lateMinutes = lateMinutesFromNow();
-      checkIn({ time: currentTime(), distanceMeters, status: lateMinutes > 0 ? "متأخر" : "حاضر", lateMinutes });
+      await checkIn({ time: currentTime(), distanceMeters, status: lateMinutes > 0 ? "متأخر" : "حاضر", lateMinutes });
       setGpsMessage(isPreview ? "وضع المعاينة: تم التحقق بنجاح" : `تم التحقق من الموقع — ${distanceMeters} متر من الفرع`);
       if (Platform.OS !== "web") await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
@@ -69,7 +69,7 @@ export default function HomeScreen() {
 
   async function handleCheckOut() {
     setWorking(true);
-    checkOut(currentTime());
+    await checkOut(currentTime());
     setGpsMessage("تم تسجيل الانصراف بنجاح");
     if (Platform.OS !== "web") await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setWorking(false);
