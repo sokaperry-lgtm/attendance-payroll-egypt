@@ -2,6 +2,7 @@ export const PAYROLL_RULES = {
   dailyHours: 9,
   workDays: 26,
   paidLeaveDays: 4,
+  calendarDays: 30,
   graceMinutes: 15,
   absencePenaltyDays: 3,
 } as const;
@@ -22,13 +23,13 @@ export function calculatePayroll(inputs: PayrollInputs) {
   const allowances = inputs.allowances ?? 0;
   const bonuses = inputs.bonuses ?? 0;
   const overtimeHours = inputs.overtimeHours ?? 0;
-  const overtimeRate = inputs.overtimeRate ?? inputs.baseSalary / PAYROLL_RULES.workDays / PAYROLL_RULES.dailyHours;
+  const overtimeRate = inputs.overtimeRate ?? inputs.baseSalary / PAYROLL_RULES.calendarDays / PAYROLL_RULES.dailyHours;
   const absences = inputs.absences ?? 0;
   const lateMinutes = Math.max(0, inputs.lateMinutes ?? 0);
   const deductions = inputs.deductions ?? 0;
   const advances = inputs.advances ?? 0;
 
-  const dailyValue = inputs.baseSalary / PAYROLL_RULES.workDays;
+  const dailyValue = inputs.baseSalary / PAYROLL_RULES.calendarDays;
   const hourlyValue = dailyValue / PAYROLL_RULES.dailyHours;
   const absenceDeduction = absences * PAYROLL_RULES.absencePenaltyDays * dailyValue;
   const lateDeduction = (lateMinutes / 60) * hourlyValue;

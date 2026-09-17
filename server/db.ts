@@ -171,11 +171,11 @@ export async function listShiftTemplates() {
   const db = await getDb();
   if (!db) return [];
   const existing = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
-  if (existing.length) return existing;
-  await db.insert(shiftTemplates).values([
-    { name: "الشيفت الصباحي", startTime: "08:00", endTime: "17:00", crossesMidnight: false, active: true },
-    { name: "الشيفت المسائي", startTime: "16:00", endTime: "01:00", crossesMidnight: true, active: true },
-  ]);
+  const seed = [];
+  if (!existing.some((item) => item.kind === "shift" && item.name === "الشيفت الصباحي")) seed.push({ name: "الشيفت الصباحي", kind: "shift", startTime: "08:00", endTime: "17:00", crossesMidnight: false, active: true });
+  if (!existing.some((item) => item.kind === "shift" && item.name === "الشيفت المسائي")) seed.push({ name: "الشيفت المسائي", kind: "shift", startTime: "16:00", endTime: "01:00", crossesMidnight: true, active: true });
+  if (!existing.some((item) => item.kind === "weekly_off")) seed.push({ name: "إجازة أسبوعية", kind: "weekly_off", startTime: "00:00", endTime: "00:00", crossesMidnight: false, active: true });
+  if (seed.length) await db.insert(shiftTemplates).values(seed);
   return db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
 }
 
@@ -259,6 +259,19 @@ export async function getAttendanceById(id: number) {
   return result[0];
 }
 
+export async function updateAttendanceByManager(input: { staffAccountId: number; date: string; checkIn?: string | null; checkOut?: string | null; status: string; lateMinutes: number; distanceMeters?: number | null; note?: string | null }) {
+  return upsertAttendance({
+    staffAccountId: input.staffAccountId,
+    date: input.date,
+    checkIn: input.checkIn ?? null,
+    checkOut: input.checkOut ?? null,
+    status: input.status,
+    lateMinutes: input.lateMinutes,
+    distanceMeters: input.distanceMeters ?? null,
+    note: input.note ?? null,
+  });
+}
+
 export async function listRequests(staffAccountId?: number) {
   const db = await getDb();
   if (!db) return [];
@@ -304,7 +317,7 @@ export async function getMonthlyStaffReports(month: string) {
       active: member.active,
       ...attendanceSummary,
       ...requestSummary,
-      records: records.map((record) => ({ date: record.date, checkIn: record.checkIn, checkOut: record.checkOut, status: record.status, lateMinutes: record.lateMinutes })),
+      records: records.map((record) => ({ id: record.id, date: record.date, checkIn: record.checkIn, checkOut: record.checkOut, status: record.status, lateMinutes: record.lateMinutes })),
     };
   });
   return {

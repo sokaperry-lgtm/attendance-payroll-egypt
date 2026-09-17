@@ -57,6 +57,7 @@ export const appRouter = router({
   }),
   attendance: router({
     list: staffProcedure.query(({ ctx }) => db.listAttendance(ctx.staffUser.id)),
+    managerUpdate: managerProcedure.input(z.object({ staffAccountId: z.number().int(), date: z.string().length(10), checkIn: z.string().max(8).nullable().optional(), checkOut: z.string().max(8).nullable().optional(), status: z.enum(["حاضر", "متأخر", "غياب", "إجازة", "مأمورية"]), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0).nullable().optional(), note: z.string().max(1000).nullable().optional() })).mutation(({ input }) => db.updateAttendanceByManager(input)),
     checkIn: staffProcedure.input(z.object({ date: z.string().length(10), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0) })).mutation(({ ctx, input }) => db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status: input.status, lateMinutes: input.lateMinutes, distanceMeters: input.distanceMeters, note: null })),
     checkOut: staffProcedure.input(z.object({ date: z.string().length(10), time: z.string().max(8) })).mutation(async ({ ctx, input }) => {
       const records = await db.listAttendance(ctx.staffUser.id);

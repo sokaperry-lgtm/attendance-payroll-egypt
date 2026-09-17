@@ -76,6 +76,7 @@ export const companySettings = mysqlTable("company_settings", {
 export const shiftTemplates = mysqlTable("shift_templates", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 80 }).notNull(),
+  kind: varchar("kind", { length: 20 }).default("shift").notNull(),
   startTime: varchar("startTime", { length: 8 }).notNull(),
   endTime: varchar("endTime", { length: 8 }).notNull(),
   crossesMidnight: boolean("crossesMidnight").default(false).notNull(),

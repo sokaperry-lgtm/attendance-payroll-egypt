@@ -31,10 +31,12 @@ export default function HomeScreen() {
   const [working, setWorking] = useState(false);
   const [gpsMessage, setGpsMessage] = useState("جاهز للتحقق من موقعك");
   const isCheckedOut = Boolean(todayRecord?.checkOut);
+  const isWeeklyOff = shift.kind === "weekly_off";
   const presentDays = records.filter((record) => record.status === "حاضر" || record.status === "متأخر").length;
   const dateLabel = useMemo(() => new Intl.DateTimeFormat("ar-EG", { weekday: "long", day: "numeric", month: "long" }).format(new Date()), []);
 
   async function handleCheckIn() {
+    if (isWeeklyOff) return;
     setWorking(true);
     try {
       let distanceMeters = 120;
@@ -85,14 +87,14 @@ export default function HomeScreen() {
 
         <View style={styles.shiftCard}>
           <View style={styles.shiftTop}>
-            <View style={styles.iconBubble}><IconSymbol name="clock" size={20} color="#0E7490" /></View>
+            <View style={styles.iconBubble}><IconSymbol name={isWeeklyOff ? "calendar" : "clock"} size={20} color="#0E7490" /></View>
             <View style={styles.flex}>
               <Text style={styles.cardLabel}>وردية اليوم</Text>
               <Text style={styles.cardTitle}>{shift.name}</Text>
             </View>
-            <View style={styles.shiftTime}><Text style={styles.timeText}>{shift.start}</Text><Text style={styles.timeDash}>—</Text><Text style={styles.timeText}>{shift.end}</Text></View>
+            {isWeeklyOff ? <View style={styles.offBadge}><Text style={styles.offBadgeText}>مدفوعة</Text></View> : <View style={styles.shiftTime}><Text style={styles.timeText}>{shift.start}</Text><Text style={styles.timeDash}>—</Text><Text style={styles.timeText}>{shift.end}</Text></View>}
           </View>
-          <View style={styles.shiftMeta}><Text style={styles.metaText}>فترة السماح {PAYROLL_RULES.graceMinutes} دقيقة</Text><Text style={styles.metaText}>•</Text><Text style={styles.metaText}>الفرع الرئيسي</Text></View>
+          <View style={styles.shiftMeta}><Text style={styles.metaText}>{isWeeklyOff ? "لا توجد مواعيد — اليوم إجازة أسبوعية مدفوعة" : `فترة السماح ${PAYROLL_RULES.graceMinutes} دقيقة`}</Text>{!isWeeklyOff && <><Text style={styles.metaText}>•</Text><Text style={styles.metaText}>الفرع الرئيسي</Text></>}</View>
         </View>
 
         <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>تسجيل اليوم</Text><Text style={styles.liveDot}>● مباشر</Text></View>
@@ -102,11 +104,11 @@ export default function HomeScreen() {
             <Text style={styles.statusText}>{isCheckedOut ? "تم الانتهاء" : checkedIn ? "أنت داخل العمل" : "لم تسجل حضورك بعد"}</Text>
           </View>
           <Text style={styles.gpsText}>{gpsMessage}</Text>
-          <Pressable disabled={working || isCheckedOut} onPress={checkedIn ? handleCheckOut : handleCheckIn} style={({ pressed }) => [styles.primaryButton, (working || isCheckedOut) && styles.disabledButton, pressed && styles.pressed]}>
-            <IconSymbol name={checkedIn ? "logout" : "location"} size={20} color="#FFFFFF" />
-            <Text style={styles.primaryButtonText}>{working ? "جاري التحقق..." : isCheckedOut ? "تم تسجيل اليوم" : checkedIn ? "تسجيل الانصراف" : "تسجيل الحضور"}</Text>
+          <Pressable disabled={working || isCheckedOut || isWeeklyOff} onPress={checkedIn ? handleCheckOut : handleCheckIn} style={({ pressed }) => [styles.primaryButton, (working || isCheckedOut || isWeeklyOff) && styles.disabledButton, pressed && styles.pressed]}>
+            <IconSymbol name={isWeeklyOff ? "checkmark" : checkedIn ? "logout" : "location"} size={20} color="#FFFFFF" />
+            <Text style={styles.primaryButtonText}>{isWeeklyOff ? "إجازة أسبوعية مدفوعة" : working ? "جاري التحقق..." : isCheckedOut ? "تم تسجيل اليوم" : checkedIn ? "تسجيل الانصراف" : "تسجيل الحضور"}</Text>
           </Pressable>
-          <Text style={styles.securityNote}>يُسمح بالتسجيل داخل نطاق {branch.radiusMeters} متر من {branch.name}</Text>
+          <Text style={styles.securityNote}>{isWeeklyOff ? "لن يتم احتساب غياب أو تأخير في هذا اليوم" : `يُسمح بالتسجيل داخل نطاق ${branch.radiusMeters} متر من ${branch.name}`}</Text>
         </View>
 
         <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>ملخص الشهر</Text><Text style={styles.linkText}>سبتمبر 2026</Text></View>
@@ -137,6 +139,8 @@ const styles = StyleSheet.create({
   cardLabel: { color: "#CCFBF1", fontSize: 12, textAlign: "right" },
   cardTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "700", marginTop: 2, textAlign: "right" },
   shiftTime: { flexDirection: "row", alignItems: "center", gap: 5 },
+  offBadge: { backgroundColor: "#FEF3C7", borderRadius: 10, paddingHorizontal: 9, paddingVertical: 7 },
+  offBadgeText: { color: "#92400E", fontSize: 11, fontWeight: "800" },
   timeText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
   timeDash: { color: "#99F6E4" },
   shiftMeta: { borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.2)", marginTop: 15, paddingTop: 12, flexDirection: "row-reverse", gap: 8 },

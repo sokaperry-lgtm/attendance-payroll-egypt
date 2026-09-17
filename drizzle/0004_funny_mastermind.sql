@@ -1,0 +1,1 @@
+ALTER TABLE `shift_templates` ADD `kind` varchar(20) DEFAULT 'shift' NOT NULL;

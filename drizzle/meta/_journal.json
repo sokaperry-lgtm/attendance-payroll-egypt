@@ -29,6 +29,13 @@
       "when": 1789563542888,
       "tag": "0003_salty_bushwacker",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1789648026834,
+      "tag": "0004_funny_mastermind",
+      "breakpoints": true
     }
   ]
 }
