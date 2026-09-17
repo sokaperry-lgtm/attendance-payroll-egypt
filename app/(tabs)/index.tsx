@@ -6,6 +6,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAppData } from "@/lib/app-data";
 import { PAYROLL_RULES } from "@/lib/payroll";
+import { calculateLateMinutes } from "@/lib/shift-utils";
 import { trpc } from "@/lib/trpc";
 import { useRouter } from "expo-router";
 import * as Auth from "@/lib/_core/auth";
@@ -21,13 +22,6 @@ function distanceBetween(lat1: number, lon1: number, lat2: number, lon2: number)
 
 function currentTime() {
   return new Intl.DateTimeFormat("ar-EG", { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
-}
-
-function lateMinutesFromNow() {
-  const now = new Date();
-  const start = new Date(now);
-  start.setHours(9, 0, 0, 0);
-  return Math.max(0, Math.floor((now.getTime() - start.getTime()) / 60000) - PAYROLL_RULES.graceMinutes);
 }
 
 export default function HomeScreen() {
@@ -54,7 +48,7 @@ export default function HomeScreen() {
         distanceMeters = distanceBetween(branch.latitude, branch.longitude, position.coords.latitude, position.coords.longitude);
       }
       if (distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الفرع بـ ${distanceMeters} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`);
-      const lateMinutes = lateMinutesFromNow();
+      const lateMinutes = calculateLateMinutes(new Date(), shift.start, PAYROLL_RULES.graceMinutes);
       await checkIn({ time: currentTime(), distanceMeters, status: lateMinutes > 0 ? "متأخر" : "حاضر", lateMinutes });
       setGpsMessage(isPreview ? "وضع المعاينة: تم التحقق بنجاح" : `تم التحقق من الموقع — ${distanceMeters} متر من الفرع`);
       if (Platform.OS !== "web") await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

@@ -73,6 +73,25 @@ export const companySettings = mysqlTable("company_settings", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const shiftTemplates = mysqlTable("shift_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 80 }).notNull(),
+  startTime: varchar("startTime", { length: 8 }).notNull(),
+  endTime: varchar("endTime", { length: 8 }).notNull(),
+  crossesMidnight: boolean("crossesMidnight").default(false).notNull(),
+  active: boolean("active").default(true).notNull(),
+});
+
+export const weeklySchedules = mysqlTable("weekly_schedules", {
+  id: int("id").autoincrement().primaryKey(),
+  staffAccountId: int("staffAccountId").notNull(),
+  scheduleDate: varchar("scheduleDate", { length: 10 }).notNull(),
+  shiftTemplateId: int("shiftTemplateId").notNull(),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type StaffAccount = typeof staffAccounts.$inferSelect;
@@ -80,3 +99,5 @@ export type InsertStaffAccount = typeof staffAccounts.$inferInsert;
 export type StaffRequest = typeof staffRequests.$inferSelect;
 export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
 export type CompanySettings = typeof companySettings.$inferSelect;
+export type ShiftTemplate = typeof shiftTemplates.$inferSelect;
+export type WeeklySchedule = typeof weeklySchedules.$inferSelect;

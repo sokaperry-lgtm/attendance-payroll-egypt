@@ -9,7 +9,9 @@ export type RequestType = "إجازة" | "إذن" | "مأمورية";
 export type RequestStatus = "قيد المراجعة" | "مقبول" | "مرفوض";
 
 export type Branch = { name: string; address: string; latitude: number; longitude: number; radiusMeters: number };
-export type Shift = { name: string; start: string; end: string; days: string };
+export type Shift = { name: string; start: string; end: string; days: string; crossesMidnight?: boolean };
+export type ShiftTemplate = { id: number; name: string; startTime: string; endTime: string; crossesMidnight: boolean; active: boolean };
+export type ScheduleEntry = { id: number; staffAccountId: number; scheduleDate: string; shiftTemplateId: number; note?: string | null; shift: ShiftTemplate | null };
 export type AttendanceRecord = { id: string; date: string; checkIn?: string | null; checkOut?: string | null; status: AttendanceState; lateMinutes: number; distanceMeters?: number | null; note?: string | null };
 export type LeaveRequest = { id: string; type: RequestType; from: string; to: string; reason: string; status: RequestStatus; staffAccountId?: number };
 export type Employee = { id: string; name: string; title: string; department: string; baseSalary: number; initials: string; phone?: string; role?: Role; active?: boolean };
@@ -42,6 +44,10 @@ export type AppDataContext = {
   createStaffAccount: (input: { phone: string; password: string; name: string; title?: string; department?: string; baseSalary: number }) => Promise<void>;
   updateStaffAccount: (input: { id: number; phone?: string; password?: string; name?: string; title?: string; department?: string; baseSalary?: number; shiftStart?: string; shiftEnd?: string; active?: boolean }) => Promise<void>;
   updateBranch: (input: { name: string; address: string; latitude: string; longitude: string; radiusMeters: number }) => Promise<void>;
+  shiftTemplates: ShiftTemplate[];
+  schedules: ScheduleEntry[];
+  teamSchedules: ScheduleEntry[];
+  saveSchedule: (input: { staffAccountId: number; scheduleDate: string; shiftTemplateId: number; note?: string }) => Promise<void>;
 };
 
 const AppData = createContext<AppDataContext | null>(null);
@@ -60,20 +66,29 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const updateStaffMutation = trpc.staff.update.useMutation();
   const companyQuery = trpc.company.settings.useQuery(undefined, { enabled: Boolean(meQuery.data), retry: false });
   const updateCompanyMutation = trpc.company.updateSettings.useMutation();
+  const shiftTemplatesQuery = trpc.schedule.templates.useQuery(undefined, { enabled: Boolean(meQuery.data), retry: false });
+  const mineScheduleQuery = trpc.schedule.mine.useQuery(undefined, { enabled: Boolean(meQuery.data), retry: false });
+  const teamScheduleQuery = trpc.schedule.all.useQuery(undefined, { enabled: meQuery.data?.role === "manager", retry: false });
+  const saveScheduleMutation = trpc.schedule.save.useMutation();
 
   const employee = meQuery.data ? mapEmployee(meQuery.data) : { id: "", name: "", title: "", department: "", baseSalary: 0, initials: "" };
   const branch: Branch = companyQuery.data ? { name: companyQuery.data.name, address: companyQuery.data.address, latitude: Number(companyQuery.data.latitude), longitude: Number(companyQuery.data.longitude), radiusMeters: companyQuery.data.radiusMeters } : defaultBranch;
   const records: AttendanceRecord[] = (attendanceQuery.data ?? []).map((record) => ({ id: String(record.id), date: record.date, checkIn: record.checkIn, checkOut: record.checkOut, status: record.status as AttendanceState, lateMinutes: record.lateMinutes, distanceMeters: record.distanceMeters, note: record.note }));
   const requests: LeaveRequest[] = (requestsQuery.data ?? []).map((request) => ({ id: String(request.id), type: request.type as RequestType, from: request.fromDate, to: request.toDate, reason: request.reason, status: request.status as RequestStatus, staffAccountId: request.staffAccountId }));
   const staffMembers: Employee[] = (staffQuery.data ?? []).map((staff) => mapEmployee(staff));
+  const shiftTemplates: ShiftTemplate[] = (shiftTemplatesQuery.data ?? []).map((item) => ({ id: item.id, name: item.name, startTime: item.startTime, endTime: item.endTime, crossesMidnight: item.crossesMidnight, active: item.active }));
+  const schedules: ScheduleEntry[] = (mineScheduleQuery.data ?? []) as ScheduleEntry[];
+  const teamSchedules: ScheduleEntry[] = (teamScheduleQuery.data ?? []) as ScheduleEntry[];
   const todayRecord = records.find((record) => record.date === todayKey());
+  const todaySchedule = schedules.find((item) => item.scheduleDate === todayKey());
+  const activeShift = todaySchedule?.shift;
   const payrollInputs: PayrollInputs = useMemo(() => ({ baseSalary: employee.baseSalary, allowances: 0, bonuses: 0, overtimeHours: 0, absences: records.filter((record) => record.status === "غياب").length, lateMinutes: records.reduce((sum, record) => sum + record.lateMinutes, 0), deductions: 0, advances: 0 }), [employee.baseSalary, records]);
   const payroll = useMemo(() => calculatePayroll(payrollInputs), [payrollInputs]);
   const role: Role = meQuery.data?.role === "manager" ? "manager" : "employee";
 
   const invalidateAll = () => queryClient.invalidateQueries();
   const value = useMemo<AppDataContext>(() => ({
-    role, employee, branch, shift: { name: "وردية صباحية", start: meQuery.data?.shiftStart ?? "09:00", end: meQuery.data?.shiftEnd ?? "18:00", days: "السبت — الخميس" }, records, requests, staffMembers, payrollInputs, payroll, todayRecord, checkedIn: Boolean(todayRecord?.checkIn && !todayRecord?.checkOut), loading: meQuery.isLoading || attendanceQuery.isLoading, refresh: invalidateAll,
+    role, employee, branch, shift: { name: activeShift?.name ?? "الوردية الأساسية", start: activeShift?.startTime ?? meQuery.data?.shiftStart ?? "09:00", end: activeShift?.endTime ?? meQuery.data?.shiftEnd ?? "18:00", days: "حسب جدول الأسبوع", crossesMidnight: activeShift?.crossesMidnight }, records, requests, staffMembers, payrollInputs, payroll, todayRecord, checkedIn: Boolean(todayRecord?.checkIn && !todayRecord?.checkOut), loading: meQuery.isLoading || attendanceQuery.isLoading, refresh: invalidateAll, shiftTemplates, schedules, teamSchedules,
     checkIn: async (payload) => { await checkInMutation.mutateAsync({ date: todayKey(), time: payload.time, status: payload.status, lateMinutes: payload.lateMinutes, distanceMeters: payload.distanceMeters }); await invalidateAll(); },
     checkOut: async (time) => { await checkOutMutation.mutateAsync({ date: todayKey(), time }); await invalidateAll(); },
     submitRequest: async (request) => { await requestMutation.mutateAsync({ type: request.type, fromDate: request.from, toDate: request.to, reason: request.reason }); await invalidateAll(); },
@@ -81,7 +96,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     createStaffAccount: async (input) => { await createStaffMutation.mutateAsync({ ...input, shiftStart: "09:00", shiftEnd: "18:00" }); await invalidateAll(); },
     updateStaffAccount: async (input) => { await updateStaffMutation.mutateAsync(input); await invalidateAll(); },
     updateBranch: async (input) => { await updateCompanyMutation.mutateAsync(input); await invalidateAll(); },
-  }), [role, employee, branch, meQuery.data?.shiftStart, meQuery.data?.shiftEnd, records, requests, staffMembers, payrollInputs, payroll, todayRecord, meQuery.isLoading, attendanceQuery.isLoading, checkInMutation, checkOutMutation, requestMutation, reviewMutation, createStaffMutation, updateStaffMutation, updateCompanyMutation]);
+    saveSchedule: async (input) => { await saveScheduleMutation.mutateAsync(input); await invalidateAll(); },
+  }), [role, employee, branch, meQuery.data?.shiftStart, meQuery.data?.shiftEnd, records, requests, staffMembers, payrollInputs, payroll, todayRecord, meQuery.isLoading, attendanceQuery.isLoading, shiftTemplates, schedules, teamSchedules, activeShift, checkInMutation, checkOutMutation, requestMutation, reviewMutation, createStaffMutation, updateStaffMutation, updateCompanyMutation, saveScheduleMutation]);
   return <AppData.Provider value={value}>{children}</AppData.Provider>;
 }
 

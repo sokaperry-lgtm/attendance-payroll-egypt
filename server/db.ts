@@ -4,11 +4,13 @@ import { drizzle } from "drizzle-orm/mysql2";
 import {
   attendanceRecords,
   companySettings,
+  shiftTemplates,
   type AttendanceRecord,
   type InsertUser,
   staffAccounts,
   staffRequests,
   staffSessions,
+  weeklySchedules,
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
@@ -162,6 +164,37 @@ export async function updateCompanySettings(input: { name: string; address: stri
   if (current) await db.update(companySettings).set({ ...input, updatedAt: new Date() }).where(eq(companySettings.id, current.id));
   else await db.insert(companySettings).values(input);
   return getCompanySettings();
+}
+
+export async function listShiftTemplates() {
+  const db = await getDb();
+  if (!db) return [];
+  const existing = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
+  if (existing.length) return existing;
+  await db.insert(shiftTemplates).values([
+    { name: "الشيفت الصباحي", startTime: "08:00", endTime: "17:00", crossesMidnight: false, active: true },
+    { name: "الشيفت المسائي", startTime: "16:00", endTime: "01:00", crossesMidnight: true, active: true },
+  ]);
+  return db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
+}
+
+export async function listSchedules(staffAccountId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = staffAccountId === undefined
+    ? await db.select().from(weeklySchedules).orderBy(weeklySchedules.scheduleDate)
+    : await db.select().from(weeklySchedules).where(eq(weeklySchedules.staffAccountId, staffAccountId)).orderBy(weeklySchedules.scheduleDate);
+  const shifts = await listShiftTemplates();
+  return rows.map((row) => ({ ...row, shift: shifts.find((item) => item.id === row.shiftTemplateId) ?? null }));
+}
+
+export async function saveSchedule(input: { staffAccountId: number; scheduleDate: string; shiftTemplateId: number; note?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await db.select().from(weeklySchedules).where(and(eq(weeklySchedules.staffAccountId, input.staffAccountId), eq(weeklySchedules.scheduleDate, input.scheduleDate))).limit(1);
+  if (existing[0]) await db.update(weeklySchedules).set({ shiftTemplateId: input.shiftTemplateId, note: input.note ?? null, updatedAt: new Date() }).where(eq(weeklySchedules.id, existing[0].id));
+  else await db.insert(weeklySchedules).values({ ...input, note: input.note ?? null });
+  return listSchedules(input.staffAccountId);
 }
 
 export async function authenticateStaff(phone: string, password: string) {

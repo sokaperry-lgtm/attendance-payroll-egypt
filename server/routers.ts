@@ -49,6 +49,12 @@ export const appRouter = router({
     settings: staffProcedure.query(async () => (await db.getCompanySettings()) ?? { id: 0, name: "الفرع الرئيسي", address: "مدينة نصر، القاهرة", latitude: "30.0444", longitude: "31.2357", radiusMeters: 200 }),
     updateSettings: managerProcedure.input(z.object({ name: z.string().min(2).max(160), address: z.string().min(2).max(255), latitude: z.string().max(32), longitude: z.string().max(32), radiusMeters: z.number().int().min(50).max(5000) })).mutation(({ input }) => db.updateCompanySettings(input)),
   }),
+  schedule: router({
+    templates: staffProcedure.query(() => db.listShiftTemplates()),
+    mine: staffProcedure.query(({ ctx }) => db.listSchedules(ctx.staffUser.id)),
+    all: managerProcedure.query(() => db.listSchedules()),
+    save: managerProcedure.input(z.object({ staffAccountId: z.number().int(), scheduleDate: z.string().length(10), shiftTemplateId: z.number().int(), note: z.string().max(255).optional() })).mutation(({ input }) => db.saveSchedule(input)),
+  }),
   attendance: router({
     list: staffProcedure.query(({ ctx }) => db.listAttendance(ctx.staffUser.id)),
     checkIn: staffProcedure.input(z.object({ date: z.string().length(10), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0) })).mutation(({ ctx, input }) => db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status: input.status, lateMinutes: input.lateMinutes, distanceMeters: input.distanceMeters, note: null })),
