@@ -2,6 +2,8 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
+import fs from "fs";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
@@ -70,12 +72,34 @@ async function startServer() {
     }),
   );
 
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
-
-  if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+  // Serve the exported web build (from `expo export -p web`) so the whole
+  // app (API + frontend) runs as a single service. The build lives at
+  // <repo root>/dist-web. We resolve it from the current working directory
+  // (not __dirname) because __dirname differs between `tsx` (dev, runs the
+  // TS source in server/_core) and the esbuild bundle (prod, runs from
+  // dist/index.js) — process.cwd() is the repo root in both cases since
+  // that's where `npm run dev` / `npm start` are invoked from.
+  const webBuildDir = path.resolve(process.cwd(), "dist-web");
+  if (fs.existsSync(webBuildDir)) {
+    app.use(express.static(webBuildDir, { extensions: ["html"] }));
+    app.get(/^(?!\/api).*/, (_req, res) => {
+      const notFoundPath = path.join(webBuildDir, "+not-found.html");
+      const indexPath = path.join(webBuildDir, "index.html");
+      res.sendFile(fs.existsSync(notFoundPath) ? notFoundPath : indexPath);
+    });
+  } else {
+    console.warn(
+      `[web] dist-web not found at ${webBuildDir} — only the API will be served. Run "npm run build:web" to generate it.`,
+    );
   }
+
+  const preferredPort = parseInt(process.env.PORT || "3000");
+  // In production (Railway, etc.) the platform tells us the exact port it
+  // will route traffic to — we must bind that port directly, never fall
+  // back to a different one or the platform's proxy won't find us.
+  const port = process.env.NODE_ENV === "production"
+    ? preferredPort
+    : await findAvailablePort(preferredPort);
 
   server.listen(port, () => {
     console.log(`[api] server listening on port ${port}`);
