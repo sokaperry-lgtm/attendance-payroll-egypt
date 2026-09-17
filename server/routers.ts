@@ -70,6 +70,9 @@ export const appRouter = router({
     create: staffProcedure.input(z.object({ type: z.string().max(32), fromDate: z.string().length(10), toDate: z.string().length(10), reason: z.string().min(2).max(1000) })).mutation(({ ctx, input }) => db.createRequest({ ...input, staffAccountId: ctx.staffUser.id })),
     review: managerProcedure.input(z.object({ id: z.number().int(), status: z.enum(["مقبول", "مرفوض"]) })).mutation(({ ctx, input }) => db.approveRequest(input.id, ctx.staffUser.id, input.status)),
   }),
+  reports: router({
+    month: managerProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(({ input }) => db.getMonthlyStaffReports(input.month)),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

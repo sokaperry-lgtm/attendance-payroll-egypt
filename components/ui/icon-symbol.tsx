@@ -23,6 +23,8 @@ const MAPPING = {
   logout: "logout",
   edit: "edit",
   plus: "add",
+  "chart.bar.fill": "bar-chart",
+  info: "info-outline",
 } as IconMapping;
 
 export function IconSymbol({

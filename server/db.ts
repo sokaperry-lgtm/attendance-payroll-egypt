@@ -14,6 +14,7 @@ import {
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { summarizeAttendance, summarizeRequests } from "../lib/report-utils";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -278,6 +279,45 @@ export async function approveRequest(id: number, managerId: number, status: "Ù…Ù
   if (!db) throw new Error("Database not available");
   await db.update(staffRequests).set({ status, reviewedBy: managerId, reviewedAt: new Date() }).where(eq(staffRequests.id, id));
   return getRequestById(id);
+}
+
+export async function getMonthlyStaffReports(month: string) {
+  const db = await getDb();
+  if (!db) return { month, employees: [], summary: { staffCount: 0, presentDays: 0, absentDays: 0, lateMinutes: 0, pendingRequests: 0 } };
+  const [staff, attendance, requests] = await Promise.all([
+    listStaffAccounts(),
+    db.select().from(attendanceRecords),
+    db.select().from(staffRequests),
+  ]);
+  const employees = staff.filter((member) => member.role === "employee").map((member) => {
+    const records = attendance.filter((record) => record.staffAccountId === member.id && record.date.startsWith(month));
+    const memberRequests = requests.filter((request) => request.staffAccountId === member.id && (request.fromDate.startsWith(month) || request.toDate.startsWith(month)));
+    const attendanceSummary = summarizeAttendance(records);
+    const requestSummary = summarizeRequests(memberRequests);
+    return {
+      id: member.id,
+      name: member.name,
+      phone: member.phone,
+      title: member.title,
+      department: member.department,
+      baseSalary: member.baseSalary,
+      active: member.active,
+      ...attendanceSummary,
+      ...requestSummary,
+      records: records.map((record) => ({ date: record.date, checkIn: record.checkIn, checkOut: record.checkOut, status: record.status, lateMinutes: record.lateMinutes })),
+    };
+  });
+  return {
+    month,
+    employees,
+    summary: {
+      staffCount: employees.length,
+      presentDays: employees.reduce((sum, member) => sum + member.presentDays, 0),
+      absentDays: employees.reduce((sum, member) => sum + member.absentDays, 0),
+      lateMinutes: employees.reduce((sum, member) => sum + member.lateMinutes, 0),
+      pendingRequests: employees.reduce((sum, member) => sum + member.pendingRequests, 0),
+    },
+  };
 }
 
 async function getRequestById(id: number) {
