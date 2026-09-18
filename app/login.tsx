@@ -37,7 +37,10 @@ export default function LoginScreen() {
       // Persist the staff session on both web and native. Web requests also
       // send this token as a Bearer header, so login survives cookie quirks.
       await Auth.setSessionToken(result.token);
-      await utils.auth.me.invalidate();
+      // Seed the auth gate immediately with the authenticated staff returned by login.
+      // This prevents a stale cached `auth.me = null` query from redirecting us back to login.
+      utils.auth.me.setData(undefined, result.staff as any);
+      await utils.auth.me.refetch();
       router.replace("/(tabs)");
     } catch (error) {
       showAlert("تعذر الدخول", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
