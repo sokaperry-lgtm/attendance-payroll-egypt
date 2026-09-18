@@ -42,7 +42,7 @@ export async function getCompanyForStaff(staffAccountId: number) {
   return membership;
 }
 
-export async function listCompanyBranches(staffAccountId: number) {
+export async function getBranchForStaff(staffAccountId: number) { const db = await getDb(); if (!db) return undefined; const m = await getCompanyForStaff(staffAccountId); if (!m?.branchId) return undefined; return (await db.select().from(branches).where(eq(branches.id,m.branchId)).limit(1))[0]; }\n\nexport async function listCompanyBranches(staffAccountId: number) {
   const db = await getDb(); if (!db) return [];
   const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
   return db.select().from(branches).where(eq(branches.companyId, m.companyId)).orderBy(desc(branches.createdAt));
