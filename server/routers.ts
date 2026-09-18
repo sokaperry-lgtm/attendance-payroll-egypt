@@ -18,6 +18,7 @@ export const appRouter = router({
     setupManager: publicProcedure.input(z.object({ phone: z.string().min(3).max(32), password: z.string().min(6).max(120), name: z.string().min(2).max(160) })).mutation(async ({ ctx, input }) => {
       if ((await db.countStaffAccounts()) > 0) throw new Error("تم إعداد حساب المدير بالفعل.");
       const staff = await db.createStaffAccount({ ...input, role: "manager", title: "مدير الشركة" });
+      if (staff) await enterprise.ensureCompanyForStaff(staff.id, "الشركة الرئيسية");
       const token = await db.createStaffSession(staff!.id);
       ctx.res.cookie(INTERNAL_SESSION_COOKIE, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
       return { token, staff: staffView(staff) };
@@ -28,7 +29,8 @@ export const appRouter = router({
     login: publicProcedure.input(loginInput).mutation(async ({ ctx, input }) => {
       const staff = await db.authenticateStaff(input.phone, input.password);
       if (!staff) throw new Error("رقم الهاتف أو كلمة المرور غير صحيحة.");
-      await enterprise.ensureCompanyForStaff(staff.id);\n      const token = await db.createStaffSession(staff.id);
+      await enterprise.ensureCompanyForStaff(staff.id);
+      const token = await db.createStaffSession(staff.id);
       ctx.res.cookie(INTERNAL_SESSION_COOKIE, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
       return { token, staff: staffView(staff) };
     }),
