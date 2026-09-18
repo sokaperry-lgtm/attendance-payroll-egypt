@@ -1,8 +1,8 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "./db";
 import { calculateEgyptPayroll } from "./egypt-payroll";
 import {
-  companies, branches, companyMembers, departments, leaveBalances,
+  companies, branches, companyMembers, leaveBalances,
   payrollRecords, notifications, subscriptions, auditLogs, staffAccounts,
   attendanceRecords, staffRequests
 } from "../drizzle/schema";
@@ -43,7 +43,12 @@ export async function getCompanyForStaff(staffAccountId: number) {
   return membership;
 }
 
-export async function getBranchForStaff(staffAccountId: number) { const db = await getDb(); if (!db) return undefined; const m = await getCompanyForStaff(staffAccountId); if (!m?.branchId) return undefined; return (await db.select().from(branches).where(eq(branches.id,m.branchId)).limit(1))[0]; }
+export async function getBranchForStaff(staffAccountId: number) {
+  const db = await getDb(); if (!db) return undefined;
+  const m = await getCompanyForStaff(staffAccountId);
+  if (!m?.branchId) return undefined;
+  return (await db.select().from(branches).where(eq(branches.id, m.branchId)).limit(1))[0];
+}
 
 export async function listCompanyBranches(staffAccountId: number) {
   const db = await getDb(); if (!db) return [];
@@ -136,10 +141,9 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const lateDeduction=Math.round((s.baseSalary/30/8/60)*lateMinutes);
     const absenceDeduction=Math.round((s.baseSalary/30)*absences);
     const gross=s.baseSalary;
-    const net=Math.max(0,gross-lateDeduction-absenceDeduction);
     const existing=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.staffAccountId,s.id),eq(payrollRecords.month,month))).limit(1))[0];
     const egypt = calculateEgyptPayroll({ monthlyGross: gross, employeeSocialInsurance: 0, monthlyOtherDeductions: 0 });
-    const net = Math.max(0, egypt.net - absenceDeduction - lateDeduction);
+    const net=Math.max(0, egypt.net-absenceDeduction-lateDeduction);
     const values={companyId:m.companyId,staffAccountId:s.id,month,baseSalary:s.baseSalary,allowances:0,bonuses:0,overtime:0,absenceDeduction,lateDeduction,otherDeductions:0,advances:0,employeeSocialInsurance:egypt.employeeSocialInsurance,employeeIncomeTax:egypt.employeeIncomeTax,grossSalary:gross,netSalary:net,status:"draft"};
     if(existing) await db.update(payrollRecords).set({...values,updatedAt:new Date()}).where(eq(payrollRecords.id,existing.id));
     else await db.insert(payrollRecords).values(values);
@@ -192,7 +196,6 @@ export async function updateBranchForStaff(staffAccountId:number,input:{name:str
   return getBranchForStaff(staffAccountId);
 }
 
-
 export async function listCompanyRequests(staffAccountId:number) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
@@ -221,8 +224,8 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
 }
 
 export function toCsv(rows: Array<Record<string, unknown>>) {
-  if (!rows.length) return "";
+  if(!rows.length) return "";
   const headers=Object.keys(rows[0]);
   const escape=(value:unknown)=>`"${String(value??"").replace(/"/g,'""')}"`;
-  return [headers.map(escape).join(","),...rows.map(row=>headers.map(h=>escape(row[h])).join(","))].join("\n");
+  return [headers.map(escape).join(","),...rows.map(row=>headers.map(h=>escape(row[h])).join("\n"))].join("\n");
 }
