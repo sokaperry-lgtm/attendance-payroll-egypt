@@ -3,7 +3,7 @@ name: Premium HR Preview
 on:
   push:
     branches:
-      - premium-hr-redesign
+      - main
   workflow_dispatch:
 
 permissions:
