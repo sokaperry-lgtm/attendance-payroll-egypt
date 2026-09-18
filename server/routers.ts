@@ -99,22 +99,22 @@ export const appRouter = router({
   reports: router({
     month: managerProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(({ input }) => db.getMonthlyStaffReports(input.month)),
   }),
-});
-
   audit: router({
     list: companyAdminProcedure.query(({ ctx }) => enterprise.listAuditLogs(ctx.staffUser.id)),
   }),
   selfService: router({
-    me: staffProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).query(({ ctx, input }) => enterprise.getEmployeeSelfService(ctx.staffUser.id, input.month)),
+    me: staffProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(({ ctx, input }) => enterprise.getEmployeeSelfService(ctx.staffUser.id, input.month)),
   }),
   exports: router({
-    attendanceCsv: managerProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).query(async ({ input }) => {
+    attendanceCsv: managerProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ input }) => {
       const report = await db.getMonthlyStaffReports(input.month);
       return enterprise.toCsv(report.employees.flatMap((e:any) => e.records.map((r:any) => ({ employee:e.name, date:r.date, checkIn:r.checkIn, checkOut:r.checkOut, status:r.status, lateMinutes:r.lateMinutes }))));
     }),
-    payrollCsv: companyAdminProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).query(async ({ ctx, input }) => {
+    payrollCsv: companyAdminProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ ctx, input }) => {
       const rows = await enterprise.getPayroll(ctx.staffUser.id, input.month);
       return enterprise.toCsv(rows.map((r:any) => ({ staffAccountId:r.staffAccountId, month:r.month, baseSalary:r.baseSalary, socialInsurance:r.employeeSocialInsurance, incomeTax:r.employeeIncomeTax, absenceDeduction:r.absenceDeduction, lateDeduction:r.lateDeduction, netSalary:r.netSalary, status:r.status })));
     }),
   }),
+});
+
 export type AppRouter = typeof appRouter;
