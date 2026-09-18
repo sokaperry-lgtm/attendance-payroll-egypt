@@ -193,6 +193,16 @@ export async function updateBranchForStaff(staffAccountId:number,input:{name:str
 }
 
 
+export async function listCompanyRequests(staffAccountId:number) {
+  const db=await getDb(); if(!db) return [];
+  const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
+  const members=await db.select({staffAccountId:companyMembers.staffAccountId}).from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
+  const ids=members.map(x=>x.staffAccountId);
+  if(!ids.length) return [];
+  const rows=await db.select().from(staffRequests).orderBy(desc(staffRequests.createdAt));
+  return rows.filter(r=>ids.includes(r.staffAccountId));
+}
+
 export async function listAuditLogs(staffAccountId:number, limit=100) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
