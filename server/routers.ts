@@ -2,7 +2,8 @@ import { z } from "zod";
 import { parse as parseCookieHeader } from "cookie";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { INTERNAL_SESSION_COOKIE } from "../shared/const";
-import { managerProcedure, publicProcedure, router, staffProcedure } from "./_core/trpc";
+import { companyAdminProcedure, managerProcedure, publicProcedure, router, staffProcedure } from "./_core/trpc";
+import * as enterprise from "./enterprise";
 import * as db from "./db";
 
 const loginInput = z.object({ phone: z.string().min(3).max(32), password: z.string().min(4).max(120) });
@@ -27,7 +28,7 @@ export const appRouter = router({
     login: publicProcedure.input(loginInput).mutation(async ({ ctx, input }) => {
       const staff = await db.authenticateStaff(input.phone, input.password);
       if (!staff) throw new Error("رقم الهاتف أو كلمة المرور غير صحيحة.");
-      const token = await db.createStaffSession(staff.id);
+      await enterprise.ensureCompanyForStaff(staff.id);\n      const token = await db.createStaffSession(staff.id);
       ctx.res.cookie(INTERNAL_SESSION_COOKIE, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
       return { token, staff: staffView(staff) };
     }),
@@ -42,7 +43,7 @@ export const appRouter = router({
   }),
   staff: router({
     list: managerProcedure.query(async () => (await db.listStaffAccounts()).map((item) => ({ ...item }))),
-    create: managerProcedure.input(z.object({ phone: z.string().min(3).max(32), password: z.string().min(6).max(120), name: z.string().min(2).max(160), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).default(0), shiftStart: z.string().max(8).default("09:00"), shiftEnd: z.string().max(8).default("18:00") })).mutation(async ({ input }) => staffView(await db.createStaffAccount({ ...input, role: "employee" }))),
+    create: managerProcedure.input(z.object({ phone: z.string().min(3).max(32), password: z.string().min(6).max(120), name: z.string().min(2).max(160), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).default(0), shiftStart: z.string().max(8).default("09:00"), shiftEnd: z.string().max(8).default("18:00") })).mutation(async ({ ctx, input }) => { const staff = await db.createStaffAccount({ ...input, role: "employee" }); if (staff) { const actor = await enterprise.getCompanyForStaff(ctx.staffUser.id); if (actor) { const m = await enterprise.getMembership(staff.id); if (!m) { const dbx = await db.getDb(); if (dbx) { const { companyMembers } = await import("../drizzle/schema"); await dbx.insert(companyMembers).values({ companyId: actor.companyId, branchId: actor.branchId, staffAccountId: staff.id, role: "employee" }); } } await enterprise.createNotification(staff.id, "welcome", "مرحبًا بك في الشركة", "تم إنشاء حسابك ويمكنك الآن تسجيل الدخول."); } } return staffView(staff); }),
     update: managerProcedure.input(z.object({ id: z.number().int(), phone: z.string().min(3).max(32).optional(), password: z.string().min(6).max(120).optional(), name: z.string().min(2).max(160).optional(), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).optional(), shiftStart: z.string().max(8).optional(), shiftEnd: z.string().max(8).optional(), active: z.boolean().optional() })).mutation(async ({ input }) => { const { id, ...changes } = input; return staffView(await db.updateStaffAccount(id, changes)); }),
   }),
   company: router({
@@ -69,7 +70,27 @@ export const appRouter = router({
   requests: router({
     list: staffProcedure.query(({ ctx }) => db.listRequests(ctx.staffUser.role === "manager" ? undefined : ctx.staffUser.id)),
     create: staffProcedure.input(z.object({ type: z.string().max(32), fromDate: z.string().length(10), toDate: z.string().length(10), reason: z.string().min(2).max(1000) })).mutation(({ ctx, input }) => db.createRequest({ ...input, staffAccountId: ctx.staffUser.id })),
-    review: managerProcedure.input(z.object({ id: z.number().int(), status: z.enum(["مقبول", "مرفوض"]) })).mutation(({ ctx, input }) => db.approveRequest(input.id, ctx.staffUser.id, input.status)),
+    review: managerProcedure.input(z.object({ id: z.number().int(), status: z.enum(["مقبول", "مرفوض"]) })).mutation(async ({ ctx, input }) => { const row = await db.approveRequest(input.id, ctx.staffUser.id, input.status); if (row) await enterprise.createNotification(row.staffAccountId, "request", `تم تحديث طلبك`, `حالة الطلب أصبحت: ${input.status}`); return row; }),
+  }),
+  leave: router({
+    balance: staffProcedure.input(z.object({ year: z.number().int().min(2024).max(2100) })).query(({ ctx, input }) => enterprise.getLeaveBalance(ctx.staffUser.id, input.year)),
+  }),
+  payroll: router({
+    list: companyAdminProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).query(({ ctx, input }) => enterprise.getPayroll(ctx.staffUser.id, input.month)),
+    generate: companyAdminProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).mutation(({ ctx, input }) => enterprise.generatePayroll(ctx.staffUser.id, input.month)),
+    approve: companyAdminProcedure.input(z.object({ id: z.number().int() })).mutation(({ ctx, input }) => enterprise.approvePayroll(ctx.staffUser.id, input.id)),
+  }),
+  notifications: router({
+    list: staffProcedure.query(({ ctx }) => enterprise.listNotifications(ctx.staffUser.id)),
+    read: staffProcedure.input(z.object({ id: z.number().int() })).mutation(({ ctx, input }) => enterprise.markNotificationRead(ctx.staffUser.id, input.id)),
+  }),
+  companyAdmin: router({
+    branches: companyAdminProcedure.query(({ ctx }) => enterprise.listCompanyBranches(ctx.staffUser.id)),
+    createBranch: companyAdminProcedure.input(z.object({ name:z.string().min(2), address:z.string().min(2), latitude:z.string(), longitude:z.string(), radiusMeters:z.number().int().min(50).max(5000) })).mutation(({ ctx, input }) => enterprise.createBranch(ctx.staffUser.id,input)),
+    role: managerProcedure.input(z.object({ staffAccountId:z.number().int(), role:z.enum(["owner","hr","manager","accountant","employee"]) })).mutation(({ ctx,input }) => enterprise.setMemberRole(ctx.staffUser.id,input.staffAccountId,input.role)),
+    subscription: staffProcedure.query(({ ctx }) => enterprise.getSubscription(ctx.staffUser.id)),
+    changePlan: managerProcedure.input(z.object({ plan:z.enum(["trial","starter","growth","scale"]) })).mutation(({ ctx,input }) => enterprise.updateSubscription(ctx.staffUser.id,input.plan)),
+    security: staffProcedure.query(({ ctx }) => enterprise.getSecuritySummary(ctx.staffUser.id)),
   }),
   reports: router({
     month: managerProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(({ input }) => db.getMonthlyStaffReports(input.month)),
