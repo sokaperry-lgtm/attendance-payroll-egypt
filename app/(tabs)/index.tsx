@@ -278,8 +278,8 @@ export default function HomeScreen() {
         <View style={styles.analyticsRow}>
           <View style={styles.chartCard}>
             <View style={styles.cardHeader}>
-              <View><Text style={styles.cardTitle}>اتجاه الحضور</Text><Text style={styles.cardSubtitle}>آخر 7 أيام</Text></View>
-              <View style={styles.chartLegend}><View style={styles.legendDot} /><Text style={styles.legendText}>حضور</Text></View>
+              <View><Text style={styles.cardTitle}>أداء الحضور</Text><Text style={styles.cardSubtitle}>معدل الالتزام خلال آخر 7 أيام</Text></View>
+              <View style={styles.periodPill}><Text style={styles.periodText}>هذا الأسبوع</Text><IconSymbol name="chevron.down" size={14} color="#64748B" /></View>
             </View>
             <View style={styles.chartArea}>
               <View style={styles.gridLine} /><View style={[styles.gridLine, { top: "33%" }]} /><View style={[styles.gridLine, { top: "66%" }]} />
@@ -392,13 +392,13 @@ const styles = StyleSheet.create({
   subtitle: { color: "#64748B", fontSize: 13, marginTop: 5, textAlign: "right" },
   avatar: { width: 50, height: 50, borderRadius: 17, backgroundColor: "#1D4ED8", alignItems: "center", justifyContent: "center", marginLeft: 14 },
   avatarText: { color: "#FFF", fontWeight: "800", fontSize: 16 },
-  hero: { backgroundColor: "#0F172A", borderRadius: 24, padding: 20, overflow: "hidden", shadowColor: "#0F172A", shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 5 },
+  hero: { backgroundColor: "#0B1220", borderRadius: 28, padding: 24, overflow: "hidden", shadowColor: "#0F172A", shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 5 },
   heroGlow: { position: "absolute", width: 210, height: 210, borderRadius: 105, backgroundColor: "#1D4ED8", opacity: 0.35, top: -100, left: -50 },
   heroTop: { flexDirection: "row-reverse", alignItems: "center", gap: 13 },
   heroIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: "#DBEAFE", alignItems: "center", justifyContent: "center" },
   heroCopy: { flex: 1 },
   heroEyebrow: { color: "#93C5FD", fontSize: 11, textAlign: "right" },
-  heroTitle: { color: "#FFF", fontSize: 19, fontWeight: "800", marginTop: 2, textAlign: "right" },
+  heroTitle: { color: "#FFF", fontSize: 25, fontWeight: "800", marginTop: 2, textAlign: "right" },
   heroMeta: { color: "#CBD5E1", fontSize: 12, marginTop: 4, textAlign: "right" },
   heroTime: { alignItems: "flex-end" },
   heroTimeLabel: { color: "#94A3B8", fontSize: 10 },
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#10B981" },
   liveText: { color: "#047857", fontSize: 10, fontWeight: "800" },
   kpiGrid: { flexDirection: "row-reverse", gap: 10 },
-  kpiCard: { flex: 1, backgroundColor: "#FFF", borderRadius: 19, padding: 15, minHeight: 128, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOpacity: 0.03, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
+  kpiCard: { flex: 1, backgroundColor: "#FFF", borderRadius: 20, padding: 17, minHeight: 140, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOpacity: 0.03, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
   kpiIcon: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center", marginBottom: 10 },
   kpiValue: { color: "#0F172A", fontSize: 21, fontWeight: "800", textAlign: "right" },
   kpiLabel: { color: "#64748B", fontSize: 11, marginTop: 3, textAlign: "right" },
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
   chartLegend: { flexDirection: "row-reverse", alignItems: "center", gap: 5 },
   legendDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#2563EB" },
   legendText: { color: "#64748B", fontSize: 9 },
-  chartArea: { height: 190, marginTop: 15, position: "relative" },
+  chartArea: { height: 215, marginTop: 10, position: "relative" },\n  chartLabels: { position: "absolute", left: 22, right: 22, bottom: 0, flexDirection: "row-reverse", justifyContent: "space-between" },\n  chartLabel: { color: "#94A3B8", fontSize: 9 },\n  periodPill: { flexDirection: "row-reverse", alignItems: "center", gap: 5, borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 9, paddingHorizontal: 8, paddingVertical: 6 },\n  periodText: { color: "#64748B", fontSize: 9 },
   gridLine: { position: "absolute", left: 0, right: 0, top: "0%", borderTopWidth: 1, borderTopColor: "#F1F5F9" },
   bars: { flex: 1, flexDirection: "row-reverse", alignItems: "flex-end", justifyContent: "space-around", paddingTop: 8 },
   barColumn: { height: "100%", alignItems: "center", justifyContent: "flex-end", flex: 1 },
