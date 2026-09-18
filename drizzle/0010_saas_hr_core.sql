@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_audit_company (companyId, createdAt)
 );
-INSERT INTO companies (name, address) SELECT 'الشركة الرئيسية', 'القاهرة' FROM (SELECT 1) x WHERE NOT EXISTS (SELECT 1 FROM companies);
+INSERT INTO companies (name) SELECT 'الشركة الرئيسية' FROM (SELECT 1) x WHERE NOT EXISTS (SELECT 1 FROM companies);
 INSERT INTO branches (companyId,name,address,latitude,longitude,radiusMeters)
 SELECT c.id,'الفرع الرئيسي','مدينة نصر، القاهرة','30.0444','31.2357',200 FROM companies c
 WHERE c.id = (SELECT MIN(id) FROM companies)
