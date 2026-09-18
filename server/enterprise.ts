@@ -180,3 +180,11 @@ export async function consumeAnnualLeave(staffAccountId:number, fromDate:string,
   if(balance.annualDays-balance.annualUsed < days) throw new Error("رصيد الإجازات السنوية غير كافٍ.");
   await db.update(leaveBalances).set({annualUsed:balance.annualUsed+days,updatedAt:new Date()}).where(eq(leaveBalances.id,balance.id));
 }
+
+export async function updateBranchForStaff(staffAccountId:number,input:{name:string;address:string;latitude:string;longitude:string;radiusMeters:number}) {
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const m=await getCompanyForStaff(staffAccountId); if(!m || !["owner","hr","manager"].includes(m.role)) throw new Error("غير مصرح");
+  if(!m.branchId) throw new Error("الفرع غير مرتبط بالحساب");
+  await db.update(branches).set({...input,updatedAt:new Date()}).where(and(eq(branches.id,m.branchId),eq(branches.companyId,m.companyId)));
+  return getBranchForStaff(staffAccountId);
+}
