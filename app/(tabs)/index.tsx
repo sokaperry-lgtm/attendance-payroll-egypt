@@ -411,6 +411,8 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        <View style={styles.quickActions}><Pressable onPress={() => router.push("/attendance" as never)} style={styles.quickAction}><View style={styles.quickActionIcon}><IconSymbol name="calendar" size={18} color="#2563EB" /></View><Text style={styles.quickActionText}>سجل الحضور</Text></Pressable><Pressable onPress={() => router.push("/schedule" as never)} style={styles.quickAction}><View style={styles.quickActionIcon}><IconSymbol name="clock" size={18} color="#2563EB" /></View><Text style={styles.quickActionText}>الورديات</Text></Pressable><Pressable onPress={() => router.push("/requests" as never)} style={styles.quickAction}><View style={styles.quickActionIcon}><IconSymbol name="doc.text" size={18} color="#2563EB" /></View><Text style={styles.quickActionText}>الطلبات</Text></Pressable></View>
+
         <View style={styles.notice}>
           <IconSymbol name="wallet" size={20} color="#B45309" />
           <Text style={styles.noticeText}>
