@@ -4,11 +4,13 @@ import { showAlert } from "@/lib/alert";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAppData, type RequestType } from "@/lib/app-data";
+import { trpc } from "@/lib/trpc";
 
 const requestPalette: Record<string, { bg: string; text: string }> = { "قيد المراجعة": { bg: "#FEF3C7", text: "#92400E" }, مقبول: { bg: "#DCFCE7", text: "#166534" }, مرفوض: { bg: "#FEE2E2", text: "#991B1B" } };
 
 export default function RequestsScreen() {
   const { requests, submitRequest } = useAppData();
+  const leaveBalance = trpc.leave.balance.useQuery({year:new Date().getFullYear()});
   const [modalOpen, setModalOpen] = useState(false);
   const [type, setType] = useState<RequestType>("إجازة");
   const [from, setFrom] = useState("2026-09-20");
@@ -35,7 +37,7 @@ export default function RequestsScreen() {
       <View style={styles.requestsHeroCopy}><Text style={styles.requestsHeroTitle}>مركز الطلبات</Text><Text style={styles.requestsHeroText}>قدّم طلبك وتابع حالته من مكان واحد.</Text></View>
       <View style={styles.requestsHeroBadge}><Text style={styles.requestsHeroNumber}>{requests.length}</Text><Text style={styles.requestsHeroLabel}>طلبات</Text></View>
     </View>
-    <View style={styles.info}><Text style={styles.infoTitle}>رصيد الإجازات المدفوعة</Text><Text style={styles.infoValue}>4 <Text style={styles.infoUnit}>أيام متاحة</Text></Text><Text style={styles.infoHint}>حسب سياسة الشركة: 26 يوم عمل + 4 أيام إجازة مدفوعة</Text></View>
+    <View style={styles.info}><Text style={styles.infoTitle}>رصيد الإجازات المدفوعة</Text><Text style={styles.infoValue}>{Math.max(0,(leaveBalance.data?.annualDays??21)-(leaveBalance.data?.annualUsed??0))} <Text style={styles.infoUnit}>أيام متاحة</Text></Text><Text style={styles.infoHint}>الرصيد السنوي المتاح حسب سياسة الشركة.</Text></View>
     <Text style={styles.sectionTitle}>طلباتك السابقة</Text>
     {requests.map((request) => { const palette = requestPalette[request.status] ?? requestPalette["قيد المراجعة"]; return <Pressable key={request.id} onPress={() => setSelectedRequest(request)} style={styles.requestCard}><View style={styles.requestTop}><View style={[styles.statusBadge, { backgroundColor: palette.bg }]}><Text style={[styles.statusText, { color: palette.text }]}>{request.status}</Text></View><Text style={styles.requestType}>{request.type}</Text></View><Text style={styles.requestDates}>{request.from} {request.to !== request.from ? `— ${request.to}` : ""}</Text><Text style={styles.reason}>{request.reason}</Text></Pressable>; })}
     {requests.length === 0 && <Text style={styles.empty}>لم ترسل أي طلبات بعد.</Text>}
