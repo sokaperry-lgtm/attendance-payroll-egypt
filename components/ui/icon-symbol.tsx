@@ -27,6 +27,12 @@ const MAPPING = {
   plus: "add",
   "chart.bar.fill": "bar-chart",
   info: "info-outline",
+  "chart.bar": "bar-chart",
+  "doc.text": "description",
+  sparkles: "auto-awesome",
+  notifications: "notifications-none",
+  history: "history",
+  login: "login",
 } as IconMapping;
 
 export function IconSymbol({
