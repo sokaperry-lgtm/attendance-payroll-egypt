@@ -51,8 +51,8 @@ export const appRouter = router({
     update: managerProcedure.input(z.object({ id: z.number().int(), phone: z.string().min(3).max(32).optional(), password: z.string().min(6).max(120).optional(), name: z.string().min(2).max(160).optional(), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).optional(), shiftStart: z.string().max(8).optional(), shiftEnd: z.string().max(8).optional(), active: z.boolean().optional() })).mutation(async ({ input }) => { const { id, ...changes } = input; return staffView(await db.updateStaffAccount(id, changes)); }),
   }),
   company: router({
-    settings: staffProcedure.query(async () => (await db.getCompanySettings()) ?? { id: 0, name: "الفرع الرئيسي", address: "مدينة نصر، القاهرة", latitude: "30.0444", longitude: "31.2357", radiusMeters: 200 }),
-    updateSettings: managerProcedure.input(z.object({ name: z.string().min(2).max(160), address: z.string().min(2).max(255), latitude: z.string().max(32), longitude: z.string().max(32), radiusMeters: z.number().int().min(50).max(5000) })).mutation(({ input }) => db.updateCompanySettings(input)),
+    settings: staffProcedure.query(async ({ctx}) => { const b = await enterprise.getBranchForStaff(ctx.staffUser.id); return b ?? { id: 0, name: "الفرع الرئيسي", address: "مدينة نصر، القاهرة", latitude: "30.0444", longitude: "31.2357", radiusMeters: 200 }; }),
+    updateSettings: managerProcedure.input(z.object({ name: z.string().min(2).max(160), address: z.string().min(2).max(255), latitude: z.string().max(32), longitude: z.string().max(32), radiusMeters: z.number().int().min(50).max(5000) })).mutation(({ ctx,input }) => enterprise.updateBranchForStaff(ctx.staffUser.id,input)),
   }),
   schedule: router({
     templates: staffProcedure.query(() => db.listShiftTemplates()),
