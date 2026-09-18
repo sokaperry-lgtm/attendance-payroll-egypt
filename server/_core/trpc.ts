@@ -2,6 +2,7 @@ import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from "../../shared/const.js";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
+import { getMembership } from "../enterprise";
 
 const t = initTRPC.context<TrpcContext>().create({ transformer: superjson });
 
@@ -26,5 +27,5 @@ const requireManager = t.middleware(async (opts) => {
 
 export const protectedProcedure = t.procedure.use(requireUser);
 export const staffProcedure = t.procedure.use(requireStaff);
-export const managerProcedure = t.procedure.use(requireManager);
+const requireCompanyAdmin = t.middleware(async (opts) => {\n  if (!opts.ctx.staffUser) throw new TRPCError({ code: "UNAUTHORIZED", message: "يجب تسجيل الدخول بحساب الشركة." });\n  const membership = await getMembership(opts.ctx.staffUser.id);\n  if (!membership || !["owner", "hr", "manager", "accountant"].includes(membership.role)) throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });\n  return opts.next({ ctx: { ...opts.ctx, staffUser: opts.ctx.staffUser, membership } });\n});\n\nexport const managerProcedure = t.procedure.use(requireManager);\nexport const companyAdminProcedure = t.procedure.use(requireCompanyAdmin);
 export const adminProcedure = t.procedure.use(requireManager);
