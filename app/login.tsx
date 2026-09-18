@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
+import { showAlert } from "@/lib/alert";
 import * as Auth from "@/lib/_core/auth";
 
 export default function LoginScreen() {
@@ -20,12 +21,12 @@ export default function LoginScreen() {
 
   async function handleSubmit() {
     try {
-      if (!phone.trim() || !password.trim() || (isSetup && !name.trim())) { Alert.alert("بيانات ناقصة", "اكتب البيانات المطلوبة أولًا."); return; }
+      if (!phone.trim() || !password.trim() || (isSetup && !name.trim())) { showAlert("بيانات ناقصة", "اكتب البيانات المطلوبة أولًا."); return; }
       const result = isSetup ? await setupMutation.mutateAsync({ phone, password, name }) : await loginMutation.mutateAsync({ phone, password });
       if (Platform.OS !== "web") await Auth.setSessionToken(result.token);
       await utils.auth.me.invalidate();
       router.replace("/(tabs)");
-    } catch (error) { Alert.alert("تعذر الدخول", error instanceof Error ? error.message : "حدث خطأ غير متوقع."); }
+    } catch (error) { showAlert("تعذر الدخول", error instanceof Error ? error.message : "حدث خطأ غير متوقع."); }
   }
 
   return <ScreenContainer edges={["top", "bottom", "left", "right"]}><KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}><View style={styles.brandMark}><Text style={styles.brandMarkText}>ح</Text></View><Text style={styles.brand}>حاضر</Text><Text style={styles.tagline}>حضور وانصراف ومرتبات</Text><View style={styles.card}><Text style={styles.title}>{isSetup ? "إعداد حساب المدير" : "تسجيل الدخول"}</Text><Text style={styles.subtitle}>{isSetup ? "أنشئ حسابك الإداري الأول، وبعدها أضف فريقك." : "استخدم رقم الهاتف وكلمة المرور التي أعطاها لك المدير."}</Text>{isSetup && <><Text style={styles.label}>اسم المدير</Text><TextInput value={name} onChangeText={setName} placeholder="اسمك" style={styles.input} textAlign="right" /></>}<Text style={styles.label}>رقم الهاتف</Text><TextInput value={phone} onChangeText={setPhone} placeholder="01xxxxxxxxx" keyboardType="phone-pad" style={styles.input} textAlign="right" /><Text style={styles.label}>كلمة المرور</Text><TextInput value={password} onChangeText={setPassword} placeholder={isSetup ? "6 أحرف على الأقل" : "كلمة المرور"} secureTextEntry style={styles.input} textAlign="right" /><Pressable onPress={handleSubmit} disabled={loginMutation.isPending || setupMutation.isPending} style={({ pressed }) => [styles.button, pressed && { opacity: 0.82 }]}><Text style={styles.buttonText}>{loginMutation.isPending || setupMutation.isPending ? "جاري الدخول..." : isSetup ? "إنشاء حساب المدير" : "دخول"}</Text></Pressable></View><Text style={styles.footer}>حسابات الشركة خاصة بالاستاف فقط</Text></KeyboardAvoidingView></ScreenContainer>;

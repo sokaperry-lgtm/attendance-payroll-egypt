@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { showAlert } from "@/lib/alert";
 import * as Location from "expo-location";
 import * as Haptics from "expo-haptics";
 import { ScreenContainer } from "@/components/screen-container";
@@ -57,7 +58,7 @@ export default function HomeScreen() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "تعذر التحقق من الموقع";
       setGpsMessage(message);
-      Alert.alert("لم يتم تسجيل الحضور", message);
+      showAlert("لم يتم تسجيل الحضور", message);
     } finally {
       setWorking(false);
     }

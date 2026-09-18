@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { showAlert } from "@/lib/alert";
 import { ScreenContainer } from "@/components/screen-container";
 import { useAppData, type RequestType } from "@/lib/app-data";
 
@@ -14,15 +15,15 @@ export default function RequestsScreen() {
   const [reason, setReason] = useState("");
 
   async function saveRequest() {
-    if (!reason.trim()) { Alert.alert("بيانات ناقصة", "اكتب سبب الطلب أولًا."); return; }
+    if (!reason.trim()) { showAlert("بيانات ناقصة", "اكتب سبب الطلب أولًا."); return; }
     try {
       await submitRequest({ type, from, to, reason });
     } catch (error) {
-      Alert.alert("تعذر إرسال الطلب", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
+      showAlert("تعذر إرسال الطلب", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
       return;
     }
     setReason(""); setModalOpen(false);
-    Alert.alert("تم إرسال الطلب", "سيظهر للمدير للمراجعة والاعتماد.");
+    showAlert("تم إرسال الطلب", "سيظهر للمدير للمراجعة والاعتماد.");
   }
 
   return <ScreenContainer><ScrollView contentContainerStyle={styles.content}>

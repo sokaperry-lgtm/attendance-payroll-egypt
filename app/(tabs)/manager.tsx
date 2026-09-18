@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { showAlert } from "@/lib/alert";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAppData, type Employee } from "@/lib/app-data";
@@ -34,28 +35,28 @@ export default function ManagerScreen() {
 
   function resetAdd() { setName(""); setPhone(""); setPassword(""); setTitle(""); setDepartment(""); setBaseSalary(""); }
   async function saveEmployee() {
-    if (!name.trim() || !phone.trim() || password.length < 6) { Alert.alert("بيانات ناقصة", "اكتب الاسم ورقم الهاتف وكلمة مرور من 6 أحرف على الأقل."); return; }
-    try { await createStaffAccount({ name, phone, password, title, department, baseSalary: Number(baseSalary) || 0 }); resetAdd(); setAddOpen(false); Alert.alert("تم إنشاء الحساب", "أصبح الموظف يستطيع الدخول بنفس رقم الهاتف وكلمة المرور."); }
-    catch (error) { Alert.alert("تعذر إنشاء الحساب", error instanceof Error ? error.message : "حدث خطأ غير متوقع."); }
+    if (!name.trim() || !phone.trim() || password.length < 6) { showAlert("بيانات ناقصة", "اكتب الاسم ورقم الهاتف وكلمة مرور من 6 أحرف على الأقل."); return; }
+    try { await createStaffAccount({ name, phone, password, title, department, baseSalary: Number(baseSalary) || 0 }); resetAdd(); setAddOpen(false); showAlert("تم إنشاء الحساب", "أصبح الموظف يستطيع الدخول بنفس رقم الهاتف وكلمة المرور."); }
+    catch (error) { showAlert("تعذر إنشاء الحساب", error instanceof Error ? error.message : "حدث خطأ غير متوقع."); }
   }
   function openEdit(member: Employee) {
     setEditEmployee(member); setName(member.name); setPhone(member.phone ?? ""); setTitle(member.title); setDepartment(member.department); setBaseSalary(String(member.baseSalary)); setPassword(""); setEditActive(member.active !== false); setEditShiftStart("09:00"); setEditShiftEnd("18:00");
   }
   async function saveEdit() {
     if (!editEmployee) return;
-    if (!name.trim() || !phone.trim()) { Alert.alert("بيانات ناقصة", "الاسم ورقم الهاتف مطلوبان."); return; }
-    try { await updateStaffAccount({ id: Number(editEmployee.id), name, phone, title, department, baseSalary: Number(baseSalary) || 0, shiftStart: editShiftStart, shiftEnd: editShiftEnd, active: editActive, ...(password ? { password } : {}) }); setEditEmployee(null); Alert.alert("تم الحفظ", "تم تحديث بيانات الموظف."); }
-    catch (error) { Alert.alert("تعذر الحفظ", error instanceof Error ? error.message : "حدث خطأ غير متوقع."); }
+    if (!name.trim() || !phone.trim()) { showAlert("بيانات ناقصة", "الاسم ورقم الهاتف مطلوبان."); return; }
+    try { await updateStaffAccount({ id: Number(editEmployee.id), name, phone, title, department, baseSalary: Number(baseSalary) || 0, shiftStart: editShiftStart, shiftEnd: editShiftEnd, active: editActive, ...(password ? { password } : {}) }); setEditEmployee(null); showAlert("تم الحفظ", "تم تحديث بيانات الموظف."); }
+    catch (error) { showAlert("تعذر الحفظ", error instanceof Error ? error.message : "حدث خطأ غير متوقع."); }
   }
   function openBranchSettings() { setBranchName(branch.name); setBranchAddress(branch.address); setBranchLatitude(String(branch.latitude)); setBranchLongitude(String(branch.longitude)); setBranchRadius(String(branch.radiusMeters)); setBranchOpen(true); }
   async function saveBranch() {
-    const radius = Number(branchRadius); if (!branchName.trim() || !branchAddress.trim() || !Number.isFinite(radius) || radius < 50) { Alert.alert("بيانات غير صحيحة", "اكتب اسم الفرع والعنوان ونطاقًا لا يقل عن 50 متر."); return; }
-    try { await updateBranch({ name: branchName, address: branchAddress, latitude: branchLatitude, longitude: branchLongitude, radiusMeters: radius }); setBranchOpen(false); Alert.alert("تم الحفظ", "تم تحديث بيانات الفرع ونطاق GPS."); }
-    catch (error) { Alert.alert("تعذر الحفظ", error instanceof Error ? error.message : "حدث خطأ غير متوقع."); }
+    const radius = Number(branchRadius); if (!branchName.trim() || !branchAddress.trim() || !Number.isFinite(radius) || radius < 50) { showAlert("بيانات غير صحيحة", "اكتب اسم الفرع والعنوان ونطاقًا لا يقل عن 50 متر."); return; }
+    try { await updateBranch({ name: branchName, address: branchAddress, latitude: branchLatitude, longitude: branchLongitude, radiusMeters: radius }); setBranchOpen(false); showAlert("تم الحفظ", "تم تحديث بيانات الفرع ونطاق GPS."); }
+    catch (error) { showAlert("تعذر الحفظ", error instanceof Error ? error.message : "حدث خطأ غير متوقع."); }
   }
   async function reviewRequest(id: string, status: "مقبول" | "مرفوض") {
-    try { await approveRequest(id, status); Alert.alert("تم الحفظ", status === "مقبول" ? "تمت الموافقة على الطلب." : "تم رفض الطلب."); }
-    catch (error) { Alert.alert("تعذر حفظ القرار", error instanceof Error ? error.message : "حدث خطأ غير متوقع."); }
+    try { await approveRequest(id, status); showAlert("تم الحفظ", status === "مقبول" ? "تمت الموافقة على الطلب." : "تم رفض الطلب."); }
+    catch (error) { showAlert("تعذر حفظ القرار", error instanceof Error ? error.message : "حدث خطأ غير متوقع."); }
   }
 
   if (role !== "manager") return <ScreenContainer><View style={styles.denied}><IconSymbol name="person.2.fill" size={36} color="#0E7490" /><Text style={styles.deniedTitle}>هذه الصفحة للمدير فقط</Text><Text style={styles.deniedText}>سجّل الدخول بحساب المدير للوصول إلى بيانات الفريق.</Text></View></ScreenContainer>;

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { showAlert } from "@/lib/alert";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAppData, type ScheduleEntry, type ShiftTemplate } from "@/lib/app-data";
@@ -24,9 +25,9 @@ export default function ScheduleScreen() {
     setSaving(true);
     try {
       await saveSchedule({ staffAccountId: Number(selectedEmployee), scheduleDate: selectedDay, shiftTemplateId: shift.id });
-      Alert.alert("تم حفظ الجدول", `${selectedMember?.name ?? "الموظف"} — ${selectedDay}`);
+      showAlert("تم حفظ الجدول", `${selectedMember?.name ?? "الموظف"} — ${selectedDay}`);
     } catch (error) {
-      Alert.alert("تعذر حفظ الجدول", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
+      showAlert("تعذر حفظ الجدول", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
     } finally { setSaving(false); }
   }
 

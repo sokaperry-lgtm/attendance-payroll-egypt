@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { showAlert } from "@/lib/alert";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAppData } from "@/lib/app-data";
@@ -38,8 +39,8 @@ export default function ReportsScreen() {
       await updateAttendance.mutateAsync({ staffAccountId: selected.id, date: recordDate, checkIn: checkIn.trim() || null, checkOut: checkOut.trim() || null, status, lateMinutes: Math.max(0, Number(lateMinutes) || 0), distanceMeters: null, note: "تعديل يدوي من المدير" });
       await reportQuery.refetch();
       setEditing(null);
-      Alert.alert("تم الحفظ", `تم تحديث سجل ${recordDate} للموظف ${selected.name}.`);
-    } catch (error) { Alert.alert("تعذر الحفظ", error instanceof Error ? error.message : "حدث خطأ غير متوقع."); }
+      showAlert("تم الحفظ", `تم تحديث سجل ${recordDate} للموظف ${selected.name}.`);
+    } catch (error) { showAlert("تعذر الحفظ", error instanceof Error ? error.message : "حدث خطأ غير متوقع."); }
     finally { setSaving(false); }
   }
 
