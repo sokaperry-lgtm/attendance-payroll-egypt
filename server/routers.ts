@@ -6,7 +6,7 @@ import { companyAdminProcedure, managerProcedure, publicProcedure, router, staff
 import * as enterprise from "./enterprise";
 import * as db from "./db";
 
-const loginInput = z.object({ phone: z.string().min(3).max(32), password: z.string().min(4).max(120) });
+function timeMinutes(value: string) { const [h,m]=value.split(":").map(Number); return (h||0)*60+(m||0); }\n\nconst loginInput = z.object({ phone: z.string().min(3).max(32), password: z.string().min(4).max(120) });
 const staffView = (staff: Awaited<ReturnType<typeof db.getStaffAccountById>> | null) => staff ? ({
   id: staff.id, phone: staff.phone, name: staff.name, title: staff.title, department: staff.department,
   role: staff.role, baseSalary: staff.baseSalary, shiftStart: staff.shiftStart, shiftEnd: staff.shiftEnd, active: staff.active,
@@ -61,7 +61,7 @@ export const appRouter = router({
   attendance: router({
     list: staffProcedure.query(({ ctx }) => db.listAttendance(ctx.staffUser.id)),
     managerUpdate: managerProcedure.input(z.object({ staffAccountId: z.number().int(), date: z.string().length(10), checkIn: z.string().max(8).nullable().optional(), checkOut: z.string().max(8).nullable().optional(), status: z.enum(["حاضر", "متأخر", "غياب", "إجازة", "مأمورية"]), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0).nullable().optional(), note: z.string().max(1000).nullable().optional() })).mutation(({ input }) => db.updateAttendanceByManager(input)),
-    checkIn: staffProcedure.input(z.object({ date: z.string().length(10), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0) })).mutation(({ ctx, input }) => db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status: input.status, lateMinutes: input.lateMinutes, distanceMeters: input.distanceMeters, note: null })),
+    checkIn: staffProcedure.input(z.object({ date: z.string().length(10), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0) })).mutation(async ({ ctx, input }) => { const branch = await enterprise.getBranchForStaff(ctx.staffUser.id); if (branch && input.distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الحضور المسموح (${branch.radiusMeters} متر).`); const records = await db.listAttendance(ctx.staffUser.id); const existing = records.find(r => r.date === input.date); if (existing?.checkIn) throw new Error("تم تسجيل الحضور بالفعل لهذا اليوم."); const late = Math.max(0, timeMinutes(input.time) - timeMinutes(ctx.staffUser.shiftStart)); const status = late > 0 ? "متأخر" : "حاضر"; return db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status, lateMinutes: late, distanceMeters: input.distanceMeters, note: null }); }),
     checkOut: staffProcedure.input(z.object({ date: z.string().length(10), time: z.string().max(8) })).mutation(async ({ ctx, input }) => {
       const records = await db.listAttendance(ctx.staffUser.id);
       const current = records.find((item) => item.date === input.date);
