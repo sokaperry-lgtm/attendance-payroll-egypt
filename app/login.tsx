@@ -33,7 +33,10 @@ export default function LoginScreen() {
       const result = isSetup
         ? await setupMutation.mutateAsync({ phone, password, name })
         : await loginMutation.mutateAsync({ phone, password });
-      if (Platform.OS !== "web") await Auth.setSessionToken(result.token);
+
+      // Persist the staff session on both web and native. Web requests also
+      // send this token as a Bearer header, so login survives cookie quirks.
+      await Auth.setSessionToken(result.token);
       await utils.auth.me.invalidate();
       router.replace("/(tabs)");
     } catch (error) {
