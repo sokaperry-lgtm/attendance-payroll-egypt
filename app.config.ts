@@ -122,7 +122,9 @@ const config: ExpoConfig = {
   experiments: {
     typedRoutes: true,
     reactCompiler: true,
-    baseUrl: "/attendance-payroll-egypt",
+    ...(process.env.GITHUB_PAGES === "true"
+      ? { baseUrl: "/attendance-payroll-egypt" }
+      : {}),
   },
 };
 
