@@ -112,6 +112,7 @@ export default function HomeScreen() {
 
   const router = useRouter();
   const logoutMutation = trpc.auth.logout.useMutation();
+  const notificationsQuery = trpc.notifications.list.useQuery();
   const [working, setWorking] = useState(false);
   const [gpsMessage, setGpsMessage] = useState("جاهز للتحقق من موقعك");
 
@@ -207,7 +208,7 @@ export default function HomeScreen() {
           <View style={styles.headerActions}>
             <Pressable style={styles.notificationButton} onPress={() => router.push("/requests" as never)}>
               <IconSymbol name="notifications" size={21} color="#334155" />
-              <View style={styles.notificationDot} />
+              {(notificationsQuery.data ?? []).some((n) => !n.readAt) && <View style={styles.notificationDot} />}
             </Pressable>
             <Pressable
               onPress={async () => {
