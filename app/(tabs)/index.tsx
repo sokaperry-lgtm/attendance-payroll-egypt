@@ -204,17 +204,23 @@ export default function HomeScreen() {
             <Text style={styles.title}>صباح الخير، {employee.name.split(" ")[0]}</Text>
             <Text style={styles.subtitle}>{employee.title} · {employee.department}</Text>
           </View>
-          <Pressable
-            onPress={async () => {
-              await logoutMutation.mutateAsync();
-              await Auth.removeSessionToken();
-              await Auth.clearUserInfo();
-              router.replace("/login" as never);
-            }}
-            style={styles.avatar}
-          >
-            <Text style={styles.avatarText}>{employee.initials}</Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable style={styles.notificationButton} onPress={() => router.push("/requests" as never)}>
+              <IconSymbol name="notifications" size={21} color="#334155" />
+              <View style={styles.notificationDot} />
+            </Pressable>
+            <Pressable
+              onPress={async () => {
+                await logoutMutation.mutateAsync();
+                await Auth.removeSessionToken();
+                await Auth.clearUserInfo();
+                router.replace("/login" as never);
+              }}
+              style={styles.avatar}
+            >
+              <Text style={styles.avatarText}>{employee.initials}</Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.hero}>
@@ -387,6 +393,9 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 50, gap: 18, maxWidth: 1180, width: "100%", alignSelf: "center" },
   header: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between" },
   headerCopy: { flex: 1 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 10, marginLeft: 14 },
+  notificationButton: { width: 46, height: 46, borderRadius: 15, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center", position: "relative" },
+  notificationDot: { position: "absolute", width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444", top: 9, right: 9, borderWidth: 2, borderColor: "#FFFFFF" },
   eyebrow: { color: "#64748B", fontSize: 12, marginBottom: 5, textAlign: "right" },
   title: { color: "#0F172A", fontSize: 27, fontWeight: "800", textAlign: "right" },
   subtitle: { color: "#64748B", fontSize: 13, marginTop: 5, textAlign: "right" },
@@ -458,9 +467,9 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },
   securityNote: { color: "#94A3B8", fontSize: 10, textAlign: "center", marginTop: 10 },
   quickGrid: { flexDirection: "row-reverse", gap: 10, flexWrap: "wrap" },
-  quickCard: { flex: 1, minWidth: 180, backgroundColor: "#FFF", borderRadius: 17, borderWidth: 1, borderColor: "#E2E8F0", padding: 14, flexDirection: "row-reverse", alignItems: "center", gap: 10 },
-  quickIcon: { width: 36, height: 36, borderRadius: 11, backgroundColor: "#EFF6FF", alignItems: "center", justifyContent: "center" },
-  quickLabel: { color: "#334155", fontSize: 12, fontWeight: "700", flex: 1, textAlign: "right" },
+  quickCard: { flex: 1, minWidth: 180, backgroundColor: "#FFF", borderRadius: 19, borderWidth: 1, borderColor: "#E2E8F0", padding: 16, flexDirection: "row-reverse", alignItems: "center", gap: 12, shadowColor: "#0F172A", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
+  quickIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: "#EFF6FF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#DBEAFE" },
+  quickLabel: { color: "#1E293B", fontSize: 13, fontWeight: "800", flex: 1, textAlign: "right" },
   quickArrow: { color: "#94A3B8", fontSize: 16 },
   insight: { backgroundColor: "#FAF5FF", borderRadius: 17, padding: 14, borderWidth: 1, borderColor: "#E9D5FF", flexDirection: "row-reverse", alignItems: "center", gap: 10 },
   insightIcon: { width: 37, height: 37, borderRadius: 12, backgroundColor: "#EDE9FE", alignItems: "center", justifyContent: "center" },
