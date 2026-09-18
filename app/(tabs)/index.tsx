@@ -271,7 +271,7 @@ export default function HomeScreen() {
               <IconSymbol
                 name={isWeeklyOff ? "calendar" : "clock"}
                 size={20}
-                color="#0E7490"
+                color="#2563EB"
               />
             </View>
 
@@ -323,8 +323,8 @@ export default function HomeScreen() {
                   backgroundColor: isCheckedOut
                     ? "#64748B"
                     : checkedIn
-                      ? "#10B981"
-                      : "#F59E0B",
+                      ? "#16A34A"
+                      : "#D97706",
                 },
               ]}
             />
@@ -411,6 +411,8 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        <View style={styles.quickActions}><Pressable onPress={() => router.push("/attendance" as never)} style={styles.quickAction}><View style={styles.quickActionIcon}><IconSymbol name="calendar" size={18} color="#2563EB" /></View><Text style={styles.quickActionText}>سجل الحضور</Text></Pressable><Pressable onPress={() => router.push("/schedule" as never)} style={styles.quickAction}><View style={styles.quickActionIcon}><IconSymbol name="clock" size={18} color="#2563EB" /></View><Text style={styles.quickActionText}>الورديات</Text></Pressable><Pressable onPress={() => router.push("/requests" as never)} style={styles.quickAction}><View style={styles.quickActionIcon}><IconSymbol name="doc.text" size={18} color="#2563EB" /></View><Text style={styles.quickActionText}>الطلبات</Text></Pressable></View>
+
         <View style={styles.notice}>
           <IconSymbol name="wallet" size={20} color="#B45309" />
           <Text style={styles.noticeText}>
@@ -420,7 +422,7 @@ export default function HomeScreen() {
 
         {Platform.OS === "web" && (
           <View style={styles.installCard}>
-            <IconSymbol name="plus" size={20} color="#0E7490" />
+            <IconSymbol name="plus" size={20} color="#2563EB" />
 
             <View style={styles.installCopy}>
               <Text style={styles.installTitle}>
@@ -474,7 +476,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 18,
-    backgroundColor: "#0E7490",
+    backgroundColor: "#2563EB",
     alignItems: "center",
     justifyContent: "center",
     marginLeft: 12,
@@ -485,10 +487,10 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
   shiftCard: {
-    backgroundColor: "#0F766E",
+    backgroundColor: "#1D4ED8",
     borderRadius: 22,
     padding: 18,
-    shadowColor: "#0F766E",
+    shadowColor: "#1D4ED8",
     shadowOpacity: 0.18,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 7 },
@@ -502,13 +504,13 @@ const styles = StyleSheet.create({
   iconBubble: {
     width: 42,
     height: 42,
-    backgroundColor: "#CCFBF1",
+    backgroundColor: "#DBEAFE",
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
   cardLabel: {
-    color: "#CCFBF1",
+    color: "#DBEAFE",
     fontSize: 12,
     textAlign: "right",
   },
@@ -541,7 +543,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   timeDash: {
-    color: "#99F6E4",
+    color: "#BFDBFE",
   },
   shiftMeta: {
     borderTopWidth: 1,
@@ -552,7 +554,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   metaText: {
-    color: "#CCFBF1",
+    color: "#DBEAFE",
     fontSize: 12,
   },
   sectionHeading: {
@@ -610,7 +612,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     minHeight: 52,
     borderRadius: 16,
-    backgroundColor: "#0E7490",
+    backgroundColor: "#2563EB",
     flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "center",
@@ -636,7 +638,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   linkText: {
-    color: "#0E7490",
+    color: "#2563EB",
     fontSize: 12,
     fontWeight: "700",
   },
@@ -687,26 +689,26 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   installCard: {
-    backgroundColor: "#F0FDFA",
+    backgroundColor: "#EFF6FF",
     borderRadius: 14,
     padding: 13,
     flexDirection: "row-reverse",
     alignItems: "center",
     gap: 9,
     borderWidth: 1,
-    borderColor: "#99F6E4",
+    borderColor: "#BFDBFE",
   },
   installCopy: {
     flex: 1,
   },
   installTitle: {
-    color: "#115E59",
+    color: "#1E40AF",
     fontSize: 12,
     fontWeight: "800",
     textAlign: "right",
   },
   installText: {
-    color: "#0F766E",
+    color: "#1D4ED8",
     fontSize: 11,
     lineHeight: 17,
     marginTop: 3,

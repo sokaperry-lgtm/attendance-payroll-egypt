@@ -9,29 +9,21 @@ import type { ExpoConfig } from "expo/config";
 const rawBundleId = "com.app.attendancepayrollegypt";
 const bundleId =
   rawBundleId
-    .replace(/[-_]/g, ".") // Replace hyphens/underscores with dots
-    .replace(/[^a-zA-Z0-9.]/g, "") // Remove invalid chars
-    .replace(/\.+/g, ".") // Collapse consecutive dots
-    .replace(/^\.+|\.+$/g, "") // Trim leading/trailing dots
+    .replace(/[-_]/g, ".")
+    .replace(/[^a-zA-Z0-9.]/g, "")
+    .replace(/\.+/g, ".")
+    .replace(/^\.+|\.+$/g, "")
     .toLowerCase()
     .split(".")
-    .map((segment) => {
-      // Android requires each segment to start with a letter
-      // Prefix with 'x' if segment starts with a digit
-      return /^[a-zA-Z]/.test(segment) ? segment : "x" + segment;
-    })
+    .map((segment) => /^[a-zA-Z]/.test(segment) ? segment : "x" + segment)
     .join(".") || "space.manus.app";
-// Extract timestamp from bundle ID and prefix with "manus" for deep link scheme
-// e.g., "space.manus.my.app.t20240115103045" -> "manus20240115103045"
+
 const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
 const schemeFromBundleId = `manus${timestamp}`;
 
 const env = {
-  // App branding - update these values directly (do not use env vars)
   appName: "حاضر — حضور وانصراف ومرتبات",
   appSlug: "attendance-payroll-egypt",
-  // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
-  // Leave empty to use the default icon from assets/images/icon.png
   logoUrl: "",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
@@ -51,8 +43,8 @@ const config: ExpoConfig = {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
     "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+      "ITSAppUsesNonExemptEncryption": false
+    }
   },
   android: {
     adaptiveIcon: {
@@ -130,6 +122,7 @@ const config: ExpoConfig = {
   experiments: {
     typedRoutes: true,
     reactCompiler: true,
+    baseUrl: "/attendance-payroll-egypt",
   },
 };
 
