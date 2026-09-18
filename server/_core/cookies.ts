@@ -48,7 +48,16 @@ export function getSessionCookieOptions(
   req: Request,
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
   const hostname = req.hostname;
-  const domain = getParentDomain(hostname);
+  // Only set a cross-subdomain cookie `domain` for known multi-subdomain
+  // preview hosts (e.g. Manus's *.manuspre.computer sandboxes). On regular
+  // hosting providers (Railway, Render, Vercel, custom domains, etc.) the
+  // frontend and API are served from the exact same origin, so the cookie
+  // should just default to that exact host. Setting `domain` to something
+  // like ".railway.app" or ".vercel.app" would target a public-suffix
+  // domain shared by thousands of other apps — browsers silently reject
+  // (drop) any cookie scoped to a public suffix, which breaks login with
+  // no visible error at all.
+  const domain = hostname.endsWith(".manuspre.computer") ? getParentDomain(hostname) : undefined;
 
   return {
     domain,
