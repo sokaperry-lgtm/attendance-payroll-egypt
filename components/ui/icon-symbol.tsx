@@ -19,6 +19,7 @@ const MAPPING = {
   location: "location-on",
   clock: "schedule",
   wallet: "account-balance-wallet",
+  banknote: "payments",
   checkmark: "check",
   arrow: "arrow-forward",
   settings: "settings",
