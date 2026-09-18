@@ -10,7 +10,7 @@ const MAPPING = {
   "house.fill": "home",
   "paperplane.fill": "send",
   "chevron.left.forwardslash.chevron.right": "code",
-  "chevron.right": "chevron-right",
+  "chevron.right": "chevron-right",\n  "chevron.left": "chevron-left",\n  "chevron.down": "keyboard-arrow-down",
   calendar: "calendar-today",
   "doc.text.fill": "description",
   "person.2.fill": "groups",
