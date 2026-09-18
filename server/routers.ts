@@ -6,7 +6,9 @@ import { companyAdminProcedure, managerProcedure, publicProcedure, router, staff
 import * as enterprise from "./enterprise";
 import * as db from "./db";
 
-function timeMinutes(value: string) { const [h,m]=value.split(":").map(Number); return (h||0)*60+(m||0); }\n\nconst loginInput = z.object({ phone: z.string().min(3).max(32), password: z.string().min(4).max(120) });
+function timeMinutes(value: string) { const [h,m]=value.split(":").map(Number); return (h||0)*60+(m||0); }
+
+const loginInput = z.object({ phone: z.string().min(3).max(32), password: z.string().min(4).max(120) });
 const staffView = (staff: Awaited<ReturnType<typeof db.getStaffAccountById>> | null) => staff ? ({
   id: staff.id, phone: staff.phone, name: staff.name, title: staff.title, department: staff.department,
   role: staff.role, baseSalary: staff.baseSalary, shiftStart: staff.shiftStart, shiftEnd: staff.shiftEnd, active: staff.active,
