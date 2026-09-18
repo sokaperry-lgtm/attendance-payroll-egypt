@@ -1,5 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb } from "./db";
+import { calculateEgyptPayroll } from "./egypt-payroll";
 import {
   companies, branches, companyMembers, departments, leaveBalances,
   payrollRecords, notifications, subscriptions, auditLogs, staffAccounts,
@@ -137,7 +138,9 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const gross=s.baseSalary;
     const net=Math.max(0,gross-lateDeduction-absenceDeduction);
     const existing=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.staffAccountId,s.id),eq(payrollRecords.month,month))).limit(1))[0];
-    const values={companyId:m.companyId,staffAccountId:s.id,month,baseSalary:s.baseSalary,allowances:0,bonuses:0,overtime:0,absenceDeduction,lateDeduction,otherDeductions:0,advances:0,grossSalary:gross,netSalary:net,status:"draft"};
+    const egypt = calculateEgyptPayroll({ monthlyGross: gross, employeeSocialInsurance: 0, monthlyOtherDeductions: 0 });
+    const net = Math.max(0, egypt.net - absenceDeduction - lateDeduction);
+    const values={companyId:m.companyId,staffAccountId:s.id,month,baseSalary:s.baseSalary,allowances:0,bonuses:0,overtime:0,absenceDeduction,lateDeduction,otherDeductions:0,advances:0,employeeSocialInsurance:egypt.employeeSocialInsurance,employeeIncomeTax:egypt.employeeIncomeTax,grossSalary:gross,netSalary:net,status:"draft"};
     if(existing) await db.update(payrollRecords).set({...values,updatedAt:new Date()}).where(eq(payrollRecords.id,existing.id));
     else await db.insert(payrollRecords).values(values);
     result.push(values);
@@ -187,4 +190,29 @@ export async function updateBranchForStaff(staffAccountId:number,input:{name:str
   if(!m.branchId) throw new Error("الفرع غير مرتبط بالحساب");
   await db.update(branches).set({...input,updatedAt:new Date()}).where(and(eq(branches.id,m.branchId),eq(branches.companyId,m.companyId)));
   return getBranchForStaff(staffAccountId);
+}
+
+
+export async function listAuditLogs(staffAccountId:number, limit=100) {
+  const db=await getDb(); if(!db) return [];
+  const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
+  return db.select().from(auditLogs).where(eq(auditLogs.companyId,m.companyId)).orderBy(desc(auditLogs.createdAt)).limit(Math.min(Math.max(limit,1),250));
+}
+
+export async function getEmployeeSelfService(staffAccountId:number, month:string) {
+  const db=await getDb(); if(!db) return null;
+  const staff=(await db.select().from(staffAccounts).where(eq(staffAccounts.id,staffAccountId)).limit(1))[0];
+  if(!staff) return null;
+  const attendance=await db.select().from(attendanceRecords).where(eq(attendanceRecords.staffAccountId,staffAccountId)).orderBy(desc(attendanceRecords.date));
+  const requests=await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,staffAccountId)).orderBy(desc(staffRequests.createdAt)).limit(50);
+  const payroll=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.staffAccountId,staffAccountId),eq(payrollRecords.month,month))).limit(1))[0] ?? null;
+  const balance=await ensureLeaveBalance(staffAccountId,Number(month.slice(0,4)));
+  return { staff, attendance: attendance.slice(0,90), requests, payroll, leaveBalance: balance };
+}
+
+export function toCsv(rows: Array<Record<string, unknown>>) {
+  if (!rows.length) return "";
+  const headers=Object.keys(rows[0]);
+  const escape=(value:unknown)=>`"${String(value??"").replace(/"/g,'""')}"`;
+  return [headers.map(escape).join(","),...rows.map(row=>headers.map(h=>escape(row[h])).join(","))].join("\n");
 }
