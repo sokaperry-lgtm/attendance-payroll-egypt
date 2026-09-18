@@ -33,6 +33,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Export web app
+        env:
+          GITHUB_PAGES: "true"
         run: pnpm exec expo export -p web --output-dir dist-web
       - name: Setup Pages
         uses: actions/configure-pages@v5
