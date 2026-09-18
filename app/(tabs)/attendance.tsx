@@ -15,7 +15,8 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 export default function AttendanceScreen() {
   const { records, employee } = useAppData();
   const present = records.filter((record) => record.status === "حاضر" || record.status === "متأخر").length;
-  const late = records.filter((record) => record.status === "متأخر").length;\n  const absent = records.filter((record) => record.status === "غياب").length;
+  const late = records.filter((record) => record.status === "متأخر").length;
+  const absent = records.filter((record) => record.status === "غياب").length;
   return (
     <ScreenContainer>
       <FlatList
@@ -48,7 +49,11 @@ const styles = StyleSheet.create({
   summaryValue: { color: "#FFFFFF", fontSize: 25, fontWeight: "800", textAlign: "center" },
   summaryLabel: { color: "#DBEAFE", fontSize: 11, marginTop: 4, textAlign: "center" },
   divider: { height: 36, width: 1, backgroundColor: "rgba(255,255,255,0.25)" },
-  insightCard: { backgroundColor: "#EFF6FF", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#BFDBFE", flexDirection: "row-reverse", alignItems: "center", gap: 10 },\n  insightIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#DBEAFE", alignItems: "center", justifyContent: "center" },\n  insightCopy: { flex: 1 },\n  insightTitle: { color: "#1E40AF", fontSize: 12, fontWeight: "800", textAlign: "right" },\n  insightText: { color: "#475569", fontSize: 11, lineHeight: 17, marginTop: 3, textAlign: "right" },\n  sectionTitle: { color: "#0F172A", fontSize: 18, fontWeight: "800", textAlign: "right", marginTop: 4 },
+  insightCard: { backgroundColor: "#EFF6FF", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#BFDBFE", flexDirection: "row-reverse", alignItems: "center", gap: 10 },
+  insightIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#DBEAFE", alignItems: "center", justifyContent: "center" },
+  insightCopy: { flex: 1 },
+  insightTitle: { color: "#1E40AF", fontSize: 12, fontWeight: "800", textAlign: "right" },\n  insightText: { color: "#475569", fontSize: 11, lineHeight: 17, marginTop: 3, textAlign: "right" },
+  sectionTitle: { color: "#0F172A", fontSize: 18, fontWeight: "800", textAlign: "right", marginTop: 4 },
   row: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 13, flexDirection: "row-reverse", alignItems: "center", gap: 11, borderWidth: 1, borderColor: "#E2E8F0" },
   dateBox: { width: 43, height: 48, backgroundColor: "#F1F5F9", borderRadius: 12, alignItems: "center", justifyContent: "center" },
   dateDay: { color: "#0F172A", fontWeight: "800", fontSize: 18 },
