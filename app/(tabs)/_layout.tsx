@@ -42,6 +42,19 @@ export default function TabLayout() {
             fontWeight: isDesktopWeb ? "700" : "500",
             marginTop: 2,
           },
+          tabBarItemStyle: isDesktopWeb
+            ? {
+                borderRadius: 14,
+                marginVertical: 4,
+                paddingHorizontal: 10,
+              }
+            : {
+                borderRadius: 14,
+                marginHorizontal: 2,
+              },
+          tabBarIconStyle: {
+            marginBottom: isDesktopWeb ? 0 : 1,
+          },
           tabBarStyle: isDesktopWeb
             ? {
                 width: 252,
@@ -50,6 +63,8 @@ export default function TabLayout() {
                 borderLeftWidth: 1,
                 paddingVertical: 18,
                 paddingHorizontal: 12,
+                borderTopWidth: 0,
+                borderBottomWidth: 0,
               }
             : {
                 paddingTop: 7,
