@@ -39,6 +39,15 @@ export default function AttendanceScreen() {
               </View>
             </View>
 
+            <View style={styles.heroCard}>
+              <View style={styles.heroIcon}><IconSymbol name="chart.bar.fill" size={23} color="#FFFFFF" /></View>
+              <View style={styles.heroCopy}>
+                <Text style={styles.heroLabel}>معدل الالتزام</Text>
+                <Text style={styles.heroValue}>{records.length ? Math.round((present / records.length) * 100) : 0}%</Text>
+                <Text style={styles.heroHint}>بناءً على سجلاتك الحالية</Text>
+              </View>
+              <View style={styles.heroRing}><Text style={styles.heroRingText}>{present}</Text><Text style={styles.heroRingLabel}>حاضر</Text></View>
+            </View>
             <View style={styles.summary}>
               <View>
                 <Text style={styles.summaryValue}>{present}</Text>
@@ -142,6 +151,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  heroCard: { backgroundColor: "#0B1220", borderRadius: 24, padding: 19, flexDirection: "row-reverse", alignItems: "center", gap: 13, overflow: "hidden" },
+  heroIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: "#2563EB", alignItems: "center", justifyContent: "center" },
+  heroCopy: { flex: 1 },
+  heroLabel: { color: "#93C5FD", fontSize: 11, textAlign: "right" },
+  heroValue: { color: "#FFFFFF", fontSize: 30, fontWeight: "900", textAlign: "right", marginTop: 2 },
+  heroHint: { color: "#94A3B8", fontSize: 10, marginTop: 2, textAlign: "right" },
+  heroRing: { width: 76, height: 76, borderRadius: 38, borderWidth: 7, borderColor: "#60A5FA", alignItems: "center", justifyContent: "center" },
+  heroRingText: { color: "#FFFFFF", fontSize: 18, fontWeight: "800" },
+  heroRingLabel: { color: "#CBD5E1", fontSize: 9, marginTop: 1 },
   summary: {
     backgroundColor: "#1D4ED8",
     borderRadius: 20,
