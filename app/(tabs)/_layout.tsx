@@ -82,6 +82,9 @@ export default function TabLayout() {
         <Tabs.Screen name="requests" options={{ title: "الطلبات", tabBarIcon: ({ color }) => <IconSymbol size={23} name="doc.text.fill" color={color} /> }} />
         <Tabs.Screen name="manager" options={{ title: "إدارة الفريق", tabBarIcon: ({ color }) => <IconSymbol size={23} name="person.2.fill" color={color} /> }} />
         <Tabs.Screen name="reports" options={{ title: "التقارير", tabBarIcon: ({ color }) => <IconSymbol size={23} name="chart.bar.fill" color={color} /> }} />
+        <Tabs.Screen name="payroll" options={{ title: "الرواتب", tabBarIcon: ({ color }) => <IconSymbol size={23} name="banknote" color={color} /> }} />
+        <Tabs.Screen name="employees" options={{ title: "الموظفين", tabBarIcon: ({ color }) => <IconSymbol size={23} name="person.2.fill" color={color} /> }} />
+        <Tabs.Screen name="settings" options={{ title: "الإعدادات", tabBarIcon: ({ color }) => <IconSymbol size={23} name="settings" color={color} /> }} />
       </Tabs>
     </AppDataProvider>
   );
