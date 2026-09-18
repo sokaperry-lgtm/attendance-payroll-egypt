@@ -177,6 +177,8 @@ export const payrollRecords = mysqlTable("payroll_records", {
   lateDeduction: int("lateDeduction").default(0).notNull(),
   otherDeductions: int("otherDeductions").default(0).notNull(),
   advances: int("advances").default(0).notNull(),
+  employeeSocialInsurance: int("employeeSocialInsurance").default(0).notNull(),
+  employeeIncomeTax: int("employeeIncomeTax").default(0).notNull(),
   grossSalary: int("grossSalary").default(0).notNull(),
   netSalary: int("netSalary").default(0).notNull(),
   status: varchar("status", { length: 24 }).default("draft").notNull(),
