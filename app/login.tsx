@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import Svg, { Defs, LinearGradient, Stop, Path } from "react-native-svg";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
@@ -45,7 +46,23 @@ export default function LoginScreen() {
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={styles.ambientOne} />
         <View style={styles.ambientTwo} />
-        <View style={styles.brandMark}><Text style={styles.brandMarkText}>ح</Text></View>
+        <View style={styles.brandMark}>
+          <Svg width={44} height={44} viewBox="0 0 64 64">
+            <Defs>
+              <LinearGradient id="fingerprintBlue" x1="0" y1="0" x2="1" y2="1">
+                <Stop offset="0" stopColor="#7DD3FC" />
+                <Stop offset="0.48" stopColor="#38BDF8" />
+                <Stop offset="1" stopColor="#0284C7" />
+              </LinearGradient>
+            </Defs>
+            <Path d="M32 8C19.3 8 9 18.3 9 31c0 6.2 2.5 11.8 6.5 15.9" fill="none" stroke="url(#fingerprintBlue)" strokeWidth="5" strokeLinecap="round"/>
+            <Path d="M32 15c-8.8 0-16 7.2-16 16 0 7.1 2.3 12.4 6.2 16.8" fill="none" stroke="url(#fingerprintBlue)" strokeWidth="5" strokeLinecap="round"/>
+            <Path d="M32 22c-4.9 0-9 4.1-9 9 0 7.7 3.1 13.2 7.1 18.3" fill="none" stroke="url(#fingerprintBlue)" strokeWidth="5" strokeLinecap="round"/>
+            <Path d="M32 8c12.7 0 23 10.3 23 23 0 10.2-4.4 18.6-11.1 24.2" fill="none" stroke="url(#fingerprintBlue)" strokeWidth="5" strokeLinecap="round"/>
+            <Path d="M32 15c8.8 0 16 7.2 16 16 0 10.1-4.7 17.1-10.3 23.2" fill="none" stroke="url(#fingerprintBlue)" strokeWidth="5" strokeLinecap="round"/>
+            <Path d="M32 22c4.9 0 9 4.1 9 9 0 7.4-2.8 13.1-6.8 18.8" fill="none" stroke="url(#fingerprintBlue)" strokeWidth="5" strokeLinecap="round"/>
+          </Svg>
+        </View>
         <Text style={styles.brand}>حاضر</Text>
         <Text style={styles.tagline}>نظام الحضور والانصراف والمرتبات</Text>
         <View style={styles.card}>
@@ -72,8 +89,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, alignItems: "center", justifyContent: "center", padding: 22, overflow: "hidden" },
   ambientOne: { position: "absolute", width: 320, height: 320, borderRadius: 160, backgroundColor: "#DBEAFE", opacity: 0.65, top: -150, right: -120 },
   ambientTwo: { position: "absolute", width: 260, height: 260, borderRadius: 130, backgroundColor: "#E0E7FF", opacity: 0.55, bottom: -130, left: -100 },
-  brandMark: { width: 68, height: 68, borderRadius: 20, backgroundColor: "#2563EB", alignItems: "center", justifyContent: "center", shadowColor: "#2563EB", shadowOpacity: 0.22, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6 },
-  brandMarkText: { color: "#FFFFFF", fontSize: 32, fontWeight: "800" },
+  brandMark: { width: 68, height: 68, borderRadius: 20, backgroundColor: "#0F6FB5", alignItems: "center", justifyContent: "center", shadowColor: "#38BDF8", shadowOpacity: 0.3, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 7 },
+  
   brand: { color: "#0F172A", fontSize: 34, fontWeight: "900", marginTop: 12 },
   tagline: { color: "#64748B", fontSize: 13, marginTop: 4 },
   card: { width: "100%", maxWidth: 430, backgroundColor: "#FFFFFF", borderRadius: 26, padding: 24, marginTop: 28, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#0F172A", shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 5, overflow: "hidden" },
