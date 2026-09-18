@@ -30,6 +30,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  try { await ensureEnterpriseSchema(); } catch (error) { console.warn("[Database] Enterprise schema bootstrap skipped:", error); }
   const app = express();
   const server = createServer(app);
 
