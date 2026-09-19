@@ -37,6 +37,23 @@ export async function ensureCompanyForStaff(staffAccountId: number, companyName 
   return (await db.select().from(companyMembers).where(eq(companyMembers.id, Number(result[0].insertId))).limit(1))[0];
 }
 
+export async function assertStaffInCompany(actorStaffAccountId: number, targetStaffAccountId: number) {
+  const actor = await getCompanyForStaff(actorStaffAccountId);
+  if (!actor) throw new Error("Company not found");
+  const target = await getMembership(targetStaffAccountId);
+  if (!target || target.companyId !== actor.companyId || !target.active) throw new Error("الموظف غير موجود في الشركة");
+  return { actor, target };
+}
+
+export async function listCompanyStaff(staffAccountId: number) {
+  const db = await getDb(); if (!db) return [];
+  const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
+  const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
+  const ids = new Set(members.map(x => x.staffAccountId));
+  const rows = await db.select().from(staffAccounts).orderBy(desc(staffAccounts.createdAt));
+  return rows.filter(row => ids.has(row.id));
+}
+
 export async function getCompanyForStaff(staffAccountId: number) {
   const db = await getDb(); if (!db) return undefined;
   const membership = await getMembership(staffAccountId);
@@ -77,7 +94,7 @@ export async function setMemberRole(actorId: number, staffAccountId: number, rol
 export async function ensureLeaveBalance(staffAccountId: number, year: number) {
   const db = await getDb(); if (!db) throw new Error("Database not available");
   const m = await getCompanyForStaff(staffAccountId); if (!m) throw new Error("Company not found");
-  const existing = (await db.select().from(leaveBalances).where(and(eq(leaveBalances.staffAccountId, staffAccountId), eq(leaveBalances.year, year))).limit(1))[0];
+  const existing = (await db.select().from(leaveBalances).where(and(eq(leaveBalances.staffAccountId, staffAccountId), eq(leaveBalances.companyId, m.companyId), eq(leaveBalances.year, year))).limit(1))[0];
   if (existing) return existing;
   const result = await db.insert(leaveBalances).values({ companyId: m.companyId, staffAccountId, year });
   return (await db.select().from(leaveBalances).where(eq(leaveBalances.id, Number(result[0].insertId))).limit(1))[0];
@@ -130,9 +147,9 @@ export async function updateSubscription(staffAccountId: number, plan: string) {
 export async function generatePayroll(staffAccountId: number, month: string) {
   const db = await getDb(); if (!db) throw new Error("Database not available");
   const m = await getCompanyForStaff(staffAccountId); if (!m || !["owner","hr","accountant","manager"].includes(m.role)) throw new Error("غير مصرح");
-  const staff = await db.select().from(staffAccounts).where(eq(staffAccounts.active,true));
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
   const ids = new Set(members.map(x=>x.staffAccountId));
+  const staff = await db.select().from(staffAccounts).where(eq(staffAccounts.active,true));
   const attendance = await db.select().from(attendanceRecords);
   const approvedOvertime = await db.select().from(staffRequests).where(and(eq(staffRequests.type,"أوفر تايم"),eq(staffRequests.status,"مقبول")));
   const result=[];
@@ -230,11 +247,13 @@ export async function listAuditLogs(staffAccountId:number, limit=100) {
 
 export async function getEmployeeSelfService(staffAccountId:number, month:string) {
   const db=await getDb(); if(!db) return null;
+  const m=await getCompanyForStaff(staffAccountId); if(!m) return null;
+  const membership=await getMembership(staffAccountId); if(!membership || membership.companyId!==m.companyId || !membership.active) return null;
   const staff=(await db.select().from(staffAccounts).where(eq(staffAccounts.id,staffAccountId)).limit(1))[0];
   if(!staff) return null;
   const attendance=await db.select().from(attendanceRecords).where(eq(attendanceRecords.staffAccountId,staffAccountId)).orderBy(desc(attendanceRecords.date));
   const requests=await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,staffAccountId)).orderBy(desc(staffRequests.createdAt)).limit(50);
-  const payroll=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.staffAccountId,staffAccountId),eq(payrollRecords.month,month))).limit(1))[0] ?? null;
+  const payroll=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.staffAccountId,staffAccountId),eq(payrollRecords.month,month))).limit(1))[0] ?? null;
   const balance=await ensureLeaveBalance(staffAccountId,Number(month.slice(0,4)));
   return { staff, attendance: attendance.slice(0,90), requests, payroll, leaveBalance: balance };
 }
