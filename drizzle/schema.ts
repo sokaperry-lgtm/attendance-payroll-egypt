@@ -222,3 +222,46 @@ export const auditLogs = mysqlTable("audit_logs", {
   metadata: text("metadata"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
+
+
+export const salaryAdjustments = mysqlTable("salary_adjustments", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  staffAccountId: int("staffAccountId").notNull(),
+  month: varchar("month", { length: 7 }).notNull(),
+  type: varchar("type", { length: 24 }).notNull(),
+  title: varchar("title", { length: 160 }).notNull(),
+  amount: int("amount").notNull(),
+  note: text("note"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const salaryAdvances = mysqlTable("salary_advances", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  staffAccountId: int("staffAccountId").notNull(),
+  amount: int("amount").notNull(),
+  installmentAmount: int("installmentAmount").notNull(),
+  remainingAmount: int("remainingAmount").notNull(),
+  startMonth: varchar("startMonth", { length: 7 }).notNull(),
+  status: varchar("status", { length: 24 }).default("active").notNull(),
+  note: text("note"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const employeeDocuments = mysqlTable("employee_documents", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  staffAccountId: int("staffAccountId").notNull(),
+  type: varchar("type", { length: 40 }).notNull(),
+  title: varchar("title", { length: 160 }).notNull(),
+  documentNumber: varchar("documentNumber", { length: 120 }),
+  expiryDate: varchar("expiryDate", { length: 10 }),
+  status: varchar("status", { length: 24 }).default("active").notNull(),
+  note: text("note"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
