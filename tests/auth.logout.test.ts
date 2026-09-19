@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { appRouter } from "../server/routers";
 import { INTERNAL_SESSION_COOKIE } from "../shared/const";
 import type { TrpcContext } from "../server/_core/context";
+import * as db from "../server/db";
 
 describe("auth.logout", () => {
   it("clears the internal staff session cookie", async () => {
@@ -35,10 +36,12 @@ describe("auth.logout", () => {
       } as TrpcContext["res"],
     };
 
+    const deleteSessionSpy = vi.spyOn(db, "deleteStaffSession").mockResolvedValue();
     const caller = appRouter.createCaller(ctx);
     const result = await caller.auth.logout();
 
     expect(result).toEqual({ success: true });
+    expect(deleteSessionSpy).toHaveBeenCalledWith("test-token");
     expect(clearedCookies).toHaveLength(1);
     expect(clearedCookies[0]?.name).toBe(INTERNAL_SESSION_COOKIE);
     expect(clearedCookies[0]?.options).toMatchObject({
