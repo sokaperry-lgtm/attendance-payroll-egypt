@@ -180,8 +180,11 @@ export default function HomeScreen() {
   async function handleCheckOut() {
     setWorking(true);
     try {
-      await checkOut(currentTime());
-      setGpsMessage("تم تسجيل الانصراف بنجاح");
+      const coordinates = await getCurrentCoordinates();
+      const distanceMeters = distanceBetween(branch.latitude, branch.longitude, coordinates.latitude, coordinates.longitude);
+      if (distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الفرع بـ ${distanceMeters} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`);
+      await checkOut({ time: currentTime(), distanceMeters });
+      setGpsMessage(`تم تسجيل الانصراف — أنت على بعد ${distanceMeters} متر من الفرع`);
       if (Platform.OS !== "web") {
         await Haptics.notificationAsync(
           Haptics.NotificationFeedbackType.Success,
