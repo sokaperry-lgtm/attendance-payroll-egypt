@@ -42,7 +42,7 @@ export type AppDataContext = {
   submitRequest: (request: Omit<LeaveRequest, "id" | "status">) => Promise<void>;
   approveRequest: (id: string, status: RequestStatus) => Promise<void>;
   createStaffAccount: (input: { phone: string; password: string; name: string; title?: string; department?: string; baseSalary: number; role: Role }) => Promise<void>;
-  updateStaffAccount: (input: { id: number; phone?: string; password?: string; name?: string; title?: string; department?: string; baseSalary?: number; shiftStart?: string; shiftEnd?: string; active?: boolean }) => Promise<void>;
+  updateStaffAccount: (input: { id: number; phone?: string; password?: string; name?: string; title?: string; department?: string; baseSalary?: number; role?: Role; shiftStart?: string; shiftEnd?: string; active?: boolean }) => Promise<void>;
   updateBranch: (input: { name: string; address: string; latitude: string; longitude: string; radiusMeters: number }) => Promise<void>;
   shiftTemplates: ShiftTemplate[];
   schedules: ScheduleEntry[];
