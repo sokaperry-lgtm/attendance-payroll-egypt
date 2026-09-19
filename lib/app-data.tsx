@@ -68,7 +68,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const updateCompanyMutation = trpc.company.updateSettings.useMutation();
   const shiftTemplatesQuery = trpc.schedule.templates.useQuery(undefined, { enabled: Boolean(meQuery.data), retry: false });
   const mineScheduleQuery = trpc.schedule.mine.useQuery(undefined, { enabled: Boolean(meQuery.data), retry: false });
-  const teamScheduleQuery = trpc.schedule.all.useQuery(undefined, { enabled: meQuery.data?.role === "manager", retry: false });
+  const teamScheduleQuery = trpc.schedule.all.useQuery(undefined, { enabled: meQuery.data?.role === "manager" || meQuery.data?.role === "supervisor", retry: false });
   const saveScheduleMutation = trpc.schedule.save.useMutation();
 
   const employee = meQuery.data ? mapEmployee(meQuery.data) : { id: "", name: "", title: "", department: "", baseSalary: 0, initials: "" };
