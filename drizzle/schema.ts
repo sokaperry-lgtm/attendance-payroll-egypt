@@ -19,7 +19,7 @@ export const staffAccounts = mysqlTable("staff_accounts", {
   name: varchar("name", { length: 160 }).notNull(),
   title: varchar("title", { length: 120 }),
   department: varchar("department", { length: 120 }),
-  role: mysqlEnum("role", ["manager", "employee"]).default("employee").notNull(),
+  role: mysqlEnum("role", ["manager", "supervisor", "employee"]).default("employee").notNull(),
   baseSalary: int("baseSalary").default(0).notNull(),
   shiftStart: varchar("shiftStart", { length: 8 }).default("09:00").notNull(),
   shiftEnd: varchar("shiftEnd", { length: 8 }).default("18:00").notNull(),
