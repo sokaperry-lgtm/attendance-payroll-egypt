@@ -34,7 +34,7 @@ function RoleAwareTabs() {
     }
   }, []);
 
-  const manager = role === "manager";
+  const manager = role === "manager" || role === "supervisor";
 
   return (
       <Tabs
