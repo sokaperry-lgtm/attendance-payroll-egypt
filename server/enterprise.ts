@@ -136,7 +136,10 @@ export async function generatePayroll(staffAccountId: number, month: string) {
   const attendance = await db.select().from(attendanceRecords);
   const approvedOvertime = await db.select().from(staffRequests).where(and(eq(staffRequests.type,"أوفر تايم"),eq(staffRequests.status,"مقبول")));
   const result=[];
+  let skippedApproved=0;
   for(const s of staff.filter(x=>ids.has(x.id))) {
+    const existing=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.staffAccountId,s.id),eq(payrollRecords.month,month))).limit(1))[0];
+    if(existing && existing.status==="approved") { result.push(existing); skippedApproved++; continue; }
     const records=attendance.filter(x=>x.staffAccountId===s.id && x.date.startsWith(month));
     const absences=records.filter(x=>x.status==="غياب").length;
     const lateMinutes=records.reduce((a,x)=>a+x.lateMinutes,0);
@@ -146,7 +149,6 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const overtimeRate=s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours;
     const overtimeValue=Math.round(overtimeHours*overtimeRate);
     const gross=s.baseSalary+overtimeValue;
-    const existing=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.staffAccountId,s.id),eq(payrollRecords.month,month))).limit(1))[0];
     const egypt = calculateEgyptPayroll({ monthlyGross: gross, employeeSocialInsurance: 0, monthlyOtherDeductions: 0 });
     const net=Math.max(0, egypt.net-absenceDeduction-lateDeduction);
     const values={companyId:m.companyId,staffAccountId:s.id,month,baseSalary:s.baseSalary,allowances:0,bonuses:0,overtime:overtimeValue,absenceDeduction,lateDeduction,otherDeductions:0,advances:0,employeeSocialInsurance:egypt.employeeSocialInsurance,employeeIncomeTax:egypt.employeeIncomeTax,grossSalary:gross,netSalary:net,status:"draft"};
@@ -154,7 +156,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     else await db.insert(payrollRecords).values(values);
     result.push(values);
   }
-  await writeAudit(staffAccountId,m.companyId,"payroll.generated","payroll",month,{count:result.length});
+  await writeAudit(staffAccountId,m.companyId,"payroll.generated","payroll",month,{count:result.length,skippedApproved});
   return db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.month,month))).orderBy(desc(payrollRecords.netSalary));
 }
 
@@ -183,14 +185,23 @@ export async function getSecuritySummary(staffAccountId:number) {
   return { sessionPolicy:"30 days", passwordHash:"scrypt", tenantIsolation:"company membership", auditLog:true, roleBasedAccess:true };
 }
 
-export async function consumeAnnualLeave(staffAccountId:number, fromDate:string, toDate:string) {
+export async function consumeLeaveBalance(staffAccountId:number, fromDate:string, toDate:string, kind:"annual"|"sick") {
   const db=await getDb(); if(!db) return;
   const days=Math.max(1,Math.floor((new Date(toDate).getTime()-new Date(fromDate).getTime())/86400000)+1);
   const year=Number(fromDate.slice(0,4));
   const balance=await ensureLeaveBalance(staffAccountId,year);
   if(!balance) return;
-  if(balance.annualDays-balance.annualUsed < days) throw new Error("رصيد الإجازات السنوية غير كافٍ.");
-  await db.update(leaveBalances).set({annualUsed:balance.annualUsed+days,updatedAt:new Date()}).where(eq(leaveBalances.id,balance.id));
+  if(kind==="annual"){
+    if(balance.annualDays-balance.annualUsed < days) throw new Error("رصيد الإجازات السنوية غير كافٍ.");
+    await db.update(leaveBalances).set({annualUsed:balance.annualUsed+days,updatedAt:new Date()}).where(eq(leaveBalances.id,balance.id));
+  } else {
+    if(balance.sickDays-balance.sickUsed < days) throw new Error("رصيد الإجازات المرضية غير كافٍ.");
+    await db.update(leaveBalances).set({sickUsed:balance.sickUsed+days,updatedAt:new Date()}).where(eq(leaveBalances.id,balance.id));
+  }
+}
+
+export async function consumeAnnualLeave(staffAccountId:number, fromDate:string, toDate:string) {
+  return consumeLeaveBalance(staffAccountId, fromDate, toDate, "annual");
 }
 
 export async function updateBranchForStaff(staffAccountId:number,input:{name:string;address:string;latitude:string;longitude:string;radiusMeters:number}) {
