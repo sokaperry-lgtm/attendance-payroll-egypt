@@ -135,7 +135,7 @@ export async function listStaffAccounts() {
   }).from(staffAccounts).orderBy(desc(staffAccounts.createdAt));
 }
 
-export async function updateStaffAccount(id: number, input: { phone?: string; name?: string; title?: string; department?: string; baseSalary?: number; shiftStart?: string; shiftEnd?: string; active?: boolean; password?: string }) {
+export async function updateStaffAccount(id: number, input: { phone?: string; name?: string; title?: string; department?: string; baseSalary?: number; shiftStart?: string; shiftEnd?: string; active?: boolean; password?: string; role?: "manager" | "supervisor" | "employee" }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const values: Record<string, unknown> = {};
@@ -147,6 +147,7 @@ export async function updateStaffAccount(id: number, input: { phone?: string; na
   if (input.shiftStart !== undefined) values.shiftStart = input.shiftStart;
   if (input.shiftEnd !== undefined) values.shiftEnd = input.shiftEnd;
   if (input.active !== undefined) values.active = input.active;
+  if (input.role !== undefined) values.role = input.role;
   if (input.password) values.passwordHash = hashPassword(input.password);
   if (Object.keys(values).length) await db.update(staffAccounts).set({ ...values, updatedAt: new Date() }).where(eq(staffAccounts.id, id));
   return getStaffAccountById(id);
