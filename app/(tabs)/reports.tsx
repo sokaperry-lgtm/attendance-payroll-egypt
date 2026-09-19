@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { PageHeader, SectionTitle, SurfaceCard, UI } from "@/components/ui/design-system";
@@ -11,7 +11,7 @@ import { trpc } from "@/lib/trpc";
 const month = new Date().toISOString().slice(0, 7);
 
 type ReportRecord = { date: string; status: string; lateMinutes: number; checkIn?: string | null; checkOut?: string | null };
-type ReportEmployee = { id: number; name: string; department?: string | null; lateMinutes: number; absentDays: number; presentDays: number; records: ReportRecord[] };
+type ReportEmployee = { id: number; name: string; department?: string | null; lateMinutes: number; absentDays: number; presentDays: number; pendingRequests?: number; records: ReportRecord[] };
 
 type Tone = "blue" | "green" | "orange" | "red" | "purple";
 const toneMap: Record<Tone, { bg: string; color: string }> = {
@@ -26,11 +26,15 @@ export default function ReportsScreen() {
   const reportQuery = trpc.reports.month.useQuery({ month });
   const payrollQuery = trpc.payroll.list.useQuery({ month });
   const [exporting, setExporting] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | "all">("all");
 
   const report = reportQuery.data;
-  const summary = report?.summary ?? { staffCount: 0, presentDays: 0, absentDays: 0, lateMinutes: 0, pendingRequests: 0 };
-  const employees = (report?.employees ?? []) as ReportEmployee[];
-  const payrollRows = payrollQuery.data ?? [];
+  const allEmployees = (report?.employees ?? []) as ReportEmployee[];
+  const allPayrollRows = payrollQuery.data ?? [];
+  const employees = selectedEmployeeId === "all" ? allEmployees : allEmployees.filter((employee) => employee.id === selectedEmployeeId);
+  const payrollRows = selectedEmployeeId === "all" ? allPayrollRows : allPayrollRows.filter((row) => Number(row.staffAccountId) === selectedEmployeeId);
+  const summary = { staffCount: employees.length, presentDays: employees.reduce((sum, employee) => sum + employee.presentDays, 0), absentDays: employees.reduce((sum, employee) => sum + employee.absentDays, 0), lateMinutes: employees.reduce((sum, employee) => sum + employee.lateMinutes, 0), pendingRequests: employees.reduce((sum, employee) => sum + (employee.pendingRequests ?? 0), 0) };
   const attendanceRate = calculateAttendanceRate(summary);
   const payrollSummary = summarizePayroll(payrollRows);
 
@@ -54,7 +58,8 @@ export default function ReportsScreen() {
     if (!report) return;
     setExporting(true);
     try {
-      await exportAttendanceReportPdf(report as AttendancePdfReport, { companyName: "الشركة الرئيسية", branchName: "الفرع الرئيسي" });
+      const exportReport = { ...report, employees, summary };
+      await exportAttendanceReportPdf(exportReport as AttendancePdfReport, { companyName: "الشركة الرئيسية", branchName: "الفرع الرئيسي" });
     } catch (error) {
       showAlert("تعذر تصدير التقرير", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
     } finally {
@@ -68,10 +73,16 @@ export default function ReportsScreen() {
         <PageHeader eyebrow={`EXECUTIVE DASHBOARD · ${month}`} title="لوحة الحضور والرواتب" subtitle="قراءة تشغيلية مرئية لأداء الفريق وتكلفة الشهر." icon="chart.bar.fill" />
         <View style={styles.toolbar}>
           <View><Text style={styles.toolbarTitle}>نظرة المدير</Text><Text style={styles.toolbarHint}>البيانات محدثة لهذا الشهر</Text></View>
-          <Pressable onPress={handleExport} disabled={exporting} style={({ pressed }) => [styles.exportButton, exporting && styles.disabled, pressed && styles.pressed]}>
-            <IconSymbol name="arrow.down.doc.fill" size={17} color="#FFFFFF" />
-            <Text style={styles.exportText}>{exporting ? "جاري التجهيز..." : "تصدير PDF"}</Text>
-          </Pressable>
+          <View style={styles.toolbarActions}>
+            <Pressable onPress={() => setFilterOpen(true)} style={({ pressed }) => [styles.filterButton, pressed && styles.pressed]}>
+              <IconSymbol name="line.3.horizontal.decrease" size={16} color={UI.primary} />
+              <Text style={styles.filterText}>{selectedEmployeeId === "all" ? "كل الموظفين" : employees[0]?.name || "موظف"}</Text>
+            </Pressable>
+            <Pressable onPress={handleExport} disabled={exporting} style={({ pressed }) => [styles.exportButton, exporting && styles.disabled, pressed && styles.pressed]}>
+              <IconSymbol name="arrow.down.doc.fill" size={17} color="#FFFFFF" />
+              <Text style={styles.exportText}>{exporting ? "جاري التجهيز..." : "تصدير PDF"}</Text>
+            </Pressable>
+          </View>
         </View>
 
         <SectionTitle title="صحة الحضور" subtitle="مؤشرات الفريق الأساسية" />
@@ -116,6 +127,15 @@ export default function ReportsScreen() {
           </SurfaceCard>
         </View>
       </ScrollView>
+      <Modal visible={filterOpen} transparent animationType="fade" onRequestClose={() => setFilterOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setFilterOpen(false)}>
+          <Pressable style={styles.filterSheet} onPress={(event) => event.stopPropagation()}>
+            <View style={styles.sheetHeader}><View><Text style={styles.sheetTitle}>تصفية التقرير</Text><Text style={styles.sheetSubtitle}>اختر نطاق التقرير المطلوب</Text></View><Pressable onPress={() => setFilterOpen(false)}><Text style={styles.closeText}>إغلاق</Text></Pressable></View>
+            <Pressable style={[styles.employeeOption, selectedEmployeeId === "all" && styles.employeeOptionActive]} onPress={() => { setSelectedEmployeeId("all"); setFilterOpen(false); }}><View style={styles.optionAvatar}><Text style={styles.optionAvatarText}>كل</Text></View><View style={styles.optionCopy}><Text style={styles.optionName}>كل الموظفين</Text><Text style={styles.optionMeta}>{allEmployees.length} موظف في التقرير</Text></View>{selectedEmployeeId === "all" && <Text style={styles.selectedMark}>✓</Text>}</Pressable>
+            <ScrollView style={styles.employeeOptions} contentContainerStyle={styles.employeeOptionsContent}>{allEmployees.map((employee) => <Pressable key={employee.id} style={[styles.employeeOption, selectedEmployeeId === employee.id && styles.employeeOptionActive]} onPress={() => { setSelectedEmployeeId(employee.id); setFilterOpen(false); }}><View style={styles.optionAvatar}><Text style={styles.optionAvatarText}>{employee.name.split(" ").slice(0, 2).map((part) => part[0]).join("")}</Text></View><View style={styles.optionCopy}><Text style={styles.optionName}>{employee.name}</Text><Text style={styles.optionMeta}>{employee.department || "عام"} · {employee.presentDays} حضور · {employee.absentDays} غياب</Text></View>{selectedEmployeeId === employee.id && <Text style={styles.selectedMark}>✓</Text>}</Pressable>)}</ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -133,9 +153,9 @@ function MetricCard({ label, value, tone }: { label: string; value: string; tone
 const styles = StyleSheet.create({
   content: { padding: 22, paddingBottom: 60, gap: 14, maxWidth: 1240, width: "100%", alignSelf: "center" },
   state: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }, stateText: { color: UI.muted, fontSize: 13 },
-  toolbar: { flexDirection: "row-reverse", justifyContent: "space-between", alignItems: "center", backgroundColor: "#EFF6FF", borderRadius: 16, padding: 13, borderWidth: 1, borderColor: "#DBEAFE" },
+  toolbar: { flexDirection: "row-reverse", justifyContent: "space-between", alignItems: "center", backgroundColor: "#EFF6FF", borderRadius: 16, padding: 13, borderWidth: 1, borderColor: "#DBEAFE" }, toolbarActions: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
   toolbarTitle: { color: UI.ink, fontSize: 13, fontWeight: "900", textAlign: "right" }, toolbarHint: { color: UI.muted, fontSize: 10, marginTop: 3, textAlign: "right" },
-  exportButton: { backgroundColor: UI.primary, borderRadius: 11, paddingVertical: 10, paddingHorizontal: 14, flexDirection: "row-reverse", alignItems: "center", gap: 7 }, exportText: { color: "#FFF", fontSize: 11, fontWeight: "900" }, disabled: { backgroundColor: "#94A3B8" }, pressed: { opacity: 0.82 },
+  filterButton: { backgroundColor: "#FFF", borderWidth: 1, borderColor: "#BFDBFE", borderRadius: 11, paddingVertical: 9, paddingHorizontal: 11, flexDirection: "row-reverse", alignItems: "center", gap: 6, maxWidth: 170 }, filterText: { color: UI.primary, fontSize: 10, fontWeight: "900" }, exportButton: { backgroundColor: UI.primary, borderRadius: 11, paddingVertical: 10, paddingHorizontal: 14, flexDirection: "row-reverse", alignItems: "center", gap: 7 }, exportText: { color: "#FFF", fontSize: 11, fontWeight: "900" }, disabled: { backgroundColor: "#94A3B8" }, pressed: { opacity: 0.82 },
   kpiGrid: { flexDirection: "row-reverse", gap: 10, flexWrap: "wrap" }, kpiCard: { flex: 1, minWidth: 190, minHeight: 142 }, kpiIcon: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center", marginBottom: 12 }, kpiLabel: { color: UI.muted, fontSize: 11, textAlign: "right" }, kpiValue: { color: UI.ink, fontSize: 25, fontWeight: "900", marginTop: 4, textAlign: "right" }, kpiCaption: { fontSize: 9, fontWeight: "700", marginTop: 8, textAlign: "right" },
   chartRow: { flexDirection: "row-reverse", gap: 12, flexWrap: "wrap" }, chartCard: { flex: 1.55, minWidth: 330 }, chartCardSmall: { flex: 1, minWidth: 290 },
   barChart: { height: 220, flexDirection: "row-reverse", alignItems: "flex-end", justifyContent: "space-around", gap: 8, paddingTop: 22 }, barColumn: { flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end", gap: 6 }, barValue: { color: UI.ink, fontSize: 9, fontWeight: "800" }, barTrack: { height: 145, width: 24, backgroundColor: "#F1F5F9", borderRadius: 9, justifyContent: "flex-end", overflow: "hidden" }, barFill: { width: "100%", backgroundColor: UI.primary, borderRadius: 9 }, barLabel: { color: UI.muted, fontSize: 9 }, empty: { color: "#94A3B8", fontSize: 11, textAlign: "center", padding: 20 },
@@ -143,4 +163,5 @@ const styles = StyleSheet.create({
   payrollGrid: { flexDirection: "row-reverse", gap: 10, flexWrap: "wrap" }, metricCard: { flex: 1, minWidth: 190, backgroundColor: "#FFF", borderWidth: 1, borderColor: UI.border, borderTopWidth: 4, borderRadius: 16, padding: 15 }, metricLabel: { color: UI.muted, fontSize: 10, textAlign: "right" }, metricValue: { fontSize: 17, fontWeight: "900", marginTop: 9, textAlign: "right" },
   departmentList: { gap: 14, marginTop: 12 }, departmentRow: { gap: 6 }, departmentTop: { flexDirection: "row-reverse", justifyContent: "space-between" }, departmentName: { color: UI.ink, fontSize: 11, fontWeight: "800" }, departmentRate: { color: UI.primary, fontSize: 11, fontWeight: "900" }, departmentTrack: { height: 8, backgroundColor: "#EFF6FF", borderRadius: 9, overflow: "hidden" }, departmentFill: { height: "100%", backgroundColor: UI.primary, borderRadius: 9 },
   lateList: { gap: 9, marginTop: 10 }, lateRow: { flexDirection: "row-reverse", alignItems: "center", gap: 9, borderBottomWidth: 1, borderBottomColor: "#F1F5F9", paddingBottom: 9 }, lateBadge: { width: 46, height: 42, borderRadius: 12, backgroundColor: "#FFF7ED", alignItems: "center", justifyContent: "center" }, lateBadgeValue: { color: "#EA580C", fontSize: 14, fontWeight: "900" }, lateBadgeLabel: { color: "#C2410C", fontSize: 8 }, lateCopy: { flex: 1 }, lateName: { color: UI.ink, fontSize: 11, fontWeight: "800", textAlign: "right" }, lateMeta: { color: UI.muted, fontSize: 9, marginTop: 3, textAlign: "right" },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(15,23,42,0.42)", justifyContent: "flex-end" }, filterSheet: { backgroundColor: "#FFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 18, maxHeight: "82%", width: "100%" }, sheetHeader: { flexDirection: "row-reverse", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 13 }, sheetTitle: { color: UI.ink, fontSize: 18, fontWeight: "900", textAlign: "right" }, sheetSubtitle: { color: UI.muted, fontSize: 10, marginTop: 4, textAlign: "right" }, closeText: { color: UI.primary, fontSize: 11, fontWeight: "800", padding: 5 }, employeeOptions: { maxHeight: 390 }, employeeOptionsContent: { gap: 8, paddingBottom: 8 }, employeeOption: { flexDirection: "row-reverse", alignItems: "center", gap: 10, borderWidth: 1, borderColor: UI.border, borderRadius: 15, padding: 11 }, employeeOptionActive: { borderColor: "#93C5FD", backgroundColor: "#EFF6FF" }, optionAvatar: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#DBEAFE", alignItems: "center", justifyContent: "center" }, optionAvatarText: { color: UI.primary, fontSize: 11, fontWeight: "900" }, optionCopy: { flex: 1 }, optionName: { color: UI.ink, fontSize: 12, fontWeight: "900", textAlign: "right" }, optionMeta: { color: UI.muted, fontSize: 9, marginTop: 3, textAlign: "right" }, selectedMark: { color: UI.primary, fontSize: 18, fontWeight: "900" },
 });
