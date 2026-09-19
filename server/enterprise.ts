@@ -5,7 +5,7 @@ import { PAYROLL_RULES } from "../lib/payroll";
 import {
   companies, branches, companyMembers, leaveBalances,
   payrollRecords, notifications, subscriptions, auditLogs, staffAccounts,
-  attendanceRecords, staffRequests
+  attendanceRecords, staffRequests, weeklySchedules, shiftTemplates
 } from "../drizzle/schema";
 
 export type CompanyRole = "owner" | "hr" | "manager" | "accountant" | "employee";
@@ -99,7 +99,7 @@ export async function listCompanySchedules(staffAccountId: number) {
   const members = await db.select({ staffAccountId: companyMembers.staffAccountId }).from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
   const ids = new Set(members.map(row => row.staffAccountId));
   const rows = await db.select().from(weeklySchedules).orderBy(desc(weeklySchedules.scheduleDate));
-  const shifts = await db.select().from((await import("../drizzle/schema")).shiftTemplates).where(eq((await import("../drizzle/schema")).shiftTemplates.active, true));
+  const shifts = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
   return rows.filter(row => ids.has(row.staffAccountId)).map(row => ({ ...row, shift: shifts.find(item => item.id === row.shiftTemplateId) ?? null }));
 }
 
