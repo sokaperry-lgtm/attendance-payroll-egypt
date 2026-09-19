@@ -9,7 +9,7 @@ import {
   attendanceRecords, staffRequests, weeklySchedules, shiftTemplates
 } from "../drizzle/schema";
 
-export type CompanyRole = "owner" | "hr" | "manager" | "accountant" | "employee";
+export type CompanyRole = "owner" | "hr" | "manager" | "supervisor" | "accountant" | "employee";
 
 export async function getMembership(staffAccountId: number) {
   const db = await getDb(); if (!db) return undefined;
@@ -39,7 +39,7 @@ export async function ensureCompanyForStaff(staffAccountId: number, companyName 
     branch = (await db.select().from(branches).where(eq(branches.id, Number(result[0].insertId))).limit(1))[0];
   }
   const staff = (await db.select().from(staffAccounts).where(eq(staffAccounts.id, staffAccountId)).limit(1))[0];
-  const role: CompanyRole = staff?.role === "manager" ? "owner" : "employee";
+  const role: CompanyRole = staff?.role === "manager" ? "owner" : staff?.role === "supervisor" ? "supervisor" : "employee";
   const result = await db.insert(companyMembers).values({ companyId: company.id, branchId: branch?.id ?? null, staffAccountId, role });
   return (await db.select().from(companyMembers).where(eq(companyMembers.id, Number(result[0].insertId))).limit(1))[0];
 }
@@ -115,7 +115,7 @@ export async function setMemberRole(actorId: number, staffAccountId: number, rol
   const actor = await getCompanyForStaff(actorId); if (!actor || actor.role !== "owner") throw new Error("غير مصرح");
   const target = await getMembership(staffAccountId); if (!target || target.companyId !== actor.companyId) throw new Error("الموظف غير موجود في الشركة");
   await db.update(companyMembers).set({ role, updatedAt: new Date() }).where(eq(companyMembers.staffAccountId, staffAccountId));
-  await db.update(staffAccounts).set({ role: role === "employee" ? "employee" : "manager", updatedAt: new Date() }).where(eq(staffAccounts.id, staffAccountId));
+  await db.update(staffAccounts).set({ role: role === "employee" ? "employee" : role === "supervisor" ? "supervisor" : "manager", updatedAt: new Date() }).where(eq(staffAccounts.id, staffAccountId));
   await writeAudit(actorId, actor.companyId, "role.updated", "staff", String(staffAccountId), { role });
   return getMembership(staffAccountId);
 }
@@ -175,7 +175,7 @@ export async function updateSubscription(staffAccountId: number, plan: string) {
 
 export async function generatePayroll(staffAccountId: number, month: string) {
   const db = await getDb(); if (!db) throw new Error("Database not available");
-  const m = await getCompanyForStaff(staffAccountId); if (!m || !["owner","hr","accountant","manager"].includes(m.role)) throw new Error("غير مصرح");
+  const m = await getCompanyForStaff(staffAccountId); if (!m || !["owner","hr","accountant","manager","supervisor"].includes(m.role)) throw new Error("غير مصرح");
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
   const ids = new Set(members.map(x=>x.staffAccountId));
   const staff = await db.select().from(staffAccounts).where(eq(staffAccounts.active,true));
@@ -258,7 +258,7 @@ export async function consumeAnnualLeave(staffAccountId:number, fromDate:string,
 
 export async function updateBranchForStaff(staffAccountId:number,input:{name:string;address:string;latitude:string;longitude:string;radiusMeters:number}) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
-  const m=await getCompanyForStaff(staffAccountId); if(!m || !["owner","hr","manager"].includes(m.role)) throw new Error("غير مصرح");
+  const m=await getCompanyForStaff(staffAccountId); if(!m || !["owner","hr","manager","supervisor"].includes(m.role)) throw new Error("غير مصرح");
   if(!m.branchId) throw new Error("الفرع غير مرتبط بالحساب");
   await db.update(branches).set({...input,updatedAt:new Date()}).where(and(eq(branches.id,m.branchId),eq(branches.companyId,m.companyId)));
   return getBranchForStaff(staffAccountId);
