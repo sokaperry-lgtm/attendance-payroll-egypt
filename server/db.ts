@@ -89,7 +89,7 @@ export async function createStaffAccount(input: {
   name: string;
   title?: string;
   department?: string;
-  role: "manager" | "employee";
+  role: "manager" | "supervisor" | "employee";
   baseSalary?: number;
   shiftStart?: string;
   shiftEnd?: string;
