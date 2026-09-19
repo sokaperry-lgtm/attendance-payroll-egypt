@@ -197,6 +197,12 @@ export async function writeAudit(staffAccountId:number, companyId:number, action
   await db.insert(auditLogs).values({staffAccountId,companyId,action,entity:entity??null,entityId:entityId??null,metadata:metadata?JSON.stringify(metadata):null});
 }
 
+export async function getMonthlyStaffReports(staffAccountId: number, month: string) {
+  const m = await getCompanyForStaff(staffAccountId);
+  if (!m) throw new Error("Company not found");
+  return db.getMonthlyStaffReports(month, m.companyId);
+}
+
 export async function getSecuritySummary(staffAccountId:number) {
   const m=await getCompanyForStaff(staffAccountId); if(!m) return null;
   return { sessionPolicy:"30 days", passwordHash:"scrypt", tenantIsolation:"company membership", auditLog:true, roleBasedAccess:true };
