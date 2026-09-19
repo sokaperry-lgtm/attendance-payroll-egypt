@@ -38,7 +38,7 @@ export type AppDataContext = {
   loading: boolean;
   refresh: () => Promise<void>;
   checkIn: (payload: { time: string; distanceMeters: number; status: AttendanceState; lateMinutes: number }) => Promise<void>;
-  checkOut: (time: string) => Promise<void>;
+  checkOut: (payload: { time: string; distanceMeters: number }) => Promise<void>;
   submitRequest: (request: Omit<LeaveRequest, "id" | "status">) => Promise<void>;
   approveRequest: (id: string, status: RequestStatus) => Promise<void>;
   createStaffAccount: (input: { phone: string; password: string; name: string; title?: string; department?: string; baseSalary: number; role: Role }) => Promise<void>;
@@ -92,7 +92,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AppDataContext>(() => ({
     role, employee, branch, shift: { name: activeShift?.name ?? "الوردية الأساسية", start: activeShift?.startTime ?? meQuery.data?.shiftStart ?? "09:00", end: activeShift?.endTime ?? meQuery.data?.shiftEnd ?? "18:00", days: "حسب جدول الأسبوع", crossesMidnight: activeShift?.crossesMidnight, kind: activeShift?.kind as "shift" | "weekly_off" | undefined }, records, requests, staffMembers, payrollInputs, payroll, todayRecord, checkedIn: Boolean(todayRecord?.checkIn && !todayRecord?.checkOut), loading: meQuery.isLoading || attendanceQuery.isLoading, refresh: invalidateAll, shiftTemplates, schedules, teamSchedules,
     checkIn: async (payload) => { await checkInMutation.mutateAsync({ date: todayKey(), time: payload.time, status: payload.status, lateMinutes: payload.lateMinutes, distanceMeters: payload.distanceMeters }); await invalidateAll(); },
-    checkOut: async (time) => { await checkOutMutation.mutateAsync({ date: todayKey(), time }); await invalidateAll(); },
+    checkOut: async (payload) => { await checkOutMutation.mutateAsync({ date: todayKey(), time: payload.time, distanceMeters: payload.distanceMeters }); await invalidateAll(); },
     submitRequest: async (request) => { await requestMutation.mutateAsync({ type: request.type, fromDate: request.from, toDate: request.to, reason: request.reason, hours: request.hours ?? undefined }); await invalidateAll(); },
     approveRequest: async (id, status) => { await reviewMutation.mutateAsync({ id: Number(id), status: status as "مقبول" | "مرفوض" }); await invalidateAll(); },
     createStaffAccount: async (input) => { await createStaffMutation.mutateAsync({ ...input, shiftStart: "09:00", shiftEnd: "18:00" }); await invalidateAll(); },
