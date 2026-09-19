@@ -15,6 +15,7 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { summarizeAttendance, summarizeRequests } from "../lib/report-utils";
+import { companyMembers } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -294,7 +295,7 @@ export async function approveRequest(id: number, managerId: number, status: "Ù…Ù
   return getRequestById(id);
 }
 
-export async function getMonthlyStaffReports(month: string) {
+export async function getMonthlyStaffReports(month: string, companyId?: number) {
   const db = await getDb();
   if (!db) return { month, employees: [], summary: { staffCount: 0, presentDays: 0, absentDays: 0, lateMinutes: 0, pendingRequests: 0 } };
   const [staff, attendance, requests] = await Promise.all([
@@ -302,7 +303,12 @@ export async function getMonthlyStaffReports(month: string) {
     db.select().from(attendanceRecords),
     db.select().from(staffRequests),
   ]);
-  const employees = staff.filter((member) => member.role === "employee").map((member) => {
+  let companyStaffIds: Set<number> | null = null;
+  if (companyId !== undefined) {
+    const members = await db.select({ staffAccountId: companyMembers.staffAccountId }).from(companyMembers).where(eq(companyMembers.companyId, companyId));
+    companyStaffIds = new Set(members.map(member => member.staffAccountId));
+  }
+  const employees = staff.filter((member) => member.role === "employee" && (companyStaffIds === null || companyStaffIds.has(member.id))).map((member) => {
     const records = attendance.filter((record) => record.staffAccountId === member.id && record.date.startsWith(month));
     const memberRequests = requests.filter((request) => request.staffAccountId === member.id && (request.fromDate.startsWith(month) || request.toDate.startsWith(month)));
     const attendanceSummary = summarizeAttendance(records);
