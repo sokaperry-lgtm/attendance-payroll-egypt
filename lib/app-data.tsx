@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc";
 import { calculatePayroll, type PayrollInputs, todayKey } from "@/lib/payroll";
 
-export type Role = "employee" | "manager";
+export type Role = "employee" | "supervisor" | "manager";
 export type AttendanceState = "حاضر" | "متأخر" | "إجازة" | "غياب" | "مأمورية";
 export type RequestType = "إجازة" | "إذن" | "مأمورية" | "أوفر تايم" | "إجازة مرضية";
 export type RequestStatus = "قيد المراجعة" | "مقبول" | "مرفوض";
@@ -41,7 +41,7 @@ export type AppDataContext = {
   checkOut: (time: string) => Promise<void>;
   submitRequest: (request: Omit<LeaveRequest, "id" | "status">) => Promise<void>;
   approveRequest: (id: string, status: RequestStatus) => Promise<void>;
-  createStaffAccount: (input: { phone: string; password: string; name: string; title?: string; department?: string; baseSalary: number }) => Promise<void>;
+  createStaffAccount: (input: { phone: string; password: string; name: string; title?: string; department?: string; baseSalary: number; role: Role }) => Promise<void>;
   updateStaffAccount: (input: { id: number; phone?: string; password?: string; name?: string; title?: string; department?: string; baseSalary?: number; shiftStart?: string; shiftEnd?: string; active?: boolean }) => Promise<void>;
   updateBranch: (input: { name: string; address: string; latitude: string; longitude: string; radiusMeters: number }) => Promise<void>;
   shiftTemplates: ShiftTemplate[];
@@ -57,7 +57,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const meQuery = trpc.auth.me.useQuery(undefined, { retry: false });
   const attendanceQuery = trpc.attendance.list.useQuery(undefined, { enabled: Boolean(meQuery.data), retry: false });
   const requestsQuery = trpc.requests.list.useQuery(undefined, { enabled: Boolean(meQuery.data), retry: false });
-  const staffQuery = trpc.staff.list.useQuery(undefined, { enabled: meQuery.data?.role === "manager", retry: false });
+  const staffQuery = trpc.staff.list.useQuery(undefined, { enabled: meQuery.data?.role === "manager" || meQuery.data?.role === "supervisor", retry: false });
   const checkInMutation = trpc.attendance.checkIn.useMutation();
   const checkOutMutation = trpc.attendance.checkOut.useMutation();
   const requestMutation = trpc.requests.create.useMutation();
@@ -86,7 +86,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const approvedOvertimeHours = requests.filter((request) => request.type === "أوفر تايم" && request.status === "مقبول" && request.from.startsWith(currentMonth)).reduce((sum, request) => sum + (request.hours ?? 0), 0);
   const payrollInputs: PayrollInputs = useMemo(() => ({ baseSalary: employee.baseSalary, allowances: 0, bonuses: 0, overtimeHours: approvedOvertimeHours, absences: records.filter((record) => record.status === "غياب").length, lateMinutes: records.reduce((sum, record) => sum + record.lateMinutes, 0), deductions: 0, advances: 0 }), [employee.baseSalary, records, approvedOvertimeHours]);
   const payroll = useMemo(() => calculatePayroll(payrollInputs), [payrollInputs]);
-  const role: Role = meQuery.data?.role === "manager" ? "manager" : "employee";
+  const role: Role = meQuery.data?.role === "manager" ? "manager" : meQuery.data?.role === "supervisor" ? "supervisor" : "employee";
 
   const invalidateAll = () => queryClient.invalidateQueries();
   const value = useMemo<AppDataContext>(() => ({
