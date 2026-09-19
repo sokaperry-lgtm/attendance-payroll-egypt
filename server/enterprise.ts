@@ -299,3 +299,49 @@ export function toCsv(rows: Array<Record<string, unknown>>) {
   const escape=(value:unknown)=>`"${String(value??"").replace(/"/g,'""')}"`;
   return [headers.map(escape).join(","),...rows.map(row=>headers.map(h=>escape(row[h])).join("\n"))].join("\n");
 }
+
+export async function listCompanySalaryAdjustments(staffAccountId:number, month?:string) {
+  const db=await getDb(); if(!db) return [];
+  const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
+  return month ? db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.companyId,m.companyId),eq(salaryAdjustments.month,month))).orderBy(desc(salaryAdjustments.createdAt))
+    : db.select().from(salaryAdjustments).where(eq(salaryAdjustments.companyId,m.companyId)).orderBy(desc(salaryAdjustments.createdAt));
+}
+export async function createSalaryAdjustment(actorId:number,input:{staffAccountId:number;month:string;type:"bonus"|"incentive"|"penalty"|"deduction";title:string;amount:number;note?:string}) {
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const m=await getCompanyForStaff(actorId); if(!m || m.role!=="owner") throw new Error("غير مصرح");
+  await assertStaffInCompany(actorId,input.staffAccountId);
+  const result=await db.insert(salaryAdjustments).values({...input,companyId:m.companyId,createdBy:actorId});
+  await writeAudit(actorId,m.companyId,"salary_adjustment.created","salary_adjustment",String(result[0].insertId),input);
+  await createNotification(input.staffAccountId,"payroll","إضافة جديدة على راتبك",input.title+": "+input.amount.toLocaleString()+" جنيه.");
+  return (await db.select().from(salaryAdjustments).where(eq(salaryAdjustments.id,Number(result[0].insertId))).limit(1))[0];
+}
+export async function createSalaryAdvance(actorId:number,input:{staffAccountId:number;amount:number;installmentAmount:number;startMonth:string;note?:string}) {
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const m=await getCompanyForStaff(actorId); if(!m || m.role!=="owner") throw new Error("غير مصرح");
+  await assertStaffInCompany(actorId,input.staffAccountId);
+  if(input.amount<=0 || input.installmentAmount<=0) throw new Error("قيمة السلفة والقسط يجب أن تكون أكبر من صفر.");
+  const result=await db.insert(salaryAdvances).values({...input,remainingAmount:input.amount,companyId:m.companyId,createdBy:actorId});
+  await writeAudit(actorId,m.companyId,"salary_advance.created","salary_advance",String(result[0].insertId),input);
+  await createNotification(input.staffAccountId,"payroll","تم تسجيل سلفة جديدة","قيمة السلفة "+input.amount.toLocaleString()+" جنيه.");
+  return (await db.select().from(salaryAdvances).where(eq(salaryAdvances.id,Number(result[0].insertId))).limit(1))[0];
+}
+export async function listCompanyAdvances(actorId:number) {
+  const db=await getDb(); if(!db) return [];
+  const m=await getCompanyForStaff(actorId); if(!m) return [];
+  return db.select().from(salaryAdvances).where(eq(salaryAdvances.companyId,m.companyId)).orderBy(desc(salaryAdvances.createdAt));
+}
+export async function listEmployee360(actorId:number,targetId:number) {
+  await assertStaffInCompany(actorId,targetId);
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const staff=await getStaffAccountById(targetId);
+  const [attendance,requests,adjustments,advances,documents]=await Promise.all([
+    db.select().from(attendanceRecords).where(eq(attendanceRecords.staffAccountId,targetId)).orderBy(desc(attendanceRecords.date)),
+    db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,targetId)).orderBy(desc(staffRequests.createdAt)),
+    db.select().from(salaryAdjustments).where(eq(salaryAdjustments.staffAccountId,targetId)).orderBy(desc(salaryAdjustments.createdAt)),
+    db.select().from(salaryAdvances).where(eq(salaryAdvances.staffAccountId,targetId)).orderBy(desc(salaryAdvances.createdAt)),
+    db.select().from(employeeDocuments).where(eq(employeeDocuments.staffAccountId,targetId)).orderBy(desc(employeeDocuments.createdAt)),
+  ]);
+  const m=await getCompanyForStaff(actorId);
+  const payroll=m ? await db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.staffAccountId,targetId))).orderBy(desc(payrollRecords.month)) : [];
+  return {staff,attendance,requests,adjustments,advances,documents,payroll};
+}
