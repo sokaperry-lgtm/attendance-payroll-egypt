@@ -32,6 +32,12 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Type check
+        run: pnpm run check
+      - name: Run tests
+        run: pnpm test
+      - name: Build server
+        run: pnpm run build:server
       - name: Export web app
         env:
           GITHUB_PAGES: "true"
