@@ -37,7 +37,7 @@ export default function ManagerScreen() {
   function resetAdd() { setName(""); setPhone(""); setPassword(""); setTitle(""); setDepartment(""); setBaseSalary(""); setNewRole("employee"); }
   async function saveEmployee() {
     if (!name.trim() || !phone.trim() || password.length < 6) { showAlert("بيانات ناقصة", "اكتب الاسم ورقم الهاتف وكلمة مرور من 6 أحرف على الأقل."); return; }
-    try { await createStaffAccount({ name, phone, password, title, department, baseSalary: Number(baseSalary) || 0 }); resetAdd(); setAddOpen(false); showAlert("تم إنشاء الحساب", "أصبح الموظف يستطيع الدخول بنفس رقم الهاتف وكلمة المرور."); }
+    try { await createStaffAccount({ name, phone, password, title, department, baseSalary: Number(baseSalary) || 0, role: newRole }); resetAdd(); setAddOpen(false); showAlert("تم إنشاء الحساب", "أصبح الموظف يستطيع الدخول بنفس رقم الهاتف وكلمة المرور."); }
     catch (error) { showAlert("تعذر إنشاء الحساب", error instanceof Error ? error.message : "حدث خطأ غير متوقع."); }
   }
   function openEdit(member: Employee) {
