@@ -15,7 +15,7 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { summarizeAttendance, summarizeRequests } from "../lib/report-utils";
-import { companyMembers } from "../drizzle/schema";
+import { companyMembers, salaryAdjustments, salaryAdvances, employeeDocuments } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -345,4 +345,19 @@ async function getRequestById(id: number) {
   if (!db) return undefined;
   const result = await db.select().from(staffRequests).where(eq(staffRequests.id, id)).limit(1);
   return result[0];
+}
+
+
+export async function listSalaryAdjustments(staffAccountId: number, month?: string) {
+  const db = await getDb(); if (!db) return [];
+  return month ? db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.staffAccountId, staffAccountId), eq(salaryAdjustments.month, month))).orderBy(desc(salaryAdjustments.createdAt))
+    : db.select().from(salaryAdjustments).where(eq(salaryAdjustments.staffAccountId, staffAccountId)).orderBy(desc(salaryAdjustments.createdAt));
+}
+export async function listSalaryAdvances(staffAccountId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(salaryAdvances).where(eq(salaryAdvances.staffAccountId, staffAccountId)).orderBy(desc(salaryAdvances.createdAt));
+}
+export async function listEmployeeDocuments(staffAccountId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(employeeDocuments).where(eq(employeeDocuments.staffAccountId, staffAccountId)).orderBy(desc(employeeDocuments.createdAt));
 }
