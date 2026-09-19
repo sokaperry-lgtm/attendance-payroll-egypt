@@ -88,6 +88,13 @@ export const appRouter = router({
     list: staffProcedure.query(({ ctx }) => enterprise.listNotifications(ctx.staffUser.id)),
     read: staffProcedure.input(z.object({ id: z.number().int() })).mutation(({ ctx, input }) => enterprise.markNotificationRead(ctx.staffUser.id, input.id)),
   }),
+  hrTools: router({
+    adjustments: companyAdminProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/).optional() })).query(({ctx,input}) => enterprise.listCompanySalaryAdjustments(ctx.staffUser.id,input.month)),
+    advances: companyAdminProcedure.query(({ctx}) => enterprise.listCompanyAdvances(ctx.staffUser.id)),
+    addAdjustment: companyAdminProcedure.input(z.object({staffAccountId:z.number().int(),month:z.string().regex(/^\\d{4}-\\d{2}$/),type:z.enum(["bonus","incentive","penalty","deduction"]),title:z.string().min(2).max(160),amount:z.number().int().positive(),note:z.string().max(500).optional()})).mutation(({ctx,input})=>enterprise.createSalaryAdjustment(ctx.staffUser.id,input)),
+    addAdvance: companyAdminProcedure.input(z.object({staffAccountId:z.number().int(),amount:z.number().int().positive(),installmentAmount:z.number().int().positive(),startMonth:z.string().regex(/^\\d{4}-\\d{2}$/),note:z.string().max(500).optional()})).mutation(({ctx,input})=>enterprise.createSalaryAdvance(ctx.staffUser.id,input)),
+    employee360: supervisorProcedure.input(z.object({staffAccountId:z.number().int()})).query(({ctx,input})=>enterprise.listEmployee360(ctx.staffUser.id,input.staffAccountId)),
+  }),
   companyAdmin: router({
     branches: companyAdminProcedure.query(({ ctx }) => enterprise.listCompanyBranches(ctx.staffUser.id)),
     createBranch: companyAdminProcedure.input(z.object({ name:z.string().min(2), address:z.string().min(2), latitude:z.string(), longitude:z.string(), radiusMeters:z.number().int().min(50).max(5000) })).mutation(({ ctx, input }) => enterprise.createBranch(ctx.staffUser.id,input)),
