@@ -5,7 +5,7 @@ import { calculatePayroll, type PayrollInputs, todayKey } from "@/lib/payroll";
 
 export type Role = "employee" | "manager";
 export type AttendanceState = "حاضر" | "متأخر" | "إجازة" | "غياب" | "مأمورية";
-export type RequestType = "إجازة" | "إذن" | "مأمورية";
+export type RequestType = "إجازة" | "إذن" | "مأمورية" | "أوفر تايم";
 export type RequestStatus = "قيد المراجعة" | "مقبول" | "مرفوض";
 
 export type Branch = { name: string; address: string; latitude: number; longitude: number; radiusMeters: number };
@@ -13,7 +13,7 @@ export type Shift = { name: string; start: string; end: string; days: string; cr
 export type ShiftTemplate = { id: number; name: string; kind: "shift" | "weekly_off"; startTime: string; endTime: string; crossesMidnight: boolean; active: boolean };
 export type ScheduleEntry = { id: number; staffAccountId: number; scheduleDate: string; shiftTemplateId: number; note?: string | null; shift: ShiftTemplate | null };
 export type AttendanceRecord = { id: string; date: string; checkIn?: string | null; checkOut?: string | null; status: AttendanceState; lateMinutes: number; distanceMeters?: number | null; note?: string | null };
-export type LeaveRequest = { id: string; type: RequestType; from: string; to: string; reason: string; status: RequestStatus; staffAccountId?: number };
+export type LeaveRequest = { id: string; type: RequestType; from: string; to: string; reason: string; status: RequestStatus; staffAccountId?: number; hours?: number | null };
 export type Employee = { id: string; name: string; title: string; department: string; baseSalary: number; initials: string; phone?: string; role?: Role; active?: boolean };
 
 export const defaultBranch: Branch = { name: "الفرع الرئيسي", address: "مدينة نصر، القاهرة", latitude: 30.0444, longitude: 31.2357, radiusMeters: 200 };
@@ -74,7 +74,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const employee = meQuery.data ? mapEmployee(meQuery.data) : { id: "", name: "", title: "", department: "", baseSalary: 0, initials: "" };
   const branch: Branch = companyQuery.data ? { name: companyQuery.data.name, address: companyQuery.data.address, latitude: Number(companyQuery.data.latitude), longitude: Number(companyQuery.data.longitude), radiusMeters: companyQuery.data.radiusMeters } : defaultBranch;
   const records: AttendanceRecord[] = (attendanceQuery.data ?? []).map((record) => ({ id: String(record.id), date: record.date, checkIn: record.checkIn, checkOut: record.checkOut, status: record.status as AttendanceState, lateMinutes: record.lateMinutes, distanceMeters: record.distanceMeters, note: record.note }));
-  const requests: LeaveRequest[] = (requestsQuery.data ?? []).map((request) => ({ id: String(request.id), type: request.type as RequestType, from: request.fromDate, to: request.toDate, reason: request.reason, status: request.status as RequestStatus, staffAccountId: request.staffAccountId }));
+  const requests: LeaveRequest[] = (requestsQuery.data ?? []).map((request) => ({ id: String(request.id), type: request.type as RequestType, from: request.fromDate, to: request.toDate, reason: request.reason, status: request.status as RequestStatus, staffAccountId: request.staffAccountId, hours: request.hours != null ? Number(request.hours) : null }));
   const staffMembers: Employee[] = (staffQuery.data ?? []).map((staff) => mapEmployee(staff));
   const shiftTemplates: ShiftTemplate[] = (shiftTemplatesQuery.data ?? []).map((item) => ({ id: item.id, name: item.name, kind: item.kind as "shift" | "weekly_off", startTime: item.startTime, endTime: item.endTime, crossesMidnight: item.crossesMidnight, active: item.active }));
   const schedules: ScheduleEntry[] = (mineScheduleQuery.data ?? []) as ScheduleEntry[];
@@ -82,7 +82,9 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const todayRecord = records.find((record) => record.date === todayKey());
   const todaySchedule = schedules.find((item) => item.scheduleDate === todayKey());
   const activeShift = todaySchedule?.shift;
-  const payrollInputs: PayrollInputs = useMemo(() => ({ baseSalary: employee.baseSalary, allowances: 0, bonuses: 0, overtimeHours: 0, absences: records.filter((record) => record.status === "غياب").length, lateMinutes: records.reduce((sum, record) => sum + record.lateMinutes, 0), deductions: 0, advances: 0 }), [employee.baseSalary, records]);
+  const currentMonth = todayKey().slice(0, 7);
+  const approvedOvertimeHours = requests.filter((request) => request.type === "أوفر تايم" && request.status === "مقبول" && request.from.startsWith(currentMonth)).reduce((sum, request) => sum + (request.hours ?? 0), 0);
+  const payrollInputs: PayrollInputs = useMemo(() => ({ baseSalary: employee.baseSalary, allowances: 0, bonuses: 0, overtimeHours: approvedOvertimeHours, absences: records.filter((record) => record.status === "غياب").length, lateMinutes: records.reduce((sum, record) => sum + record.lateMinutes, 0), deductions: 0, advances: 0 }), [employee.baseSalary, records, approvedOvertimeHours]);
   const payroll = useMemo(() => calculatePayroll(payrollInputs), [payrollInputs]);
   const role: Role = meQuery.data?.role === "manager" ? "manager" : "employee";
 
@@ -91,7 +93,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     role, employee, branch, shift: { name: activeShift?.name ?? "الوردية الأساسية", start: activeShift?.startTime ?? meQuery.data?.shiftStart ?? "09:00", end: activeShift?.endTime ?? meQuery.data?.shiftEnd ?? "18:00", days: "حسب جدول الأسبوع", crossesMidnight: activeShift?.crossesMidnight, kind: activeShift?.kind as "shift" | "weekly_off" | undefined }, records, requests, staffMembers, payrollInputs, payroll, todayRecord, checkedIn: Boolean(todayRecord?.checkIn && !todayRecord?.checkOut), loading: meQuery.isLoading || attendanceQuery.isLoading, refresh: invalidateAll, shiftTemplates, schedules, teamSchedules,
     checkIn: async (payload) => { await checkInMutation.mutateAsync({ date: todayKey(), time: payload.time, status: payload.status, lateMinutes: payload.lateMinutes, distanceMeters: payload.distanceMeters }); await invalidateAll(); },
     checkOut: async (time) => { await checkOutMutation.mutateAsync({ date: todayKey(), time }); await invalidateAll(); },
-    submitRequest: async (request) => { await requestMutation.mutateAsync({ type: request.type, fromDate: request.from, toDate: request.to, reason: request.reason }); await invalidateAll(); },
+    submitRequest: async (request) => { await requestMutation.mutateAsync({ type: request.type, fromDate: request.from, toDate: request.to, reason: request.reason, hours: request.hours ?? undefined }); await invalidateAll(); },
     approveRequest: async (id, status) => { await reviewMutation.mutateAsync({ id: Number(id), status: status as "مقبول" | "مرفوض" }); await invalidateAll(); },
     createStaffAccount: async (input) => { await createStaffMutation.mutateAsync({ ...input, shiftStart: "09:00", shiftEnd: "18:00" }); await invalidateAll(); },
     updateStaffAccount: async (input) => { await updateStaffMutation.mutateAsync(input); await invalidateAll(); },

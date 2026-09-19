@@ -1,4 +1,4 @@
-import { boolean, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { boolean, decimal, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -57,6 +57,7 @@ export const staffRequests = mysqlTable("staff_requests", {
   fromDate: varchar("fromDate", { length: 10 }).notNull(),
   toDate: varchar("toDate", { length: 10 }).notNull(),
   reason: text("reason").notNull(),
+  hours: decimal("hours", { precision: 5, scale: 2, mode: "number" }),
   status: varchar("status", { length: 32 }).default("قيد المراجعة").notNull(),
   reviewedBy: int("reviewedBy"),
   reviewedAt: timestamp("reviewedAt"),

@@ -19,6 +19,7 @@ const statements = [
 const alterStatements = [
 `ALTER TABLE payroll_records ADD COLUMN employeeSocialInsurance INT NOT NULL DEFAULT 0`,
 `ALTER TABLE payroll_records ADD COLUMN employeeIncomeTax INT NOT NULL DEFAULT 0`,
+`ALTER TABLE staff_requests ADD COLUMN hours DECIMAL(5,2) NULL`,
 ];
 
 export async function ensureEnterpriseSchema() {

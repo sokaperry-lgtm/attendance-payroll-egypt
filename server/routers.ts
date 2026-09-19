@@ -73,7 +73,7 @@ export const appRouter = router({
   }),
   requests: router({
     list: staffProcedure.query(({ ctx }) => ctx.staffUser.role === "manager" ? enterprise.listCompanyRequests(ctx.staffUser.id) : db.listRequests(ctx.staffUser.id)),
-    create: staffProcedure.input(z.object({ type: z.string().max(32), fromDate: z.string().length(10), toDate: z.string().length(10), reason: z.string().min(2).max(1000) })).mutation(({ ctx, input }) => db.createRequest({ ...input, staffAccountId: ctx.staffUser.id })),
+    create: staffProcedure.input(z.object({ type: z.string().max(32), fromDate: z.string().length(10), toDate: z.string().length(10), reason: z.string().min(2).max(1000), hours: z.number().min(0.5).max(24).optional() })).mutation(({ ctx, input }) => db.createRequest({ ...input, staffAccountId: ctx.staffUser.id })),
     review: managerProcedure.input(z.object({ id: z.number().int(), status: z.enum(["مقبول", "مرفوض"]) })).mutation(async ({ ctx, input }) => { const existing = (await enterprise.listCompanyRequests(ctx.staffUser.id)).find(r => r.id === input.id); if (!existing) throw new Error("الطلب غير موجود."); if (input.status === "مقبول" && existing.type === "إجازة") await enterprise.consumeAnnualLeave(existing.staffAccountId, existing.fromDate, existing.toDate); const row = await db.approveRequest(input.id, ctx.staffUser.id, input.status); if (row) await enterprise.createNotification(row.staffAccountId, "request", `تم تحديث طلبك`, `حالة الطلب أصبحت: ${input.status}`); return row; }),
   }),
   leave: router({

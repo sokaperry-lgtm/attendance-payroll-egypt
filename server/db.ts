@@ -280,7 +280,7 @@ export async function listRequests(staffAccountId?: number) {
     : db.select().from(staffRequests).where(eq(staffRequests.staffAccountId, staffAccountId)).orderBy(desc(staffRequests.createdAt));
 }
 
-export async function createRequest(input: { staffAccountId: number; type: string; fromDate: string; toDate: string; reason: string }) {
+export async function createRequest(input: { staffAccountId: number; type: string; fromDate: string; toDate: string; reason: string; hours?: number }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const result = await db.insert(staffRequests).values(input);

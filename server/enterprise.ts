@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "./db";
 import { calculateEgyptPayroll } from "./egypt-payroll";
+import { PAYROLL_RULES } from "../lib/payroll";
 import {
   companies, branches, companyMembers, leaveBalances,
   payrollRecords, notifications, subscriptions, auditLogs, staffAccounts,
@@ -133,18 +134,22 @@ export async function generatePayroll(staffAccountId: number, month: string) {
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
   const ids = new Set(members.map(x=>x.staffAccountId));
   const attendance = await db.select().from(attendanceRecords);
+  const approvedOvertime = await db.select().from(staffRequests).where(and(eq(staffRequests.type,"أوفر تايم"),eq(staffRequests.status,"مقبول")));
   const result=[];
   for(const s of staff.filter(x=>ids.has(x.id))) {
     const records=attendance.filter(x=>x.staffAccountId===s.id && x.date.startsWith(month));
     const absences=records.filter(x=>x.status==="غياب").length;
     const lateMinutes=records.reduce((a,x)=>a+x.lateMinutes,0);
-    const lateDeduction=Math.round((s.baseSalary/30/8/60)*lateMinutes);
-    const absenceDeduction=Math.round((s.baseSalary/30)*absences);
-    const gross=s.baseSalary;
+    const lateDeduction=Math.round((s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours/60)*lateMinutes);
+    const absenceDeduction=Math.round((s.baseSalary/PAYROLL_RULES.calendarDays)*PAYROLL_RULES.absencePenaltyDays*absences);
+    const overtimeHours=approvedOvertime.filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month)).reduce((sum,r)=>sum+Number(r.hours??0),0);
+    const overtimeRate=s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours;
+    const overtimeValue=Math.round(overtimeHours*overtimeRate);
+    const gross=s.baseSalary+overtimeValue;
     const existing=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.staffAccountId,s.id),eq(payrollRecords.month,month))).limit(1))[0];
     const egypt = calculateEgyptPayroll({ monthlyGross: gross, employeeSocialInsurance: 0, monthlyOtherDeductions: 0 });
     const net=Math.max(0, egypt.net-absenceDeduction-lateDeduction);
-    const values={companyId:m.companyId,staffAccountId:s.id,month,baseSalary:s.baseSalary,allowances:0,bonuses:0,overtime:0,absenceDeduction,lateDeduction,otherDeductions:0,advances:0,employeeSocialInsurance:egypt.employeeSocialInsurance,employeeIncomeTax:egypt.employeeIncomeTax,grossSalary:gross,netSalary:net,status:"draft"};
+    const values={companyId:m.companyId,staffAccountId:s.id,month,baseSalary:s.baseSalary,allowances:0,bonuses:0,overtime:overtimeValue,absenceDeduction,lateDeduction,otherDeductions:0,advances:0,employeeSocialInsurance:egypt.employeeSocialInsurance,employeeIncomeTax:egypt.employeeIncomeTax,grossSalary:gross,netSalary:net,status:"draft"};
     if(existing) await db.update(payrollRecords).set({...values,updatedAt:new Date()}).where(eq(payrollRecords.id,existing.id));
     else await db.insert(payrollRecords).values(values);
     result.push(values);
