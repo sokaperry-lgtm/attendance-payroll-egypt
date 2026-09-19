@@ -2,7 +2,7 @@ import { z } from "zod";
 import { parse as parseCookieHeader } from "cookie";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { INTERNAL_SESSION_COOKIE } from "../shared/const";
-import { companyAdminProcedure, managerProcedure, publicProcedure, router, staffProcedure } from "./_core/trpc";
+import { companyAdminProcedure, managerProcedure, supervisorProcedure, publicProcedure, router, staffProcedure } from "./_core/trpc";
 import * as enterprise from "./enterprise";
 import * as db from "./db";
 
@@ -57,12 +57,12 @@ export const appRouter = router({
   schedule: router({
     templates: staffProcedure.query(() => db.listShiftTemplates()),
     mine: staffProcedure.query(({ ctx }) => db.listSchedules(ctx.staffUser.id)),
-    all: managerProcedure.query(({ ctx }) => enterprise.listCompanySchedules(ctx.staffUser.id)),
-    save: managerProcedure.input(z.object({ staffAccountId: z.number().int(), scheduleDate: z.string().length(10), shiftTemplateId: z.number().int(), note: z.string().max(255).optional() })).mutation(async ({ ctx, input }) => { await enterprise.assertStaffInCompany(ctx.staffUser.id, input.staffAccountId); return db.saveSchedule(input); }),
+    all: supervisorProcedure.query(({ ctx }) => enterprise.listCompanySchedules(ctx.staffUser.id)),
+    save: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), scheduleDate: z.string().length(10), shiftTemplateId: z.number().int(), note: z.string().max(255).optional() })).mutation(async ({ ctx, input }) => { await enterprise.assertStaffInCompany(ctx.staffUser.id, input.staffAccountId); return db.saveSchedule(input); }),
   }),
   attendance: router({
     list: staffProcedure.query(({ ctx }) => db.listAttendance(ctx.staffUser.id)),
-    managerUpdate: managerProcedure.input(z.object({ staffAccountId: z.number().int(), date: z.string().length(10), checkIn: z.string().max(8).nullable().optional(), checkOut: z.string().max(8).nullable().optional(), status: z.enum(["حاضر", "متأخر", "غياب", "إجازة", "مأمورية"]), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0).nullable().optional(), note: z.string().max(1000).nullable().optional() })).mutation(async ({ ctx, input }) => { await enterprise.assertStaffInCompany(ctx.staffUser.id, input.staffAccountId); return db.updateAttendanceByManager(input); }),
+    managerUpdate: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), date: z.string().length(10), checkIn: z.string().max(8).nullable().optional(), checkOut: z.string().max(8).nullable().optional(), status: z.enum(["حاضر", "متأخر", "غياب", "إجازة", "مأمورية"]), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0).nullable().optional(), note: z.string().max(1000).nullable().optional() })).mutation(async ({ ctx, input }) => { await enterprise.assertStaffInCompany(ctx.staffUser.id, input.staffAccountId); return db.updateAttendanceByManager(input); }),
     checkIn: staffProcedure.input(z.object({ date: z.string().length(10), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0) })).mutation(async ({ ctx, input }) => { const branch = await enterprise.getBranchForStaff(ctx.staffUser.id); if (branch && input.distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الحضور المسموح (${branch.radiusMeters} متر).`); const records = await db.listAttendance(ctx.staffUser.id); const existing = records.find(r => r.date === input.date); if (existing?.checkIn) throw new Error("تم تسجيل الحضور بالفعل لهذا اليوم."); const late = Math.max(0, timeMinutes(input.time) - timeMinutes(ctx.staffUser.shiftStart)); const status = late > 0 ? "متأخر" : "حاضر"; return db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status, lateMinutes: late, distanceMeters: input.distanceMeters, note: null }); }),
     checkOut: staffProcedure.input(z.object({ date: z.string().length(10), time: z.string().max(8) })).mutation(async ({ ctx, input }) => {
       const records = await db.listAttendance(ctx.staffUser.id);
@@ -74,7 +74,7 @@ export const appRouter = router({
   requests: router({
     list: staffProcedure.query(({ ctx }) => ctx.staffUser.role === "manager" ? enterprise.listCompanyRequests(ctx.staffUser.id) : db.listRequests(ctx.staffUser.id)),
     create: staffProcedure.input(z.object({ type: z.string().max(32), fromDate: z.string().length(10), toDate: z.string().length(10), reason: z.string().min(2).max(1000), hours: z.number().min(0.5).max(24).optional() })).mutation(({ ctx, input }) => db.createRequest({ ...input, staffAccountId: ctx.staffUser.id })),
-    review: managerProcedure.input(z.object({ id: z.number().int(), status: z.enum(["مقبول", "مرفوض"]) })).mutation(async ({ ctx, input }) => { const existing = (await enterprise.listCompanyRequests(ctx.staffUser.id)).find(r => r.id === input.id); if (!existing) throw new Error("الطلب غير موجود."); if (input.status === "مقبول" && existing.type === "إجازة") await enterprise.consumeLeaveBalance(existing.staffAccountId, existing.fromDate, existing.toDate, "annual"); if (input.status === "مقبول" && existing.type === "إجازة مرضية") await enterprise.consumeLeaveBalance(existing.staffAccountId, existing.fromDate, existing.toDate, "sick"); const row = await db.approveRequest(input.id, ctx.staffUser.id, input.status); if (row) await enterprise.createNotification(row.staffAccountId, "request", `تم تحديث طلبك`, `حالة الطلب أصبحت: ${input.status}`); return row; }),
+    review: supervisorProcedure.input(z.object({ id: z.number().int(), status: z.enum(["مقبول", "مرفوض"]) })).mutation(async ({ ctx, input }) => { const existing = (await enterprise.listCompanyRequests(ctx.staffUser.id)).find(r => r.id === input.id); if (!existing) throw new Error("الطلب غير موجود."); if (input.status === "مقبول" && existing.type === "إجازة") await enterprise.consumeLeaveBalance(existing.staffAccountId, existing.fromDate, existing.toDate, "annual"); if (input.status === "مقبول" && existing.type === "إجازة مرضية") await enterprise.consumeLeaveBalance(existing.staffAccountId, existing.fromDate, existing.toDate, "sick"); const row = await db.approveRequest(input.id, ctx.staffUser.id, input.status); if (row) await enterprise.createNotification(row.staffAccountId, "request", `تم تحديث طلبك`, `حالة الطلب أصبحت: ${input.status}`); return row; }),
   }),
   leave: router({
     balance: staffProcedure.input(z.object({ year: z.number().int().min(2024).max(2100) })).query(({ ctx, input }) => enterprise.getLeaveBalance(ctx.staffUser.id, input.year)),
@@ -97,7 +97,7 @@ export const appRouter = router({
     security: staffProcedure.query(({ ctx }) => enterprise.getSecuritySummary(ctx.staffUser.id)),
   }),
   reports: router({
-    month: managerProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(({ ctx, input }) => enterprise.getMonthlyStaffReports(ctx.staffUser.id, input.month)),
+    month: supervisorProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(({ ctx, input }) => enterprise.getMonthlyStaffReports(ctx.staffUser.id, input.month)),
   }),
   audit: router({
     list: companyAdminProcedure.query(({ ctx }) => enterprise.listAuditLogs(ctx.staffUser.id)),
