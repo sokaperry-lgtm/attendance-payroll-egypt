@@ -88,6 +88,8 @@ function RoleAwareTabs() {
         }}
       >
         <Tabs.Screen name="index" options={{ title: "الرئيسية", tabBarIcon: ({ color }) => <IconSymbol size={23} name="house.fill" color={color} /> }} />
+        <Tabs.Screen name="notifications" options={{ title: "الإشعارات", tabBarIcon: ({ color }) => <IconSymbol size={23} name="notifications" color={color} /> }} />
+        <Tabs.Screen name="hr-tools" options={{ title: "HR Tools", href: manager ? "/hr-tools" : null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="banknote" color={color} /> }} />
         <Tabs.Screen name="attendance" options={{ title: "الحضور", tabBarIcon: ({ color }) => <IconSymbol size={23} name="calendar" color={color} /> }} />
         <Tabs.Screen name="requests" options={{ title: "الطلبات", tabBarIcon: ({ color }) => <IconSymbol size={23} name="doc.text.fill" color={color} /> }} />
         <Tabs.Screen name="schedule" options={{ title: "الجدول", href: teamAccess ? "/schedule" : null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="calendar" color={color} /> }} />
