@@ -21,7 +21,7 @@ const requireStaff = t.middleware(async (opts) => {
 
 const requireManager = t.middleware(async (opts) => {
   if (!opts.ctx.staffUser) throw new TRPCError({ code: "UNAUTHORIZED", message: "يجب تسجيل الدخول بحساب الشركة." });
-  if (!["manager", "supervisor"].includes(opts.ctx.staffUser.role) throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+  if (!["manager", "supervisor"].includes(opts.ctx.staffUser.role)) throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
   return opts.next({ ctx: { ...opts.ctx, staffUser: opts.ctx.staffUser } });
 });
 
