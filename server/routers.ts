@@ -57,7 +57,7 @@ export const appRouter = router({
   schedule: router({
     templates: staffProcedure.query(() => db.listShiftTemplates()),
     mine: staffProcedure.query(({ ctx }) => db.listSchedules(ctx.staffUser.id)),
-    all: managerProcedure.query(() => db.listSchedules()),
+    all: managerProcedure.query(({ ctx }) => enterprise.listCompanySchedules(ctx.staffUser.id)),
     save: managerProcedure.input(z.object({ staffAccountId: z.number().int(), scheduleDate: z.string().length(10), shiftTemplateId: z.number().int(), note: z.string().max(255).optional() })).mutation(async ({ ctx, input }) => { await enterprise.assertStaffInCompany(ctx.staffUser.id, input.staffAccountId); return db.saveSchedule(input); }),
   }),
   attendance: router({
