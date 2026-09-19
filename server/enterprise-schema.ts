@@ -12,11 +12,12 @@ const statements = [
 `CREATE TABLE IF NOT EXISTS audit_logs (id INT AUTO_INCREMENT PRIMARY KEY,companyId INT NULL,staffAccountId INT NULL,action VARCHAR(80) NOT NULL,entity VARCHAR(80),entityId VARCHAR(64),metadata TEXT,createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,INDEX idx_audit_company(companyId,createdAt))`,
 `INSERT INTO companies(name) SELECT 'الشركة الرئيسية' FROM (SELECT 1) x WHERE NOT EXISTS(SELECT 1 FROM companies)`,
 `INSERT INTO branches(companyId,name,address,latitude,longitude,radiusMeters) SELECT c.id,'الفرع الرئيسي','مدينة نصر، القاهرة','30.0444','31.2357',200 FROM companies c WHERE c.id=(SELECT MIN(id) FROM companies) AND NOT EXISTS(SELECT 1 FROM branches WHERE companyId=c.id)`,
-`INSERT INTO company_members(companyId,branchId,staffAccountId,role) SELECT c.id,b.id,s.id,CASE WHEN s.role='manager' THEN 'owner' ELSE 'employee' END FROM staff_accounts s CROSS JOIN (SELECT MIN(id) id FROM companies)c CROSS JOIN (SELECT MIN(id) id FROM branches)b WHERE NOT EXISTS(SELECT 1 FROM company_members m WHERE m.staffAccountId=s.id)`,
+`INSERT INTO company_members(companyId,branchId,staffAccountId,role) SELECT c.id,b.id,s.id,CASE WHEN s.role='manager' THEN 'owner' WHEN s.role='supervisor' THEN 'supervisor' ELSE 'employee' END FROM staff_accounts s CROSS JOIN (SELECT MIN(id) id FROM companies)c CROSS JOIN (SELECT MIN(id) id FROM branches)b WHERE NOT EXISTS(SELECT 1 FROM company_members m WHERE m.staffAccountId=s.id)`,
 `INSERT INTO subscriptions(companyId,plan,status,seats,monthlyPrice,trialEndsAt) SELECT c.id,'trial','trialing',10,0,DATE_ADD(NOW(),INTERVAL 14 DAY) FROM companies c WHERE NOT EXISTS(SELECT 1 FROM subscriptions s WHERE s.companyId=c.id)`
 ];
 
 const alterStatements = [
+`ALTER TABLE staff_accounts MODIFY COLUMN role ENUM('manager','supervisor','employee') NOT NULL DEFAULT 'employee'`,
 `ALTER TABLE payroll_records ADD COLUMN employeeSocialInsurance INT NOT NULL DEFAULT 0`,
 `ALTER TABLE payroll_records ADD COLUMN employeeIncomeTax INT NOT NULL DEFAULT 0`,
 `ALTER TABLE staff_requests ADD COLUMN hours DECIMAL(5,2) NULL`,
