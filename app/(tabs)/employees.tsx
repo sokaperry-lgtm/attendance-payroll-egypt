@@ -118,7 +118,7 @@ export default function EmployeesScreen() {
               <View style={styles.roleOptions}>
                 {(["manager", "supervisor", "employee"] as Role[]).map(item => (
                   <Pressable key={item} onPress={() => setForm(f => ({ ...f, role: item }))} style={[styles.roleOption, form.role === item && styles.roleOptionActive]}>
-                    <IconSymbol name={item === "manager" ? "person.crop.circle.badge.checkmark" : item === "supervisor" ? "person.crop.circle.badge.clock" : "person.crop.circle"} size={21} color={form.role === item ? "#FFF" : "#2563EB"} />
+                    <IconSymbol name={"person.2.fill"} size={21} color={form.role === item ? "#FFF" : "#2563EB"} />
                     <Text style={[styles.roleOptionTitle, form.role === item && styles.roleOptionTitleActive]}>{roleLabels[item]}</Text>
                     <Text style={[styles.roleOptionSub, form.role === item && styles.roleOptionSubActive]}>{item === "manager" ? "صلاحيات إدارية كاملة" : item === "supervisor" ? "إدارة وتشغيل الفريق" : "وصول الموظف الشخصي"}</Text>
                   </Pressable>
