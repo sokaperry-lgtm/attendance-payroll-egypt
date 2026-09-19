@@ -50,7 +50,19 @@ export async function listCompanyStaff(staffAccountId: number) {
   const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
   const ids = new Set(members.map(x => x.staffAccountId));
-  const rows = await db.select().from(staffAccounts).orderBy(desc(staffAccounts.createdAt));
+  const rows = await db.select({
+    id: staffAccounts.id,
+    phone: staffAccounts.phone,
+    name: staffAccounts.name,
+    title: staffAccounts.title,
+    department: staffAccounts.department,
+    role: staffAccounts.role,
+    baseSalary: staffAccounts.baseSalary,
+    shiftStart: staffAccounts.shiftStart,
+    shiftEnd: staffAccounts.shiftEnd,
+    active: staffAccounts.active,
+    createdAt: staffAccounts.createdAt,
+  }).from(staffAccounts).orderBy(desc(staffAccounts.createdAt));
   return rows.filter(row => ids.has(row.id));
 }
 
@@ -79,6 +91,16 @@ export async function createBranch(staffAccountId: number, input: { name: string
   const m = await getCompanyForStaff(staffAccountId); if (!m) throw new Error("Company not found");
   const result = await db.insert(branches).values({ ...input, companyId: m.companyId });
   return (await db.select().from(branches).where(eq(branches.id, Number(result[0].insertId))).limit(1))[0];
+}
+
+export async function listCompanySchedules(staffAccountId: number) {
+  const db = await getDb(); if (!db) return [];
+  const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
+  const members = await db.select({ staffAccountId: companyMembers.staffAccountId }).from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
+  const ids = new Set(members.map(row => row.staffAccountId));
+  const rows = await db.select().from(weeklySchedules).orderBy(desc(weeklySchedules.scheduleDate));
+  const shifts = await db.select().from((await import("../drizzle/schema")).shiftTemplates).where(eq((await import("../drizzle/schema")).shiftTemplates.active, true));
+  return rows.filter(row => ids.has(row.staffAccountId)).map(row => ({ ...row, shift: shifts.find(item => item.id === row.shiftTemplateId) ?? null }));
 }
 
 export async function setMemberRole(actorId: number, staffAccountId: number, role: CompanyRole) {
