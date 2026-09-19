@@ -98,6 +98,7 @@ const weeklyAttendance = [
 
 export default function HomeScreen() {
   const {
+    role,
     employee,
     branch,
     shift,
@@ -202,8 +203,8 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>{dateLabel}</Text>
-            <Text style={styles.title}>صباح الخير، {employee.name.split(" ")[0]}</Text>
-            <Text style={styles.subtitle}>{employee.title} · {employee.department}</Text>
+            <Text style={styles.title}>{role === "manager" ? "لوحة تشغيل الفريق" : `صباح الخير، ${employee.name.split(" ")[0]}`}</Text>
+            <Text style={styles.subtitle}>{role === "manager" ? "تابع الحضور والطلبات والرواتب من مكان واحد" : `${employee.title} · ${employee.department}`}</Text>
           </View>
           <View style={styles.headerActions}>
             <Pressable style={styles.notificationButton} onPress={() => router.push("/requests" as never)}>
@@ -256,7 +257,7 @@ export default function HomeScreen() {
         <View style={styles.sectionHeading}>
           <View>
             <Text style={styles.sectionTitle}>نظرة سريعة</Text>
-            <Text style={styles.sectionSub}>ملخص أدائك خلال سبتمبر</Text>
+              <Text style={styles.sectionSub}>{role === "manager" ? "ملخص فريقك خلال سبتمبر" : "ملخص أدائك خلال سبتمبر"}</Text>
           </View>
           <View style={styles.liveBadge}><View style={styles.liveDot} /><Text style={styles.liveText}>مباشر</Text></View>
         </View>
@@ -351,12 +352,17 @@ export default function HomeScreen() {
           <View><Text style={styles.sectionTitle}>الوصول السريع</Text><Text style={styles.sectionSub}>كل أدواتك في مكان واحد</Text></View>
         </View>
         <View style={styles.quickGrid}>
-          {[
+          {(role === "manager" ? [
+            { icon: "person.2.fill", label: "إدارة الفريق", route: "/manager" },
+            { icon: "banknote", label: "مسير الرواتب", route: "/payroll" },
+            { icon: "doc.text", label: "الطلبات المعلقة", route: "/requests" },
+            { icon: "chart.bar", label: "التقارير", route: "/reports" },
+          ] : [
             { icon: "calendar", label: "سجل الحضور", route: "/attendance" },
             { icon: "clock", label: "الورديات", route: "/schedule" },
             { icon: "doc.text", label: "الطلبات", route: "/requests" },
             { icon: "chart.bar", label: "التقارير", route: "/reports" },
-          ].map((item) => (
+          ]).map((item) => (
             <Pressable key={item.label} onPress={() => router.push(item.route as never)} style={({ pressed }) => [styles.quickCard, pressed && styles.pressed]}>
               <View style={styles.quickIcon}><IconSymbol name={item.icon as never} size={19} color="#2563EB" /></View>
               <Text style={styles.quickLabel}>{item.label}</Text>

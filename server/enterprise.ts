@@ -23,7 +23,7 @@ export async function ensureCompanyForStaff(staffAccountId: number, companyName 
   if (existing) return existing;
   // Never attach an unassigned staff account to an arbitrary existing company.
   // A missing membership means this account needs its own initial tenant.
-  let company = (await db.select().from(companies).limit(1))[0];
+  let company: typeof companies.$inferSelect | undefined = (await db.select().from(companies).limit(1))[0];
   if (company) {
     const hasMembers = (await db.select({ id: companyMembers.id }).from(companyMembers).where(eq(companyMembers.companyId, company.id)).limit(1)).length > 0;
     if (hasMembers) company = undefined;

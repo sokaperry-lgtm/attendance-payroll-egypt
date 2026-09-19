@@ -1,6 +1,7 @@
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { PageHeader, SectionTitle, StatusBadge, UI } from "@/components/ui/design-system";
 import { useAppData } from "@/lib/app-data";
 import { formatDate } from "@/lib/payroll";
 
@@ -28,16 +29,7 @@ export default function AttendanceScreen() {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <>
-            <View style={styles.header}>
-              <View>
-                <Text style={styles.eyebrow}>حساب الموظف</Text>
-                <Text style={styles.title}>سجل الحضور</Text>
-                <Text style={styles.subtitle}>{employee.name} · سبتمبر 2026</Text>
-              </View>
-              <View style={styles.calendarIcon}>
-                <IconSymbol name="calendar" size={25} color="#2563EB" />
-              </View>
-            </View>
+            <PageHeader eyebrow="حساب الموظف" title="سجل الحضور" subtitle={`${employee.name} · سبتمبر 2026`} icon="calendar" />
 
             <View style={styles.heroCard}>
               <View style={styles.heroIcon}><IconSymbol name="chart.bar.fill" size={23} color="#FFFFFF" /></View>
@@ -82,7 +74,7 @@ export default function AttendanceScreen() {
               </View>
             </View>
 
-            <Text style={styles.sectionTitle}>آخر السجلات</Text>
+            <SectionTitle title="آخر السجلات" subtitle="مراجعة يومية للحضور والانصراف" />
           </>
         }
         renderItem={({ item }) => {
@@ -102,12 +94,8 @@ export default function AttendanceScreen() {
                   {item.checkOut ? `  ·  خروج ${item.checkOut}` : ""}
                 </Text>
               </View>
-              <View
-                style={[styles.badge, { backgroundColor: palette.bg }]}
-              >
-                <Text style={[styles.badgeText, { color: palette.text }]}>
-                  {item.status}
-                </Text>
+              <View>
+                <StatusBadge label={item.status} tone={item.status === "حاضر" ? "success" : item.status === "متأخر" ? "warning" : item.status === "غياب" ? "danger" : "neutral"} />
                 {item.lateMinutes > 0 && (
                   <Text style={styles.lateText}>{item.lateMinutes} د</Text>
                 )}
