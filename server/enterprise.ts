@@ -214,9 +214,14 @@ export async function generatePayroll(staffAccountId: number, month: string) {
 export async function approvePayroll(staffAccountId:number, id:number) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(staffAccountId); if(!m || !["owner","hr","accountant"].includes(m.role)) throw new Error("غير مصرح");
+  const current=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
+  if(!current) throw new Error("مسير الرواتب غير موجود.");
+  if(current.status==="approved") return current;
   await db.update(payrollRecords).set({status:"approved",approvedAt:new Date(),updatedAt:new Date()}).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId)));
+  const advances=await db.select().from(salaryAdvances).where(and(eq(salaryAdvances.staffAccountId,current.staffAccountId),eq(salaryAdvances.companyId,m.companyId),eq(salaryAdvances.status,"active")));
+  for(const advance of advances){ if(advance.startMonth<=current.month && advance.remainingAmount>0){ const paid=Math.min(advance.installmentAmount,advance.remainingAmount); const remaining=advance.remainingAmount-paid; await db.update(salaryAdvances).set({remainingAmount:remaining,status:remaining===0?"completed":"active",updatedAt:new Date()}).where(eq(salaryAdvances.id,advance.id)); } }
   const row=(await db.select().from(payrollRecords).where(eq(payrollRecords.id,id)).limit(1))[0];
-  if(row) await createNotification(row.staffAccountId,"payroll","تم اعتماد راتبك",`تم اعتماد راتب شهر ${row.month} بقيمة ${row.netSalary.toLocaleString()} جنيه.`);
+  if(row){ await createNotification(row.staffAccountId,"payroll","تم اعتماد راتبك",`تم اعتماد راتب شهر ${row.month} بقيمة ${row.netSalary.toLocaleString()} جنيه.`); await writeAudit(staffAccountId,m.companyId,"payroll.approved","payroll",String(id),{month:row.month,netSalary:row.netSalary}); }
   return row;
 }
 
