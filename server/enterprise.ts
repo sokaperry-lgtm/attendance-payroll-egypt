@@ -6,7 +6,7 @@ import { PAYROLL_RULES } from "../lib/payroll";
 import {
   companies, branches, companyMembers, leaveBalances,
   payrollRecords, notifications, subscriptions, auditLogs, staffAccounts,
-  attendanceRecords, staffRequests, weeklySchedules, shiftTemplates
+  attendanceRecords, staffRequests, weeklySchedules, shiftTemplates, salaryAdjustments, salaryAdvances, employeeDocuments
 } from "../drizzle/schema";
 
 export type CompanyRole = "owner" | "hr" | "manager" | "supervisor" | "accountant" | "employee";
@@ -194,10 +194,15 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const overtimeHours=approvedOvertime.filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month)).reduce((sum,r)=>sum+Number(r.hours??0),0);
     const overtimeRate=s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours;
     const overtimeValue=Math.round(overtimeHours*overtimeRate);
-    const gross=s.baseSalary+overtimeValue;
-    const egypt = calculateEgyptPayroll({ monthlyGross: gross, employeeSocialInsurance: 0, monthlyOtherDeductions: 0 });
-    const net=Math.max(0, egypt.net-absenceDeduction-lateDeduction);
-    const values={companyId:m.companyId,staffAccountId:s.id,month,baseSalary:s.baseSalary,allowances:0,bonuses:0,overtime:overtimeValue,absenceDeduction,lateDeduction,otherDeductions:0,advances:0,employeeSocialInsurance:egypt.employeeSocialInsurance,employeeIncomeTax:egypt.employeeIncomeTax,grossSalary:gross,netSalary:net,status:"draft"};
+    const adjustments=await db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.staffAccountId,s.id),eq(salaryAdjustments.month,month)));
+    const bonuses=adjustments.filter(a=>a.type==="bonus"||a.type==="incentive").reduce((sum,a)=>sum+a.amount,0);
+    const extraDeductions=adjustments.filter(a=>a.type==="penalty"||a.type==="deduction").reduce((sum,a)=>sum+a.amount,0);
+    const activeAdvances=await db.select().from(salaryAdvances).where(and(eq(salaryAdvances.staffAccountId,s.id),eq(salaryAdvances.status,"active")));
+    const advanceInstallment=activeAdvances.filter(a=>a.startMonth<=month && a.remainingAmount>0).reduce((sum,a)=>sum+Math.min(a.installmentAmount,a.remainingAmount),0);
+    const gross=s.baseSalary+overtimeValue+bonuses;
+    const egypt = calculateEgyptPayroll({ monthlyGross: gross, employeeSocialInsurance: 0, monthlyOtherDeductions: extraDeductions+advanceInstallment });
+    const net=Math.max(0, egypt.net-absenceDeduction-lateDeduction-extraDeductions-advanceInstallment);
+    const values={companyId:m.companyId,staffAccountId:s.id,month,baseSalary:s.baseSalary,allowances:0,bonuses,overtime:overtimeValue,absenceDeduction,lateDeduction,otherDeductions:extraDeductions,advances:advanceInstallment,employeeSocialInsurance:egypt.employeeSocialInsurance,employeeIncomeTax:egypt.employeeIncomeTax,grossSalary:gross,netSalary:net,status:"draft"};
     if(existing) await db.update(payrollRecords).set({...values,updatedAt:new Date()}).where(eq(payrollRecords.id,existing.id));
     else await db.insert(payrollRecords).values(values);
     result.push(values);
