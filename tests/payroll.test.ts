@@ -30,4 +30,16 @@ describe("قواعد المرتب الداخلية", () => {
     expect(result.totalDeductions).toBeCloseTo(result.lateDeduction + 1250);
     expect(result.net).toBeGreaterThan(0);
   });
+
+  it("لا تسمح أن يصبح صافي الراتب سالبًا", () => {
+    const result = calculatePayroll({ baseSalary: 3000, absences: 20, deductions: 10000, advances: 10000 });
+    expect(result.net).toBe(0);
+  });
+
+  it("تتجاهل دقائق التأخير السالبة وتستخدم سعر الأوفر تايم المخصص", () => {
+    const result = calculatePayroll({ baseSalary: 9000, lateMinutes: -30, overtimeHours: 2, overtimeRate: 125 });
+    expect(result.lateDeduction).toBe(0);
+    expect(result.overtimeValue).toBe(250);
+    expect(result.gross).toBe(9250);
+  });
 });

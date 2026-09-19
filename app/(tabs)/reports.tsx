@@ -5,6 +5,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { PageHeader, SectionTitle, SurfaceCard, UI } from "@/components/ui/design-system";
 import { exportAttendanceReportPdf, type AttendancePdfReport } from "@/lib/attendance-pdf";
 import { showAlert } from "@/lib/alert";
+import { buildDepartmentStats, buildStatusStats, buildWeeklyStats, calculateAttendanceRate, summarizePayroll } from "@/lib/dashboard-utils";
 import { trpc } from "@/lib/trpc";
 
 const month = new Date().toISOString().slice(0, 7);
@@ -30,51 +31,18 @@ export default function ReportsScreen() {
   const summary = report?.summary ?? { staffCount: 0, presentDays: 0, absentDays: 0, lateMinutes: 0, pendingRequests: 0 };
   const employees = (report?.employees ?? []) as ReportEmployee[];
   const payrollRows = payrollQuery.data ?? [];
-  const totalAttendanceDays = summary.presentDays + summary.absentDays;
-  const attendanceRate = totalAttendanceDays ? Math.round((summary.presentDays / totalAttendanceDays) * 100) : 0;
-  const approvedPayroll = payrollRows.filter((row) => row.status === "approved").length;
-  const totalPayroll = payrollRows.reduce((sum, row) => sum + Number(row.netSalary ?? 0), 0);
-  const totalAbsenceDeductions = payrollRows.reduce((sum, row) => sum + Number(row.absenceDeduction ?? 0), 0);
-  const totalOvertime = payrollRows.reduce((sum, row) => sum + Number(row.overtime ?? 0), 0);
+  const attendanceRate = calculateAttendanceRate(summary);
+  const payrollSummary = summarizePayroll(payrollRows);
 
   const allRecords = useMemo(() => employees.flatMap((employee) => employee.records), [employees]);
-  const statusStats = useMemo(() => [
-    { label: "حاضر", count: allRecords.filter((record) => record.status === "حاضر").length, color: "#10B981" },
-    { label: "متأخر", count: allRecords.filter((record) => record.status === "متأخر").length, color: "#F59E0B" },
-    { label: "مأمورية", count: allRecords.filter((record) => record.status === "مأمورية").length, color: "#3B82F6" },
-    { label: "غياب", count: allRecords.filter((record) => record.status === "غياب").length, color: "#EF4444" },
-    { label: "إجازة", count: allRecords.filter((record) => record.status === "إجازة").length, color: "#8B5CF6" },
-  ], [allRecords]);
+  const statusStats = useMemo(() => buildStatusStats(allRecords), [allRecords]);
   const maxStatus = Math.max(...statusStats.map((item) => item.count), 1);
   const totalStatusRecords = statusStats.reduce((sum, item) => sum + item.count, 0);
 
-  const weeklyStats = useMemo(() => {
-    const groups = new Map<string, { total: number; present: number }>();
-    allRecords.forEach((record) => {
-      const current = groups.get(record.date) ?? { total: 0, present: 0 };
-      current.total += 1;
-      if (["حاضر", "متأخر", "مأمورية"].includes(record.status)) current.present += 1;
-      groups.set(record.date, current);
-    });
-    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-7).map(([date, value]) => ({
-      label: new Intl.DateTimeFormat("ar-EG", { weekday: "short" }).format(new Date(`${date}T00:00:00`)),
-      date,
-      value: value.total ? Math.round((value.present / value.total) * 100) : 0,
-    }));
-  }, [allRecords]);
+  const weeklyStats = useMemo(() => buildWeeklyStats(allRecords), [allRecords]);
   const maxWeekly = Math.max(...weeklyStats.map((item) => item.value), 1);
 
-  const departmentStats = useMemo(() => {
-    const groups = new Map<string, { present: number; absent: number }>();
-    employees.forEach((employee) => {
-      const department = employee.department || "عام";
-      const current = groups.get(department) ?? { present: 0, absent: 0 };
-      current.present += employee.presentDays;
-      current.absent += employee.absentDays;
-      groups.set(department, current);
-    });
-    return [...groups.entries()].map(([name, value]) => ({ name, rate: value.present + value.absent ? Math.round((value.present / (value.present + value.absent)) * 100) : 0 })).sort((a, b) => b.rate - a.rate).slice(0, 5);
-  }, [employees]);
+  const departmentStats = useMemo(() => buildDepartmentStats(employees), [employees]);
 
   const topLate = [...employees].sort((a, b) => b.lateMinutes - a.lateMinutes).slice(0, 5);
 
@@ -131,10 +99,10 @@ export default function ReportsScreen() {
 
         <SectionTitle title="ملخص الرواتب" subtitle="التكلفة والاعتمادات لهذا الشهر" />
         <View style={styles.payrollGrid}>
-          <MetricCard label="صافي الرواتب" value={`${totalPayroll.toLocaleString("ar-EG")} ج.م`} tone="blue" />
-          <MetricCard label="خصومات الغياب" value={`${totalAbsenceDeductions.toLocaleString("ar-EG")} ج.م`} tone="red" />
-          <MetricCard label="الأوفر تايم" value={`${totalOvertime.toLocaleString("ar-EG")} ج.م`} tone="orange" />
-          <MetricCard label="المسيرات المعتمدة" value={`${approvedPayroll} / ${payrollRows.length}`} tone="green" />
+          <MetricCard label="صافي الرواتب" value={`${payrollSummary.totalPayroll.toLocaleString("ar-EG")} ج.م`} tone="blue" />
+          <MetricCard label="خصومات الغياب" value={`${payrollSummary.totalAbsenceDeductions.toLocaleString("ar-EG")} ج.م`} tone="red" />
+          <MetricCard label="الأوفر تايم" value={`${payrollSummary.totalOvertime.toLocaleString("ar-EG")} ج.م`} tone="orange" />
+          <MetricCard label="المسيرات المعتمدة" value={`${payrollSummary.approvedPayroll} / ${payrollSummary.totalPayrollRows}`} tone="green" />
         </View>
 
         <View style={styles.chartRow}>
