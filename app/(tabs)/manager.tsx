@@ -23,7 +23,6 @@ export default function ManagerScreen() {
   const [department, setDepartment] = useState("");
   const [baseSalary, setBaseSalary] = useState("");
   const [newRole, setNewRole] = useState<"manager" | "supervisor" | "employee">("employee");
-  const [newRole, setNewRole] = useState<"manager" | "supervisor" | "employee">("employee");
   const [editShiftStart, setEditShiftStart] = useState("09:00");
   const [editShiftEnd, setEditShiftEnd] = useState("18:00");
   const [editActive, setEditActive] = useState(true);
