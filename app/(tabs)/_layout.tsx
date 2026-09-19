@@ -34,7 +34,8 @@ function RoleAwareTabs() {
     }
   }, []);
 
-  const manager = role === "manager" || role === "supervisor";
+  const manager = role === "manager";
+  const teamAccess = role === "manager" || role === "supervisor";
 
   return (
       <Tabs
@@ -89,9 +90,9 @@ function RoleAwareTabs() {
         <Tabs.Screen name="index" options={{ title: "الرئيسية", tabBarIcon: ({ color }) => <IconSymbol size={23} name="house.fill" color={color} /> }} />
         <Tabs.Screen name="attendance" options={{ title: "الحضور", tabBarIcon: ({ color }) => <IconSymbol size={23} name="calendar" color={color} /> }} />
         <Tabs.Screen name="requests" options={{ title: "الطلبات", tabBarIcon: ({ color }) => <IconSymbol size={23} name="doc.text.fill" color={color} /> }} />
-        <Tabs.Screen name="schedule" options={{ title: "الجدول", href: manager ? "/schedule" : null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="calendar" color={color} /> }} />
-        <Tabs.Screen name="manager" options={{ title: "الفريق", href: manager ? "/manager" : null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="person.2.fill" color={color} /> }} />
-        <Tabs.Screen name="reports" options={{ title: "التقارير", href: manager ? "/reports" : null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="chart.bar.fill" color={color} /> }} />
+        <Tabs.Screen name="schedule" options={{ title: "الجدول", href: teamAccess ? "/schedule" : null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="calendar" color={color} /> }} />
+        <Tabs.Screen name="manager" options={{ title: "الفريق", href: teamAccess ? "/manager" : null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="person.2.fill" color={color} /> }} />
+        <Tabs.Screen name="reports" options={{ title: "التقارير", href: teamAccess ? "/reports" : null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="chart.bar.fill" color={color} /> }} />
         <Tabs.Screen name="payroll" options={{ title: "الرواتب", href: manager ? "/payroll" : null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="banknote" color={color} /> }} />
         <Tabs.Screen name="employees" options={{ title: "الموظفون", href: manager ? "/employees" : null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="person.2.fill" color={color} /> }} />
         <Tabs.Screen name="settings" options={{ title: "الإعدادات", href: "/settings", tabBarIcon: ({ color }) => <IconSymbol size={23} name="settings" color={color} /> }} />
