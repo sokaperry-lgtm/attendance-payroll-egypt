@@ -15,7 +15,7 @@ export default function EmployeesScreen() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", password: "", title: "", department: "", baseSalary: "", role: "employee" as Role });
 
-  if (role !== "manager" && role !== "supervisor") return <ScreenContainer><State text="إدارة الموظفين للمدير أو السوبرفايزر فقط" /></ScreenContainer>;
+  if (role !== "manager") return <ScreenContainer><State text="إدارة الموظفين للمدير فقط" /></ScreenContainer>;
   if (loading) return <ScreenContainer><State text="جاري تحميل الفريق..." loading /></ScreenContainer>;
 
   const reset = () => {
