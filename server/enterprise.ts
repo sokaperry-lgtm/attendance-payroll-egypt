@@ -1,5 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "./db";
+import * as dbQueries from "./db";
 import { calculateEgyptPayroll } from "./egypt-payroll";
 import { PAYROLL_RULES } from "../lib/payroll";
 import {
@@ -222,7 +223,7 @@ export async function writeAudit(staffAccountId:number, companyId:number, action
 export async function getMonthlyStaffReports(staffAccountId: number, month: string) {
   const m = await getCompanyForStaff(staffAccountId);
   if (!m) throw new Error("Company not found");
-  return db.getMonthlyStaffReports(month, m.companyId);
+  return dbQueries.getMonthlyStaffReports(month, m.companyId);
 }
 
 export async function getSecuritySummary(staffAccountId:number) {
