@@ -61,5 +61,8 @@ export function formatDate(date: Date | string) {
 }
 
 export function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
