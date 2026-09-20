@@ -68,7 +68,16 @@ export default function HomeScreen(){
     finally{setWorking(false);}
   }
 
-  const quick=[["الحضور","calendar","/attendance"],["الطلبات","doc.text.fill","/requests"],["الجدول","calendar","/schedule"],["التقارير","chart.bar.fill","/reports"]];
+  const quick=role==="manager"
+    ? [["الحضور","calendar","/attendance"],["الطلبات","doc.text.fill","/requests"],["التقارير","chart.bar.fill","/reports"],["الرواتب","banknote","/payroll"]]
+    : role==="supervisor"
+      ? [["الحضور","calendar","/attendance"],["الطلبات","doc.text.fill","/requests"],["الجدول","calendar","/schedule"],["الفريق","person.2.fill","/team"]]
+      : [["الحضور","calendar","/attendance"],["الطلبات","doc.text.fill","/requests"],["الجدول","calendar","/schedule"],["الإشعارات","notifications","/notifications"]];
+  const workspaceItems = role==="manager"
+    ? [["حالة الفريق","مستقر","person.2.fill"],["الطلبات",unread+" جديدة","doc.text.fill"],["الرواتب","هذا الشهر","banknote"]]
+    : role==="supervisor"
+      ? [["حضور الفريق",presentDays+" سجل","person.2.fill"],["الطلبات",unread+" تحتاج مراجعة","doc.text.fill"],["تغطية الوردية","92%","calendar"]]
+      : [["وردية اليوم",isWeeklyOff?"إجازة":shift.start+" — "+shift.end,"calendar"],["الحضور",checkedIn?"مسجل الآن":"لم يُسجل بعد","checkmark"],["الراتب",payroll.net.toLocaleString("ar-EG")+" EGP","banknote"]];
 
   return <ScreenContainer edges={["top","left","right"]}>
     <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
@@ -94,13 +103,36 @@ export default function HomeScreen(){
         </View>
       </View>
 
-      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{role==="manager"?"لوحة الإدارة":role==="supervisor"?"لوحة الفريق":"يومك اليوم"}</Text><Text style={styles.sectionSub}>{role==="manager"?"ملخص سريع لأداء الفريق":role==="supervisor"?"متابعة سريعة لفريقك":"أهم معلومات يوم العمل في لمحة"}</Text></View></View>
+      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{role==="manager"?"لوحة الإدارة":role==="supervisor"?"لوحة الفريق":"يومك اليوم"}</Text><Text style={styles.sectionSub}>{role==="manager"?"ملخص سريع لأداء الفريق":role==="supervisor"?"متابعة سريعة لفريقك":"أهم معلومات يوم العمل في لمحة"}</Text></View><View style={styles.sectionBadge}><View style={styles.sectionBadgeDot}/><Text style={styles.sectionBadgeText}>محدث الآن</Text></View></View>
       <View style={[styles.kpis, isMobile && styles.kpisMobile]}>
-        <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="person.2.fill" value={String(presentDays)} label="أيام الحضور" note="هذا الشهر"/></View>
-        <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="clock" value={String(payrollInputs.lateMinutes??0)} label="دقائق التأخير" note="إجمالي الشهر"/></View>
-        <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="banknote" value={payroll.net.toLocaleString("ar-EG")} label="صافي الراتب" note="جنيه مصري"/></View>
-        <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="notifications" value={String(unread)} label="تنبيهات جديدة" note="تحتاج مراجعة"/></View>
+        {role==="manager" ? <>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="person.2.fill" value={String(presentDays)} label="أيام الحضور" note="هذا الشهر"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="clock" value={String(payrollInputs.lateMinutes??0)} label="دقائق التأخير" note="إجمالي الشهر"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="banknote" value={payroll.net.toLocaleString("ar-EG")} label="صافي الرواتب" note="جنيه مصري"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="notifications" value={String(unread)} label="طلبات وتنبيهات" note="تحتاج مراجعة"/></View>
+        </> : role==="supervisor" ? <>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="person.2.fill" value={String(presentDays)} label="حضور الفريق" note="السجلات الحالية"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="clock" value={String(payrollInputs.lateMinutes??0)} label="دقائق التأخير" note="للمتابعة"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="doc.text.fill" value={String(unread)} label="طلبات جديدة" note="في انتظار المراجعة"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="calendar" value="92%" label="تغطية الوردية" note="اليوم"/></View>
+        </> : <>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="calendar" value={isWeeklyOff?"إجازة":shift.start} label="وردية اليوم" note={isWeeklyOff?"راحة أسبوعية":"بداية الوردية"}/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="checkmark" value={checkedIn?"جاري":"بانتظارك"} label="حالة الحضور" note={checkedIn?"تم تسجيل الدخول":"سجل حضورك لبدء اليوم"}/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="banknote" value={payroll.net.toLocaleString("ar-EG")} label="صافي الراتب" note="جنيه مصري"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="notifications" value={String(unread)} label="تنبيهاتك" note="تحتاج انتباهك"/></View>
+        </>}
       </View>
+
+      {role==="manager" ? <View style={styles.executiveGrid}>
+        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>نبض الفريق</Text><Text style={styles.cardMeta}>اليوم</Text></View><View style={styles.pulseRow}><View style={styles.pulseRing}><Text style={styles.pulseValue}>{Math.min(100,Math.round((presentDays/Math.max(records.length,1))*100))}%</Text></View><View style={styles.pulseCopy}><Text style={styles.pulseTitle}>{presentDays > 0 ? "الحضور مستقر" : "بانتظار بيانات الحضور"}</Text><Text style={styles.pulseSub}>مؤشر مبني على سجلات الحضور الحالية</Text></View></View><View style={styles.miniMetric}><Text style={styles.miniValue}>{records.length}</Text><Text style={styles.miniLabel}>سجل حضور</Text></View></View>
+        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>ملخص الرواتب</Text><Text style={styles.cardMeta}>هذا الشهر</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>EGP</Text><Text style={styles.payrollValue}>{payroll.net.toLocaleString("ar-EG")}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>صافي المستحق</Text><Text style={styles.payrollStatus}>جاهز</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{payrollInputs.lateMinutes??0} دقيقة</Text></View></View>
+      </View> : role==="supervisor" ? <View style={styles.executiveGrid}>
+        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>Team Operations</Text><Text style={styles.cardMeta}>اليوم</Text></View><View style={styles.pulseRow}><View style={styles.pulseRing}><Text style={styles.pulseValue}>{Math.min(100,Math.round((presentDays/Math.max(records.length,1))*100))}%</Text></View><View style={styles.pulseCopy}><Text style={styles.pulseTitle}>متابعة تشغيل الفريق</Text><Text style={styles.pulseSub}>راجع الحضور والتأخير والطلبات قبل نهاية الوردية.</Text></View></View><View style={styles.miniMetric}><Text style={styles.miniValue}>{unread}</Text><Text style={styles.miniLabel}>طلبات تحتاج مراجعة</Text></View></View>
+        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>تغطية الوردية</Text><Text style={styles.cardMeta}>مؤشر تشغيلي</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>%</Text><Text style={styles.payrollValue}>92</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>الحضور المسجل</Text><Text style={styles.payrollStatus}>{presentDays} سجل</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{payrollInputs.lateMinutes??0} دقيقة</Text></View></View>
+      </View> : <View style={styles.executiveGrid}>
+        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>Personal Workday</Text><Text style={styles.cardMeta}>اليوم</Text></View><View style={styles.pulseRow}><View style={styles.pulseRing}><Text style={styles.pulseValue}>{checkedIn?"ON":"OFF"}</Text></View><View style={styles.pulseCopy}><Text style={styles.pulseTitle}>{checkedIn?"وردية جارية الآن":"لم يبدأ يوم العمل"}</Text><Text style={styles.pulseSub}>{isWeeklyOff?"اليوم إجازتك الأسبوعية":"سجل حضورك وتابع وقت الوردية من هنا."}</Text></View></View><View style={styles.miniMetric}><Text style={styles.miniValue}>{shift.start+" — "+shift.end}</Text><Text style={styles.miniLabel}>ساعات الوردية</Text></View></View>
+        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>ملخصك المالي</Text><Text style={styles.cardMeta}>هذا الشهر</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>EGP</Text><Text style={styles.payrollValue}>{payroll.net.toLocaleString("ar-EG")}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>صافي الراتب</Text><Text style={styles.payrollStatus}>محدث</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{payrollInputs.lateMinutes??0} دقيقة</Text></View></View>
+      </View>}
 
       <View style={[styles.grid, isMobile && styles.gridMobile]}>
         <View style={[styles.card,styles.attendancePanel,isMobile&&styles.panelMobile]}>
@@ -114,7 +146,7 @@ export default function HomeScreen(){
         </View>
       </View>
 
-      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>وصول سريع</Text><Text style={styles.sectionSub}>اختصارات للمهام اليومية</Text></View></View>
+      <View style={styles.workspaceGrid}>{workspaceItems.map(([label,value,icon])=><View key={label} style={styles.workspaceCard}><View style={styles.workspaceIcon}><IconSymbol name={icon as any} size={17} color="#163A63"/></View><View style={styles.workspaceCopy}><Text style={styles.workspaceLabel}>{label}</Text><Text style={styles.workspaceValue}>{value}</Text></View><Text style={styles.workspaceChevron}>‹</Text></View>)}</View><View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>وصول سريع</Text><Text style={styles.sectionSub}>اختصارات للمهام اليومية</Text></View></View>
       <View style={[styles.quickGrid, isMobile && styles.quickGridMobile]}>{quick.map(([label,icon,path])=><Pressable key={label} onPress={()=>router.push(path as never)} style={({pressed})=>[styles.quick,isMobile&&styles.quickMobile,pressed&&styles.pressed]}><View style={styles.quickIcon}><IconSymbol name={icon as any} size={18} color="#163A63"/></View><View style={styles.quickCopy}><Text style={styles.quickTitle}>{label}</Text><Text style={styles.quickSub}>فتح القسم</Text></View><Text style={styles.chevron}>‹</Text></Pressable>)}</View>
     </ScrollView>
   </ScreenContainer>;
@@ -134,7 +166,9 @@ const styles=StyleSheet.create({
   panelMobile:{minWidth:0,width:"100%"},
   quickMobile:{minWidth:0,width:"100%"},
   gridMobile:{flexDirection:"column",gap:10},
-  quickGridMobile:{flexDirection:"column",gap:9},
+  quickGridMobile:{flexDirection:"column",gap:9},\n  executiveGrid:{flexDirection:"row-reverse",gap:14,flexWrap:"wrap"},executiveCard:{flex:1,minWidth:320,backgroundColor:"#fff",borderRadius:20,borderWidth:1,borderColor:"#E4E7EC",padding:18},pulseRow:{flexDirection:"row-reverse",alignItems:"center",gap:15,marginTop:17},pulseRing:{width:74,height:74,borderRadius:37,borderWidth:7,borderColor:"#163A63",alignItems:"center",justifyContent:"center"},pulseValue:{fontSize:17,fontWeight:"900",color:"#172033"},pulseCopy:{flex:1},pulseTitle:{fontSize:13,fontWeight:"900",color:"#172033",textAlign:"right"},pulseSub:{fontSize:9,color:"#98A2B3",lineHeight:15,marginTop:4,textAlign:"right"},miniMetric:{marginTop:15,borderTopWidth:1,borderTopColor:"#EAECF0",paddingTop:11,flexDirection:"row-reverse",justifyContent:"space-between"},miniValue:{fontSize:12,fontWeight:"900",color:"#172033"},miniLabel:{fontSize:9,color:"#98A2B3"},payrollTotal:{flexDirection:"row-reverse",alignItems:"baseline",gap:7,marginTop:18},payrollValue:{fontSize:27,fontWeight:"900",color:"#172033"},payrollCurrency:{fontSize:9,fontWeight:"900",color:"#98A2B3"},payrollRow:{flexDirection:"row-reverse",justifyContent:"space-between",borderTopWidth:1,borderTopColor:"#EAECF0",paddingTop:10,marginTop:10},payrollLabel:{fontSize:9,color:"#98A2B3"},payrollStatus:{fontSize:9,color:"#15803D",fontWeight:"900"},payrollText:{fontSize:10,color:"#475467",fontWeight:"800"},activityCard:{backgroundColor:"#fff",borderRadius:20,borderWidth:1,borderColor:"#E4E7EC",padding:18},activityRow:{flexDirection:"row-reverse",alignItems:"center",gap:10,borderTopWidth:1,borderTopColor:"#F2F4F7",paddingVertical:12},activityIcon:{width:34,height:34,borderRadius:10,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},activityCopy:{flex:1},activityTitle:{fontSize:11,color:"#172033",fontWeight:"900",textAlign:"right"},activitySub:{fontSize:9,color:"#98A2B3",marginTop:2,textAlign:"right"},activityTime:{fontSize:9,color:"#98A2B3"} ,
+  sectionBadge:{flexDirection:"row-reverse",alignItems:"center",gap:6,backgroundColor:"#F0FDF4",borderRadius:10,paddingHorizontal:9,paddingVertical:6},sectionBadgeDot:{width:6,height:6,borderRadius:3,backgroundColor:"#16A34A"},sectionBadgeText:{fontSize:9,color:"#15803D",fontWeight:"800"},
+  workspaceGrid:{flexDirection:"row-reverse",gap:11,flexWrap:"wrap"},workspaceCard:{flex:1,minWidth:190,backgroundColor:"#fff",borderRadius:16,borderWidth:1,borderColor:"#E4E7EC",padding:13,flexDirection:"row-reverse",alignItems:"center",gap:10},workspaceIcon:{width:38,height:38,borderRadius:11,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},workspaceCopy:{flex:1},workspaceChevron:{fontSize:19,color:"#98A2B3"},workspaceLabel:{fontSize:9,color:"#98A2B3",textAlign:"right"},workspaceValue:{fontSize:12,color:"#172033",fontWeight:"900",marginTop:3,textAlign:"right"},
 
   brand:{flexDirection:"row-reverse",alignItems:"center",gap:11},logo:{width:48,height:48,borderRadius:15,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},kicker:{fontSize:9,color:"#98A2B3",fontWeight:"900",letterSpacing:1,textAlign:"right"},company:{fontSize:14,color:"#172033",fontWeight:"900",marginTop:2,textAlign:"right"},
   headerRight:{flexDirection:"row-reverse",alignItems:"center",gap:15},dateBlock:{alignItems:"flex-end"},date:{fontSize:10,color:"#98A2B3"},welcome:{fontSize:12,color:"#172033",fontWeight:"800",marginTop:3},bell:{width:44,height:44,borderRadius:13,borderWidth:1,borderColor:"#E4E7EC",backgroundColor:"#fff",alignItems:"center",justifyContent:"center",position:"relative"},dot:{position:"absolute",right:8,top:8,width:7,height:7,borderRadius:4,backgroundColor:"#163A63",borderWidth:2,borderColor:"#fff"},
