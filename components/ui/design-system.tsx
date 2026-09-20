@@ -10,9 +10,9 @@ export const UI = {
   border: "#E4E7EC",
   canvas: "#FFFFFF",
   surface: "#FFFFFF",
-  success: "#2F7D5B",
-  warning: "#B7791F",
-  danger: "#C05656",
+  success: "#163A63",
+  warning: "#31577F",
+  danger: "#0F2742",
 } as const;
 
 export function PageHeader({ eyebrow, title, subtitle, icon }: { eyebrow: string; title: string; subtitle?: string; icon: string }) {
@@ -45,7 +45,12 @@ export function SurfaceCard({ children, style }: { children: ReactNode; style?: 
 }
 
 export function StatusBadge({ label, tone = "neutral" }: { label: string; tone?: "success" | "warning" | "danger" | "neutral" }) {
-  const palette = { success: ["#ECFDF3", UI.success], warning: ["#FFFAEB", UI.warning], danger: ["#FEF2F2", UI.danger], neutral: ["#F2F4F7", UI.muted] }[tone];
+  const palette = {
+    success: ["#EAF1F8", UI.navy],
+    warning: ["#EEF3F8", UI.warning],
+    danger: ["#E6EDF5", UI.danger],
+    neutral: ["#F2F4F7", UI.muted],
+  }[tone];
   return <View style={[styles.badge, { backgroundColor: palette[0] }]}><View style={[styles.dot, { backgroundColor: palette[1] }]} /><Text style={[styles.badgeText, { color: palette[1] }]}>{label}</Text></View>;
 }
 
