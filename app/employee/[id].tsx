@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { trpc } from "@/lib/trpc";
@@ -37,7 +37,7 @@ export default function EmployeeProfileScreen() {
   const absent = attendance.filter((r) => r.status === "غياب").length;
   const late = attendance.reduce((sum, r) => sum + Number(r.lateMinutes || 0), 0);
   const approvedRequests = requests.filter((r) => r.status === "مقبول").length;
-  const latestPayroll = payroll[0];
+  const latestPayroll = payroll[0];  const attendanceRate = attendance.length ? Math.round((present / attendance.length) * 100) : 0;  const recentAttendance = useMemo(() => attendance.slice(0, 8), [attendance]);
 
   return (
     <Screen>
@@ -50,14 +50,14 @@ export default function EmployeeProfileScreen() {
             <Text style={styles.kicker}>EMPLOYEE 360</Text>
             <Text style={styles.name}>{employee.name}</Text>
             <Text style={styles.role}>{employee.title || "موظف"} · {employee.department || "—"}</Text>
-            <Text style={styles.phone}>{employee.phone || "لا يوجد رقم هاتف"}</Text>
+            <Text style={styles.phone}>{employee.phone || "لا يوجد رقم هاتف"}</Text>            <View style={styles.heroBadges}><Text style={styles.heroBadge}>نشط</Text><Text style={styles.heroBadgeGhost}>{employee.role === "manager" ? "مدير" : employee.role === "supervisor" ? "مشرف" : "موظف"}</Text></View>
           </View>
         </View>
 
         <View style={styles.kpis}>
-          <Kpi label="الحضور" value={String(present)} />
-          <Kpi label="الغياب" value={String(absent)} />
-          <Kpi label="التأخير" value={`${late} د`} />
+          <Kpi label="معدل الحضور" value={`${attendanceRate}%`} />
+          <Kpi label="أيام الحضور" value={String(present)} />
+          <Kpi label="دقائق التأخير" value={`${late} د`} />
           <Kpi label="آخر صافي راتب" value={latestPayroll ? formatMoney(Number(latestPayroll.netSalary || 0)) : "—"} />
         </View>
 
@@ -137,6 +137,7 @@ const styles = StyleSheet.create({
   name: { color: "#FFFFFF", fontSize: 27, fontWeight: "900", textAlign: "right", marginTop: 4 },
   role: { color: "#D9E6F2", fontSize: 12, textAlign: "right", marginTop: 4 },
   phone: { color: "#FFFFFF", opacity: 0.75, fontSize: 11, textAlign: "right", marginTop: 5 },
+  heroBadges:{flexDirection:"row-reverse",gap:7,marginTop:10},heroBadge:{color:"#163A63",backgroundColor:"#FFFFFF",borderRadius:8,paddingHorizontal:9,paddingVertical:4,fontSize:9,fontWeight:"900"},heroBadgeGhost:{color:"#FFFFFF",backgroundColor:"rgba(255,255,255,0.12)",borderRadius:8,paddingHorizontal:9,paddingVertical:4,fontSize:9,fontWeight:"800"},
   kpis: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 12 },
   kpi: { flexGrow: 1, flexBasis: 180, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E4E7EC", borderRadius: 18, padding: 16, minHeight: 88, justifyContent: "center" },
   kpiValue: { color: "#163A63", fontSize: 20, fontWeight: "900", textAlign: "right" },
@@ -155,6 +156,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
   title: { color: "#172033", fontSize: 21, fontWeight: "900", textAlign: "center" },
   muted: { color: "#667085", fontSize: 12, lineHeight: 21, textAlign: "center", paddingVertical: 8 },
+  progressTrack:{height:10,borderRadius:8,backgroundColor:"#EEF2F6",overflow:"hidden",marginTop:8},progressFill:{height:"100%",backgroundColor:"#163A63",borderRadius:8},progressText:{color:"#667085",fontSize:10,textAlign:"right",marginTop:9},bigMoney:{color:"#163A63",fontSize:25,fontWeight:"900",textAlign:"right"},mutedSmall:{color:"#98A6B8",fontSize:10,textAlign:"right",marginTop:4},
   button: { backgroundColor: "#163A63", borderRadius: 12, paddingHorizontal: 22, paddingVertical: 12 },
   buttonText: { color: "#FFFFFF", fontWeight: "800" },
 });
