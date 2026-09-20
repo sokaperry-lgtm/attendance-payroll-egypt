@@ -101,6 +101,7 @@ function RoleAwareTabs() {
         <Tabs.Screen name="payroll" options={{ title: "الرواتب", href: mobile ? null : (manager ? "/payroll" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="banknote" color={color} /> }} />
         <Tabs.Screen name="employees" options={{ title: "الموظفون", href: mobile ? null : (manager ? "/employees" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="person.2.fill" color={color} /> }} />
         <Tabs.Screen name="settings" options={{ title: "الإعدادات", href: mobile ? null : (manager ? "/settings" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="settings" color={color} /> }} />
+        <Tabs.Screen name="logout" options={{ title: "تسجيل الخروج", href: mobile ? null : "/logout", tabBarIcon: ({ color }) => <IconSymbol size={23} name="logout" color={color} /> }} />
       </Tabs>
   );
 }

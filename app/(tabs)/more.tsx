@@ -14,6 +14,7 @@ export default function MoreScreen() {
     ...(manager ? [["الموظفون", "person.2.fill", "/employees"], ["الرواتب", "banknote", "/payroll"], ["HR Tools", "banknote", "/hr-tools"]] : []),
     ...(teamAccess ? [["الجدول", "calendar", "/schedule"], ["التقارير", "chart.bar.fill", "/reports"]] : []),
     ...(manager ? [["الإعدادات", "settings", "/settings"]] : []),
+    ["تسجيل الخروج", "logout", "/logout"],
   ];
 
   return (
