@@ -3,16 +3,16 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
 export const UI = {
-  navy: "#33443F",
-  primary: "#668C7F",
-  ink: "#303735",
-  muted: "#7B817E",
-  border: "#E7E2D9",
-  canvas: "#F7F4EE",
+  navy: "#163A63",
+  primary: "#163A63",
+  ink: "#172033",
+  muted: "#667085",
+  border: "#E4E7EC",
+  canvas: "#FFFFFF",
   surface: "#FFFFFF",
-  success: "#2E7D68",
-  warning: "#B18452",
-  danger: "#B86F6B",
+  success: "#2F7D5B",
+  warning: "#B7791F",
+  danger: "#C05656",
 } as const;
 
 export function PageHeader({ eyebrow, title, subtitle, icon }: { eyebrow: string; title: string; subtitle?: string; icon: string }) {
@@ -45,7 +45,7 @@ export function SurfaceCard({ children, style }: { children: ReactNode; style?: 
 }
 
 export function StatusBadge({ label, tone = "neutral" }: { label: string; tone?: "success" | "warning" | "danger" | "neutral" }) {
-  const palette = { success: ["#E6F1EC", UI.success], warning: ["#F7EBDD", UI.warning], danger: ["#F7E7E7", UI.danger], neutral: ["#F3F0EA", UI.muted] }[tone];
+  const palette = { success: ["#ECFDF3", UI.success], warning: ["#FFFAEB", UI.warning], danger: ["#FEF2F2", UI.danger], neutral: ["#F2F4F7", UI.muted] }[tone];
   return <View style={[styles.badge, { backgroundColor: palette[0] }]}><View style={[styles.dot, { backgroundColor: palette[1] }]} /><Text style={[styles.badgeText, { color: palette[1] }]}>{label}</Text></View>;
 }
 
@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
   eyebrow: { color: UI.muted, fontSize: 11, fontWeight: "800", textAlign: "right", letterSpacing: 0.3 },
   title: { color: UI.ink, fontSize: 28, fontWeight: "900", marginTop: 5, textAlign: "right" },
   subtitle: { color: UI.muted, fontSize: 12, marginTop: 5, textAlign: "right" },
-  icon: { width: 50, height: 50, borderRadius: 16, backgroundColor: "#EEF3EF", alignItems: "center", justifyContent: "center" },
+  icon: { width: 50, height: 50, borderRadius: 16, backgroundColor: "#EEF4FB", alignItems: "center", justifyContent: "center" },
   section: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
   sectionTitle: { color: UI.ink, fontSize: 17, fontWeight: "900", textAlign: "right" },
   sectionSubtitle: { color: UI.muted, fontSize: 10, marginTop: 3, textAlign: "right" },
