@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { showAlert } from "@/lib/alert";
 import * as Location from "expo-location";
@@ -16,7 +16,7 @@ function distanceBetween(lat1:number,lon1:number,lat2:number,lon2:number){
   const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
   return Math.round(r*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
 }
-function currentTime(){return new Intl.DateTimeFormat("ar-EG",{hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date());}
+function currentTime(date = new Date()){return new Intl.DateTimeFormat("ar-EG",{hour:"2-digit",minute:"2-digit",hour12:false}).format(date);}
 type Coordinates={latitude:number;longitude:number};
 function getBrowserLocation():Promise<Coordinates>{return new Promise((resolve,reject)=>{if(!navigator.geolocation){reject(new Error("المتصفح لا يدعم تحديد الموقع."));return;}navigator.geolocation.getCurrentPosition(p=>resolve({latitude:p.coords.latitude,longitude:p.coords.longitude}),e=>reject(new Error(e.code===e.PERMISSION_DENIED?"يجب السماح بالوصول إلى الموقع لتسجيل الحضور.":e.code===e.POSITION_UNAVAILABLE?"تعذر تحديد موقعك الحالي.":"انتهت مهلة تحديد الموقع.")),{enableHighAccuracy:true,timeout:15000,maximumAge:0});});}
 async function getCurrentCoordinates():Promise<Coordinates>{
@@ -34,12 +34,18 @@ export default function HomeScreen(){
   const router=useRouter();
   const { width } = useWindowDimensions();
   const isMobile = width < 700;
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
   const notificationsQuery=trpc.notifications.list.useQuery();
   const [working,setWorking]=useState(false);
   const [gpsMessage,setGpsMessage]=useState("الموقع جاهز للتحقق");
   const isCheckedOut=Boolean(todayRecord?.checkOut),isWeeklyOff=shift.kind==="weekly_off";
   const presentDays=records.filter(r=>r.status==="حاضر"||r.status==="متأخر").length;
   const unread=(notificationsQuery.data??[]).filter(n=>!n.readAt).length;
+  const attendanceActionLabel = working ? "جارٍ التحقق..." : checkedIn ? "تسجيل الانصراف" : "تسجيل الحضور";
   const dateLabel=useMemo(()=>new Intl.DateTimeFormat("ar-EG",{weekday:"long",day:"numeric",month:"long"}).format(new Date()),[]);
 
   async function handleCheckIn(){
@@ -47,7 +53,7 @@ export default function HomeScreen(){
     try{const c=await getCurrentCoordinates(),d=distanceBetween(branch.latitude,branch.longitude,c.latitude,c.longitude);
       if(d>branch.radiusMeters)throw new Error(`أنت خارج نطاق الفرع بـ ${d} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`);
       const lateMinutes=calculateLateMinutes(new Date(),shift.start,PAYROLL_RULES.graceMinutes);
-      await checkIn({time:currentTime(),distanceMeters:d,status:lateMinutes>0?"متأخر":"حاضر",lateMinutes});
+      await checkIn({time:currentTime(now),distanceMeters:d,status:lateMinutes>0?"متأخر":"حاضر",lateMinutes});
       setGpsMessage(`تم التحقق من الموقع — ${d} متر من الفرع`);
       if(Platform.OS!=="web")await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }catch(e){const m=e instanceof Error?e.message:"تعذر التحقق من الموقع";setGpsMessage(m);showAlert("لم يتم تسجيل الحضور",m);}
@@ -57,7 +63,7 @@ export default function HomeScreen(){
     setWorking(true);
     try{const c=await getCurrentCoordinates(),d=distanceBetween(branch.latitude,branch.longitude,c.latitude,c.longitude);
       if(d>branch.radiusMeters)throw new Error(`أنت خارج نطاق الفرع بـ ${d} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`);
-      await checkOut({time:currentTime(),distanceMeters:d});setGpsMessage(`تم تسجيل الانصراف — ${d} متر من الفرع`);
+      await checkOut({time:currentTime(now),distanceMeters:d});setGpsMessage(`تم تسجيل الانصراف — ${d} متر من الفرع`);
     }catch(e){showAlert("تعذر تسجيل الانصراف",e instanceof Error?e.message:"حدث خطأ غير متوقع.");}
     finally{setWorking(false);}
   }
@@ -75,20 +81,20 @@ export default function HomeScreen(){
         <View style={styles.heroCopy}>
           <View style={styles.live}><View style={styles.liveDot}/><Text style={styles.liveText}>النظام يعمل · اليوم</Text></View>
           <Text style={styles.heroTitle}>{role==="manager"?"نظرة واحدة على يوم فريقك.":"كل ما تحتاجه ليوم عمل مرتب."}</Text>
-          <Text style={styles.heroSub}>{role==="manager"?"الحضور، الرواتب، الطلبات وأداء الفريق في مكان واحد.":"سجل حضورك وتابع ورديتك وراتبك من لوحة واحدة بسيطة."}</Text>
+          <Text style={styles.heroSub}>{role==="manager"?"الحضور، الرواتب، الطلبات وأداء الفريق في مكان واحد.":role==="supervisor"?"تابع حضور الفريق وطلبات الموظفين وجدول العمل من مكان واحد.":"سجل حضورك وتابع ورديتك وراتبك وطلباتك من لوحة واحدة بسيطة."}</Text>
           <View style={[styles.heroStats, isMobile && styles.heroStatsMobile]}><View><Text style={styles.heroLabel}>الفرع</Text><Text style={styles.heroValue}>الفرع الرئيسي</Text></View><View><Text style={styles.heroLabel}>الوردية</Text><Text style={styles.heroValue}>{isWeeklyOff?"إجازة":shift.start+" — "+shift.end}</Text></View><View><Text style={styles.heroLabel}>الالتزام</Text><Text style={styles.heroValue}>92%</Text></View></View>
         </View>
         <View style={styles.attendanceCard}>
           <Text style={styles.attendanceLabel}>{isCheckedOut?"تم إنهاء الوردية":checkedIn?"الوردية جارية":"ابدأ يومك"}</Text>
-          <Text style={styles.clock}>{currentTime()}</Text>
+          <Text style={styles.clock}>{currentTime(now)}</Text>
           <View style={styles.locationRow}><View style={styles.locationIcon}><IconSymbol name="location.fill" size={14} color="#163A63"/></View><Text style={styles.locationText}>{gpsMessage}</Text></View>
           <Pressable disabled={working||isWeeklyOff||isCheckedOut} onPress={checkedIn?handleCheckOut:handleCheckIn} style={({pressed})=>[styles.attendanceButton,(working||isWeeklyOff||isCheckedOut)&&styles.disabled,pressed&&styles.pressed]}>
-            <IconSymbol name={checkedIn?"arrow.right":"checkmark"} size={17} color="#FFFFFF"/><Text style={styles.attendanceButtonText}>{working?"جارٍ التحقق...":checkedIn?"تسجيل الانصراف":"تسجيل الحضور"}</Text>
+            <IconSymbol name={checkedIn?"arrow.right":"checkmark"} size={17} color="#FFFFFF"/><Text style={styles.attendanceButtonText}>{attendanceActionLabel}</Text>
           </Pressable>
         </View>
       </View>
 
-      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>لوحة اليوم</Text><Text style={styles.sectionSub}>أرقامك الأساسية في لمحة</Text></View></View>
+      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{role==="manager"?"لوحة الإدارة":role==="supervisor"?"لوحة الفريق":"يومك اليوم"}</Text><Text style={styles.sectionSub}>{role==="manager"?"ملخص سريع لأداء الفريق":role==="supervisor"?"متابعة سريعة لفريقك":"أهم معلومات يوم العمل في لمحة"}</Text></View></View>
       <View style={[styles.kpis, isMobile && styles.kpisMobile]}>
         <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="person.2.fill" value={String(presentDays)} label="أيام الحضور" note="هذا الشهر"/></View>
         <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="clock" value={String(payrollInputs.lateMinutes??0)} label="دقائق التأخير" note="إجمالي الشهر"/></View>
@@ -131,7 +137,7 @@ const styles=StyleSheet.create({
   quickGridMobile:{flexDirection:"column",gap:9},
 
   brand:{flexDirection:"row-reverse",alignItems:"center",gap:11},logo:{width:44,height:44,borderRadius:13,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},logoText:{color:"#fff",fontSize:12,fontWeight:"900"},kicker:{fontSize:9,color:"#98A2B3",fontWeight:"900",letterSpacing:1,textAlign:"right"},company:{fontSize:14,color:"#172033",fontWeight:"900",marginTop:2,textAlign:"right"},
-  headerRight:{flexDirection:"row-reverse",alignItems:"center",gap:15},dateBlock:{alignItems:"flex-end"},date:{fontSize:10,color:"#98A2B3"},welcome:{fontSize:12,color:"#172033",fontWeight:"800",marginTop:3},bell:{width:44,height:44,borderRadius:13,borderWidth:1,borderColor:"#E4E7EC",backgroundColor:"#fff",alignItems:"center",justifyContent:"center",position:"relative"},dot:{position:"absolute",right:8,top:8,width:7,height:7,borderRadius:4,backgroundColor:"#C05656",borderWidth:2,borderColor:"#fff"},
+  headerRight:{flexDirection:"row-reverse",alignItems:"center",gap:15},dateBlock:{alignItems:"flex-end"},date:{fontSize:10,color:"#98A2B3"},welcome:{fontSize:12,color:"#172033",fontWeight:"800",marginTop:3},bell:{width:44,height:44,borderRadius:13,borderWidth:1,borderColor:"#E4E7EC",backgroundColor:"#fff",alignItems:"center",justifyContent:"center",position:"relative"},dot:{position:"absolute",right:8,top:8,width:7,height:7,borderRadius:4,backgroundColor:"#163A63",borderWidth:2,borderColor:"#fff"},
   hero:{backgroundColor:"#163A63",borderRadius:26,padding:24,flexDirection:"row-reverse",gap:22,shadowColor:"#163A63",shadowOpacity:.14,shadowRadius:20,shadowOffset:{width:0,height:8},elevation:4},heroCopy:{flex:1,paddingVertical:5},live:{flexDirection:"row-reverse",alignItems:"center",gap:7},liveDot:{width:7,height:7,borderRadius:4,backgroundColor:"#60A5FA"},liveText:{color:"#BFD7F5",fontSize:10,fontWeight:"800"},heroTitle:{color:"#fff",fontSize:30,fontWeight:"900",lineHeight:38,marginTop:13,textAlign:"right"},heroSub:{color:"#C8D5E6",fontSize:12,lineHeight:20,marginTop:7,maxWidth:650,textAlign:"right"},heroStats:{flexDirection:"row-reverse",gap:32,borderTopWidth:1,borderTopColor:"rgba(255,255,255,.12)",marginTop:24,paddingTop:15},heroLabel:{color:"#8FA9C7",fontSize:9,textAlign:"right"},heroValue:{color:"#fff",fontSize:12,fontWeight:"800",marginTop:3,textAlign:"right"},
   attendanceCard:{width:285,maxWidth:"100%",backgroundColor:"#fff",borderRadius:20,padding:18,justifyContent:"center"},attendanceLabel:{color:"#667085",fontSize:10,fontWeight:"800",textAlign:"right"},clock:{color:"#172033",fontSize:31,fontWeight:"900",textAlign:"right",marginTop:3},locationRow:{flexDirection:"row-reverse",alignItems:"center",gap:7,marginTop:7},locationIcon:{width:28,height:28,borderRadius:9,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},locationText:{color:"#667085",fontSize:9,flex:1,textAlign:"right"},attendanceButton:{height:47,borderRadius:12,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center",flexDirection:"row-reverse",gap:7,marginTop:13},attendanceButtonText:{color:"#fff",fontSize:11,fontWeight:"900"},disabled:{backgroundColor:"#AAB8C8"},pressed:{opacity:.82,transform:[{scale:.985}]},
   sectionHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"flex-end"},sectionTitle:{fontSize:18,color:"#172033",fontWeight:"900",textAlign:"right"},sectionSub:{fontSize:10,color:"#98A2B3",marginTop:3,textAlign:"right"},
