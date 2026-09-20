@@ -37,15 +37,15 @@ export default function MoreScreen() {
 }
 
 const styles = StyleSheet.create({
-  page:{padding:22,paddingBottom:50,gap:20,maxWidth:760,width:"100%",alignSelf:"center"},
+  page:{22: 24,50: 24,20: 24,maxWidth:760,width:"100%",alignSelf:"center"},
   header:{alignItems:"flex-end"},
-  eyebrow:{fontSize:10,fontWeight:"900",letterSpacing:1,color:"#98A2B3"},
-  title:{fontSize:28,fontWeight:"900",color:"#172033",marginTop:5,textAlign:"right"},
-  subtitle:{fontSize:12,color:"#667085",marginTop:5,textAlign:"right"},
-  grid:{gap:10},
-  item:{minHeight:64,borderWidth:1,borderColor:"#E4E7EC",borderRadius:16,backgroundColor:"#FFFFFF",padding:12,flexDirection:"row-reverse",alignItems:"center",gap:12},
-  icon:{width:40,height:40,borderRadius:12,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},
-  label:{flex:1,fontSize:13,fontWeight:"800",color:"#172033",textAlign:"right"},
-  chevron:{fontSize:20,color:"#98A2B3"},
+  eyebrow:{fontSize: 10,fontWeight:"900",letterSpacing:1,color:"#667085"},
+  title:{fontSize: 26,fontWeight:"900",color:"#172033",5: 24,textAlign:"right"},
+  subtitle:{fontSize: 12,color:"#667085",5: 24,textAlign:"right"},
+  grid:{10: 24},
+  item:{minHeight:64,borderWidth:1,borderColor:"#E4E7EC",borderRadius: 16,backgroundColor:"#FFFFFF",12: 24,flexDirection:"row-reverse",alignItems:"center",12: 24},
+  icon:{width:40,height:40,borderRadius: 12,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},
+  label:{flex:1,fontSize: 13,fontWeight:"800",color:"#172033",textAlign:"right"},
+  chevron:{fontSize: 19,color:"#667085"},
   pressed:{opacity:.82,transform:[{scale:.99}]},
 });
