@@ -5,6 +5,7 @@ import { INTERNAL_SESSION_COOKIE } from "../shared/const";
 import { companyAdminProcedure, managerProcedure, supervisorProcedure, publicProcedure, router, staffProcedure } from "./_core/trpc";
 import * as enterprise from "./enterprise";
 import * as db from "./db";
+import { PAYROLL_RULES } from "../lib/payroll";
 
 function timeMinutes(value: string) { const [h,m]=value.split(":").map(Number); return (h||0)*60+(m||0); }
 
@@ -78,7 +79,9 @@ export const appRouter = router({
       if (m) await enterprise.writeAudit(ctx.staffUser.id, m.companyId, "attendance.updated", "attendance", String(row?.id ?? ""), {staffAccountId:input.staffAccountId,date:input.date,status:input.status});
       return row;
     }),
-    checkIn: staffProcedure.input(z.object({ date: z.string().length(10), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0) })).mutation(async ({ ctx, input }) => { await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7)); const branch = await enterprise.getBranchForStaff(ctx.staffUser.id); if (branch && input.distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الحضور المسموح (${branch.radiusMeters} متر).`); const records = await db.listAttendance(ctx.staffUser.id); const existing = records.find(r => r.date === input.date); if (existing?.checkIn) throw new Error("تم تسجيل الحضور بالفعل لهذا اليوم."); const late = Math.max(0, timeMinutes(input.time) - timeMinutes(ctx.staffUser.shiftStart)); const status = late > 0 ? "متأخر" : "حاضر"; return db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status, lateMinutes: late, distanceMeters: input.distanceMeters, note: null }); }),
+    checkIn: staffProcedure.input(z.object({ date: z.string().length(10), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0) })).mutation(async ({ ctx, input }) => { await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7)); const branch = await enterprise.getBranchForStaff(ctx.staffUser.id); if (branch && input.distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الحضور المسموح (${branch.radiusMeters} متر).`); const records = await db.listAttendance(ctx.staffUser.id); const existing = records.find(r => r.date === input.date); if (existing?.checkIn) throw new Error("تم تسجيل الحضور بالفعل لهذا اليوم."); const rawLate = Math.max(0, timeMinutes(input.time) - timeMinutes(ctx.staffUser.shiftStart));
+      const late = Math.max(0, rawLate - PAYROLL_RULES.graceMinutes);
+      const status = late > 0 ? "متأخر" : "حاضر"; return db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status, lateMinutes: late, distanceMeters: input.distanceMeters, note: null }); }),
     checkOut: staffProcedure.input(z.object({ date: z.string().length(10), time: z.string().max(8), distanceMeters: z.number().int().min(0) })).mutation(async ({ ctx, input }) => {
       await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7));
       const branch = await enterprise.getBranchForStaff(ctx.staffUser.id); if (branch && input.distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الانصراف المسموح (${branch.radiusMeters} متر).`);
