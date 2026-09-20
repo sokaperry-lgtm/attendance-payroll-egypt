@@ -6,7 +6,7 @@ export default function Root({ children }: PropsWithChildren) {
     <html lang="ar" dir="rtl">
       <head>
         <meta charSet="utf-8" />
-        <meta name="theme-color" content="#0F766E" />
+        <meta name="theme-color" content="#0A0E14" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />

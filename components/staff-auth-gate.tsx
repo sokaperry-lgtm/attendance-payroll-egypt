@@ -15,6 +15,6 @@ export function StaffAuthGate({ children }: { children: React.ReactNode }) {
     if (meQuery.data && isLoginRoute) router.replace("/(tabs)");
   }, [isLoginRoute, meQuery.data, meQuery.isLoading, router]);
 
-  if (!meQuery.data && !isLoginRoute) return <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#F8FAFC" }}><ActivityIndicator color="#0E7490" /><Text style={{ color: "#64748B", marginTop: 10 }}>جاري التحقق من الحساب...</Text></View>;
+  if (!meQuery.data && !isLoginRoute) return <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#10161F" }}><ActivityIndicator color="#5B9BFF" /><Text style={{ color: "#97A3B6", marginTop: 10 }}>جاري التحقق من الحساب...</Text></View>;
   return <>{children}</>;
 }
