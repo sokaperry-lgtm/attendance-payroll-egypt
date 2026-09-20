@@ -16,8 +16,7 @@ export default function TabLayout() {
 }
 
 function RoleAwareTabs() {
-  const colors = useColors();
-  const insets = useSafeAreaInsets();
+    const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { role } = useAppData();
   const isDesktopWeb = Platform.OS === "web" && width >= 900;
@@ -43,8 +42,8 @@ function RoleAwareTabs() {
           tabBarPosition: isDesktopWeb ? "right" : "bottom",
           tabBarVariant: isDesktopWeb ? "material" : "uikit",
           tabBarLabelPosition: isDesktopWeb ? "beside-icon" : "below-icon",
-          tabBarActiveTintColor: isDesktopWeb ? "#163A63" : colors.primary,
-          tabBarInactiveTintColor: isDesktopWeb ? "#667085" : colors.muted,
+          tabBarActiveTintColor: "#163A63",
+          tabBarInactiveTintColor: "#667085",
           headerShown: false,
           tabBarButton: HapticTab,
           tabBarLabelStyle: {
@@ -56,12 +55,14 @@ function RoleAwareTabs() {
           tabBarItemStyle: isDesktopWeb
             ? {
                 borderRadius: 14,
-                marginVertical: 4,
-                paddingHorizontal: 10,
+                marginVertical: 5,
+                paddingHorizontal: 12,
+                backgroundColor: "#FFFFFF",
               }
             : {
                 borderRadius: 14,
                 marginHorizontal: 2,
+                backgroundColor: "#FFFFFF",
               },
           tabBarIconStyle: {
             marginBottom: isDesktopWeb ? 0 : 1,
@@ -81,8 +82,8 @@ function RoleAwareTabs() {
                 paddingTop: 7,
                 paddingBottom: bottomPadding,
                 height: tabBarHeight,
-                backgroundColor: colors.surface,
-                borderTopColor: colors.border,
+                backgroundColor: "#FFFFFF",
+                borderTopColor: "#E4E7EC",
                 borderTopWidth: 0.5,
               },
         }}
