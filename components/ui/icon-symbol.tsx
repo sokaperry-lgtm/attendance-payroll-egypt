@@ -34,6 +34,7 @@ const MAPPING = {
   notifications: "notifications-none",
   history: "history",
   login: "login",
+  fingerprint: "fingerprint",
 } as IconMapping;
 
 export function IconSymbol({
