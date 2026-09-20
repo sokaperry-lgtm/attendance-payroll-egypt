@@ -69,6 +69,7 @@ export default function HomeScreen(){
   }
 
   const quick=[["الحضور","calendar","/attendance"],["الطلبات","doc.text.fill","/requests"],["الجدول","calendar","/schedule"],["التقارير","chart.bar.fill","/reports"]];
+  const workspaceItems = role==="manager" ? [["حالة الفريق","مستقر","person.2.fill"],["الطلبات",""+unread+" جديدة","doc.text.fill"],["الرواتب","هذا الشهر","banknote"]] : [["وردية اليوم",isWeeklyOff?"إجازة":shift.start+" — "+shift.end,"calendar"],["الحضور",checkedIn?"مسجل الآن":"لم يُسجل بعد","checkmark"],["الراتب","صافي الشهر","banknote"]];
 
   return <ScreenContainer edges={["top","left","right"]}>
     <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
@@ -94,7 +95,7 @@ export default function HomeScreen(){
         </View>
       </View>
 
-      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{role==="manager"?"لوحة الإدارة":role==="supervisor"?"لوحة الفريق":"يومك اليوم"}</Text><Text style={styles.sectionSub}>{role==="manager"?"ملخص سريع لأداء الفريق":role==="supervisor"?"متابعة سريعة لفريقك":"أهم معلومات يوم العمل في لمحة"}</Text></View></View>
+      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{role==="manager"?"لوحة الإدارة":role==="supervisor"?"لوحة الفريق":"يومك اليوم"}</Text><Text style={styles.sectionSub}>{role==="manager"?"ملخص سريع لأداء الفريق":role==="supervisor"?"متابعة سريعة لفريقك":"أهم معلومات يوم العمل في لمحة"}</Text></View><View style={styles.sectionBadge}><View style={styles.sectionBadgeDot}/><Text style={styles.sectionBadgeText}>محدث الآن</Text></View></View>
       <View style={[styles.kpis, isMobile && styles.kpisMobile]}>
         <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="person.2.fill" value={String(presentDays)} label="أيام الحضور" note="هذا الشهر"/></View>
         <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="clock" value={String(payrollInputs.lateMinutes??0)} label="دقائق التأخير" note="إجمالي الشهر"/></View>
@@ -114,7 +115,7 @@ export default function HomeScreen(){
         </View>
       </View>
 
-      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>وصول سريع</Text><Text style={styles.sectionSub}>اختصارات للمهام اليومية</Text></View></View>
+      <View style={styles.workspaceGrid}>{workspaceItems.map(([label,value,icon])=><View key={label} style={styles.workspaceCard}><View style={styles.workspaceIcon}><IconSymbol name={icon as any} size={17} color="#163A63"/></View><View style={styles.workspaceCopy}><Text style={styles.workspaceLabel}>{label}</Text><Text style={styles.workspaceValue}>{value}</Text></View><IconSymbol name="chevron.left" size={13} color="#98A2B3"/></View>)}</View><View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>وصول سريع</Text><Text style={styles.sectionSub}>اختصارات للمهام اليومية</Text></View></View>
       <View style={[styles.quickGrid, isMobile && styles.quickGridMobile]}>{quick.map(([label,icon,path])=><Pressable key={label} onPress={()=>router.push(path as never)} style={({pressed})=>[styles.quick,isMobile&&styles.quickMobile,pressed&&styles.pressed]}><View style={styles.quickIcon}><IconSymbol name={icon as any} size={18} color="#163A63"/></View><View style={styles.quickCopy}><Text style={styles.quickTitle}>{label}</Text><Text style={styles.quickSub}>فتح القسم</Text></View><Text style={styles.chevron}>‹</Text></Pressable>)}</View>
     </ScrollView>
   </ScreenContainer>;
@@ -135,6 +136,8 @@ const styles=StyleSheet.create({
   quickMobile:{minWidth:0,width:"100%"},
   gridMobile:{flexDirection:"column",gap:10},
   quickGridMobile:{flexDirection:"column",gap:9},
+  sectionBadge:{flexDirection:"row-reverse",alignItems:"center",gap:6,backgroundColor:"#F0FDF4",borderRadius:10,paddingHorizontal:9,paddingVertical:6},sectionBadgeDot:{width:6,height:6,borderRadius:3,backgroundColor:"#16A34A"},sectionBadgeText:{fontSize:9,color:"#15803D",fontWeight:"800"},
+  workspaceGrid:{flexDirection:"row-reverse",gap:11,flexWrap:"wrap"},workspaceCard:{flex:1,minWidth:190,backgroundColor:"#fff",borderRadius:16,borderWidth:1,borderColor:"#E4E7EC",padding:13,flexDirection:"row-reverse",alignItems:"center",gap:10},workspaceIcon:{width:38,height:38,borderRadius:11,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},workspaceCopy:{flex:1},workspaceLabel:{fontSize:9,color:"#98A2B3",textAlign:"right"},workspaceValue:{fontSize:12,color:"#172033",fontWeight:"900",marginTop:3,textAlign:"right"},
 
   brand:{flexDirection:"row-reverse",alignItems:"center",gap:11},logo:{width:48,height:48,borderRadius:15,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},kicker:{fontSize:9,color:"#98A2B3",fontWeight:"900",letterSpacing:1,textAlign:"right"},company:{fontSize:14,color:"#172033",fontWeight:"900",marginTop:2,textAlign:"right"},
   headerRight:{flexDirection:"row-reverse",alignItems:"center",gap:15},dateBlock:{alignItems:"flex-end"},date:{fontSize:10,color:"#98A2B3"},welcome:{fontSize:12,color:"#172033",fontWeight:"800",marginTop:3},bell:{width:44,height:44,borderRadius:13,borderWidth:1,borderColor:"#E4E7EC",backgroundColor:"#fff",alignItems:"center",justifyContent:"center",position:"relative"},dot:{position:"absolute",right:8,top:8,width:7,height:7,borderRadius:4,backgroundColor:"#163A63",borderWidth:2,borderColor:"#fff"},
