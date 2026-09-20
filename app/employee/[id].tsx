@@ -13,23 +13,30 @@ export default function EmployeeProfileScreen() {
   const { id }=useLocalSearchParams<{id:string}>();
   const { staffMembers, role }=useAppData();
   const employee=staffMembers.find(x=>x.id===String(id));
-  const month=new Date().toISOString().slice(0,7);
-  const reports=trpc.reports.month.useQuery({month},{enabled:role==="manager" || role==="supervisor"});
-  const profile=trpc.hrTools.employee360.useQuery({staffAccountId:Number(id)},{enabled:(role==="manager" || role==="supervisor") && Boolean(id)});
+  const profile=trpc.hrTools.employee360.useQuery(
+    {staffAccountId:Number(id)},
+    {enabled:(role==="manager" || role==="supervisor") && Boolean(id) && Number.isFinite(Number(id))}
+  );
   const [docOpen,setDocOpen]=useState(false);
   const [docTitle,setDocTitle]=useState("");
   const [docType,setDocType]=useState("عقد");
   const [expiryDate,setExpiryDate]=useState("");
   const addDoc=trpc.hrTools.addDocument.useMutation({onSuccess:()=>{setDocOpen(false);setDocTitle("");setExpiryDate("");profile.refetch();}});
   const deleteDoc=trpc.hrTools.deleteDocument.useMutation({onSuccess:()=>profile.refetch()});
-  if(!employee) return <ScreenContainer><View style={styles.state}><IconSymbol name="person.fill" size={40} color="#5B9BFF"/><Text style={styles.stateTitle}>الموظف غير موجود</Text><Pressable onPress={()=>router.back()} style={styles.back}><Text style={styles.backText}>رجوع</Text></Pressable></View></ScreenContainer>;
-  const stats=reports.data?.employees?.find((x:any)=>String(x.id)===employee.id);
+  if(!employee) return <ScreenContainer><View style={styles.state}><IconSymbol name="person.2.fill" size={40} color="#163A63"/><Text style={styles.stateTitle}>الموظف غير موجود</Text><Pressable onPress={()=>router.back()} style={styles.back}><Text style={styles.backText}>رجوع</Text></Pressable></View></ScreenContainer>;
+  if(profile.isLoading) return <ScreenContainer><View style={styles.state}><ActivityIndicator size="large" color="#163A63"/><Text style={styles.stateTitle}>جاري تحميل ملف الموظف...</Text></View></ScreenContainer>;
+  const stats={
+    presentDays:(profile.data?.attendance??[]).filter((r:any)=>r.status==="حاضر"||r.status==="متأخر").length,
+    absentDays:(profile.data?.attendance??[]).filter((r:any)=>r.status==="غياب").length,
+    lateMinutes:(profile.data?.attendance??[]).reduce((sum:number,r:any)=>sum+Number(r.lateMinutes??0),0),
+    pendingRequests:(profile.data?.requests??[]).filter((r:any)=>r.status==="قيد المراجعة").length,
+  };
   return <ScreenContainer><ScrollView contentContainerStyle={styles.content}>
     <Pressable onPress={()=>router.back()}><Text style={styles.backLink}>‹ رجوع للفريق</Text></Pressable>
     <View style={styles.hero}><View style={styles.avatar}><Text style={styles.avatarText}>{employee.initials}</Text></View><View style={{flex:1}}><Text style={styles.kicker}>EMPLOYEE PROFILE</Text><Text style={styles.name}>{employee.name}</Text><Text style={styles.role}>{employee.title} · {employee.department}</Text><View style={styles.status}><View style={styles.dot}/><Text style={styles.statusText}>{employee.active===false?"غير نشط":"موظف نشط"}</Text></View></View></View>
     <View style={styles.grid}>
       <Card title="بيانات أساسية"><Row label="رقم الهاتف" value={employee.phone||"—"}/><Row label="القسم" value={employee.department}/><Row label="المسمى الوظيفي" value={employee.title}/><Row label="الراتب الأساسي" value={formatMoney(employee.baseSalary)}/></Card>
-      <Card title="مؤشرات الشهر"><Row label="أيام الحضور" value={String(stats?.presentDays??0)}/><Row label="أيام الغياب" value={String(stats?.absentDays??0)}/><Row label="دقائق التأخير" value={String(stats?.lateMinutes??0)}/><Row label="طلبات معلقة" value={String(stats?.pendingRequests??0)}/></Card>
+      <Card title="مؤشرات الشهر"><Row label="أيام الحضور" value={String(stats.presentDays)}/><Row label="أيام الغياب" value={String(stats.absentDays)}/><Row label="دقائق التأخير" value={String(stats.lateMinutes)}/><Row label="طلبات معلقة" value={String(stats.pendingRequests)}/></Card>
     </View>
     <Card title="المستندات"><View style={styles.docHeader}><Text style={styles.hint}>المستندات المرتبطة بملف الموظف</Text>{role==="manager"&&<Pressable onPress={()=>setDocOpen(true)} style={styles.docButton}><Text style={styles.docButtonText}>+ إضافة مستند</Text></Pressable>}</View>{(profile.data?.documents??[]).map((d:any)=><View key={d.id} style={styles.docRow}><View style={styles.docMain}><Text style={styles.docTitle}>{d.title}</Text><Text style={styles.docMeta}>{d.type}{d.expiryDate?` · ينتهي ${d.expiryDate}`:""}</Text></View>{role==="manager"&&<Pressable onPress={()=>deleteDoc.mutate({id:d.id})}><Text style={styles.deleteText}>حذف</Text></Pressable>}</View>)}{!(profile.data?.documents?.length)&&<Text style={styles.empty}>لا توجد مستندات مضافة.</Text>}</Card>
     <Card title="Payroll snapshot"><View style={styles.payroll}><Text style={styles.payrollValue}>{formatMoney(employee.baseSalary)}</Text><Text style={styles.payrollLabel}>الأساسي الشهري</Text></View><View style={styles.metrics}><Metric label="تعديلات راتب" value={String(profile.data?.adjustments?.length ?? 0)} /><Metric label="سلف" value={String(profile.data?.advances?.length ?? 0)} /><Metric label="مستندات" value={String(profile.data?.documents?.length ?? 0)} /><Metric label="مسيرات" value={String(profile.data?.payroll?.length ?? 0)} /></View></Card>
