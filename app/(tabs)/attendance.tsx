@@ -59,7 +59,7 @@ export default function AttendanceScreen() {
 
             <View style={styles.insightCard}>
               <View style={styles.insightIcon}>
-                <IconSymbol name="chart.bar.fill" size={18} color="#4F7D70" />
+                <IconSymbol name="chart.bar.fill" size={18} color="#668C7F" />
               </View>
               <View style={styles.insightCopy}>
                 <Text style={styles.insightTitle}>ملخص سريع</Text>
@@ -117,16 +117,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 2,
   },
-  eyebrow: { color: "#7A8088", fontSize: 13, textAlign: "right" },
+  eyebrow: { color: "#7B817E", fontSize: 13, textAlign: "right" },
   title: {
-    color: "#20262E",
+    color: "#303735",
     fontSize: 27,
     fontWeight: "800",
     marginTop: 5,
     textAlign: "right",
   },
   subtitle: {
-    color: "#7A8088",
+    color: "#7B817E",
     fontSize: 12,
     marginTop: 5,
     textAlign: "right",
@@ -139,17 +139,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  heroCard: { backgroundColor: "#263A36", borderRadius: 24, padding: 19, flexDirection: "row-reverse", alignItems: "center", gap: 13, overflow: "hidden" },
-  heroIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: "#355C52", alignItems: "center", justifyContent: "center" },
+  heroCard: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 19, flexDirection: "row-reverse", alignItems: "center", gap: 13, overflow: "hidden" },
+  heroIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: "#668C7F", alignItems: "center", justifyContent: "center" },
   heroCopy: { flex: 1 },
   heroLabel: { color: "#93C5FD", fontSize: 11, textAlign: "right" },
   heroValue: { color: "#FFFFFF", fontSize: 30, fontWeight: "900", textAlign: "right", marginTop: 2 },
-  heroHint: { color: "#92989F", fontSize: 10, marginTop: 2, textAlign: "right" },
-  heroRing: { width: 76, height: 76, borderRadius: 38, borderWidth: 7, borderColor: "#355C52", alignItems: "center", justifyContent: "center" },
+  heroHint: { color: "#8A918D", fontSize: 10, marginTop: 2, textAlign: "right" },
+  heroRing: { width: 76, height: 76, borderRadius: 38, borderWidth: 7, borderColor: "#668C7F", alignItems: "center", justifyContent: "center" },
   heroRingText: { color: "#FFFFFF", fontSize: 18, fontWeight: "800" },
   heroRingLabel: { color: "#8B96A8", fontSize: 9, marginTop: 1 },
   summary: {
-    backgroundColor: "#4F7D70",
+    backgroundColor: "#668C7F",
     borderRadius: 20,
     padding: 18,
     flexDirection: "row-reverse",
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#243352",
+    borderColor: "#D6E2DC",
     flexDirection: "row-reverse",
     alignItems: "center",
     gap: 10,
@@ -199,14 +199,14 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   insightText: {
-    color: "#92989F",
+    color: "#8A918D",
     fontSize: 11,
     lineHeight: 17,
     marginTop: 3,
     textAlign: "right",
   },
   sectionTitle: {
-    color: "#20262E",
+    color: "#303735",
     fontSize: 18,
     fontWeight: "800",
     textAlign: "right",
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 11,
     borderWidth: 1,
-    borderColor: "#E6E1D8",
+    borderColor: "#E7E2D9",
   },
   dateBox: {
     width: 43,
@@ -230,8 +230,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  dateDay: { color: "#20262E", fontWeight: "800", fontSize: 18 },
-  dateMonth: { color: "#7A8088", fontSize: 10, marginTop: 1 },
+  dateDay: { color: "#303735", fontWeight: "800", fontSize: 18 },
+  dateMonth: { color: "#7B817E", fontSize: 10, marginTop: 1 },
   rowMain: { flex: 1 },
   rowDate: {
     color: "#AAB4C4",
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   rowTime: {
-    color: "#92989F",
+    color: "#8A918D",
     fontSize: 11,
     marginTop: 5,
     textAlign: "right",
@@ -254,5 +254,5 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 11, fontWeight: "800" },
   lateText: { color: "#B77A32", fontSize: 9, marginTop: 2 },
-  empty: { color: "#7A8088", textAlign: "center", padding: 30 },
+  empty: { color: "#7B817E", textAlign: "center", padding: 30 },
 });
