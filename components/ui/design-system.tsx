@@ -3,16 +3,16 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
 export const UI = {
-  navy: "#263A36",
-  primary: "#4F7D70",
-  ink: "#20262E",
-  muted: "#7A8088",
-  border: "#E6E1D8",
-  canvas: "#F4F1EB",
+  navy: "#33443F",
+  primary: "#668C7F",
+  ink: "#303735",
+  muted: "#7B817E",
+  border: "#E7E2D9",
+  canvas: "#F7F4EE",
   surface: "#FFFFFF",
   success: "#2E7D68",
-  warning: "#B77A32",
-  danger: "#B85C5C",
+  warning: "#B18452",
+  danger: "#B86F6B",
 } as const;
 
 export function PageHeader({ eyebrow, title, subtitle, icon }: { eyebrow: string; title: string; subtitle?: string; icon: string }) {
@@ -55,12 +55,12 @@ const styles = StyleSheet.create({
   eyebrow: { color: UI.muted, fontSize: 11, fontWeight: "800", textAlign: "right", letterSpacing: 0.3 },
   title: { color: UI.ink, fontSize: 28, fontWeight: "900", marginTop: 5, textAlign: "right" },
   subtitle: { color: UI.muted, fontSize: 12, marginTop: 5, textAlign: "right" },
-  icon: { width: 50, height: 50, borderRadius: 16, backgroundColor: "#E8EEE9", alignItems: "center", justifyContent: "center" },
+  icon: { width: 50, height: 50, borderRadius: 16, backgroundColor: "#EEF3EF", alignItems: "center", justifyContent: "center" },
   section: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
   sectionTitle: { color: UI.ink, fontSize: 17, fontWeight: "900", textAlign: "right" },
   sectionSubtitle: { color: UI.muted, fontSize: 10, marginTop: 3, textAlign: "right" },
   action: { color: UI.primary, fontSize: 11, fontWeight: "800" },
-  card: { backgroundColor: UI.surface, borderWidth: 1, borderColor: UI.border, borderRadius: 20, padding: 16 },
+  card: { backgroundColor: UI.surface, borderWidth: 1, borderColor: UI.border, borderRadius: 18, padding: 16 },
   badge: { flexDirection: "row-reverse", alignItems: "center", gap: 6, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 6 },
   dot: { width: 7, height: 7, borderRadius: 4 },
   badgeText: { fontSize: 10, fontWeight: "800" },
