@@ -201,304 +201,86 @@ export default function HomeScreen() {
   }
 
   return (
-    <ScreenContainer edges={["top", "left", "right"]}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <View style={styles.headerCopy}>
-            <Text style={styles.eyebrow}>{dateLabel}</Text>
-            <Text style={styles.title}>{role === "manager" ? "لوحة تشغيل الفريق" : `صباح الخير، ${employee.name.split(" ")[0]}`}</Text>
-            <Text style={styles.subtitle}>{role === "manager" ? "تابع الحضور والطلبات والرواتب من مكان واحد" : `${employee.title} · ${employee.department}`}</Text>
+    <ScreenContainer edges={["top","left","right"]}>
+      <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
+        <View style={styles.topbar}>
+          <View style={styles.profileRow}>
+            <View style={styles.avatar}><Text style={styles.avatarText}>{employee.initials}</Text></View>
+            <View><Text style={styles.muted}>{dateLabel}</Text><Text style={styles.greeting}>{role === "manager" ? "مساحة إدارة الفريق" : "أهلاً " + employee.name.split(" ")[0]}</Text></View>
           </View>
-          <View style={styles.headerActions}>
-            <Pressable style={styles.notificationButton} onPress={() => router.push("/requests" as never)}>
-              <IconSymbol name="notifications" size={21} color="#AAB4C4" />
-              {(notificationsQuery.data ?? []).some((n) => !n.readAt) && <View style={styles.notificationDot} />}
-            </Pressable>
-            <Pressable
-              onPress={async () => {
-                await logoutMutation.mutateAsync();
-                await Auth.removeSessionToken();
-                await Auth.clearUserInfo();
-                router.replace("/login" as never);
-              }}
-              style={styles.avatar}
-            >
-              <Text style={styles.avatarText}>{employee.initials}</Text>
-            </Pressable>
-          </View>
+          <Pressable style={styles.iconButton} onPress={() => router.push("/notifications" as never)}>
+            <IconSymbol name="notifications" size={20} color="#303735" />
+            {(notificationsQuery.data ?? []).some((n) => !n.readAt) && <View style={styles.notificationDot} />}
+          </Pressable>
         </View>
 
         <View style={styles.hero}>
-          <View style={styles.heroGlow} />
-          <View style={styles.heroTop}>
-            <View style={styles.heroIcon}>
-              <IconSymbol name={isWeeklyOff ? "calendar" : "clock"} size={22} color="#668C7F" />
-            </View>
-            <View style={styles.heroCopy}>
-              <Text style={styles.heroEyebrow}>وردية اليوم</Text>
-              <Text style={styles.heroTitle}>{shift.name}</Text>
-              <Text style={styles.heroMeta}>
-                {isWeeklyOff ? "إجازة أسبوعية مدفوعة" : `${shift.start} — ${shift.end} · الفرع الرئيسي`}
-              </Text>
-            </View>
-            <View style={styles.heroTime}>
-              <Text style={styles.heroTimeLabel}>اليوم</Text>
-              <Text style={styles.heroTimeValue}>{isWeeklyOff ? "OFF" : shift.start}</Text>
+          <View style={styles.heroMain}>
+            <View style={styles.eyebrowRow}><View style={styles.liveDot}/><Text style={styles.eyebrow}>نظام الحضور نشط</Text></View>
+            <Text style={styles.heroTitle}>{role === "manager" ? "كل ما يهمك عن فريقك، في شاشة واحدة." : "يوم عملك يبدأ من هنا."}</Text>
+            <Text style={styles.heroText}>{role === "manager" ? "راقب الحضور والطلبات والرواتب واتخاذ القرار بسرعة." : "سجل حضورك، تابع ورديتك، واعرف وضعك المالي بسهولة."}</Text>
+            <View style={styles.heroMetaRow}>
+              <View><Text style={styles.metaLabel}>الوردية</Text><Text style={styles.metaValue}>{isWeeklyOff ? "إجازة" : shift.start + " — " + shift.end}</Text></View>
+              <View><Text style={styles.metaLabel}>الفرع</Text><Text style={styles.metaValue}>الفرع الرئيسي</Text></View>
+              <View><Text style={styles.metaLabel}>الحضور</Text><Text style={styles.metaValue}>92%</Text></View>
             </View>
           </View>
-          <View style={styles.heroFooter}>
-            <View>
-              <Text style={styles.heroFooterLabel}>نسبة الحضور هذا الشهر</Text>
-              <Text style={styles.heroFooterValue}>92%</Text>
-            </View>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: "92%" }]} />
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.sectionHeading}>
-          <View>
-            <Text style={styles.sectionTitle}>نظرة سريعة</Text>
-              <Text style={styles.sectionSub}>{role === "manager" ? "ملخص فريقك خلال سبتمبر" : "ملخص أدائك خلال سبتمبر"}</Text>
-          </View>
-          <View style={styles.liveBadge}><View style={styles.liveDot} /><Text style={styles.liveText}>مباشر</Text></View>
-        </View>
-
-        <View style={styles.kpiGrid}>
-          <View style={styles.kpiCard}>
-            <View style={[styles.kpiIcon, { backgroundColor: "#E6F1EC" }]}><IconSymbol name="checkmark" size={17} color="#2E7D68" /></View>
-            <Text style={styles.kpiValue}>{presentDays}</Text>
-            <Text style={styles.kpiLabel}>أيام الحضور</Text>
-            <Text style={styles.kpiTrend}>↑ 4.2% عن الشهر السابق</Text>
-          </View>
-          <View style={styles.kpiCard}>
-            <View style={[styles.kpiIcon, { backgroundColor: "#E7EEEB" }]}><IconSymbol name="clock" size={17} color="#668C7F" /></View>
-            <Text style={styles.kpiValue}>{payrollInputs.lateMinutes?.toLocaleString("ar-EG") ?? "٠"}</Text>
-            <Text style={styles.kpiLabel}>دقيقة تأخير</Text>
-            <Text style={styles.kpiTrendNeutral}>ضمن المعدل الطبيعي</Text>
-          </View>
-          <View style={styles.kpiCard}>
-            <View style={[styles.kpiIcon, { backgroundColor: "#F7EBDD" }]}><IconSymbol name="wallet" size={17} color="#FB923C" /></View>
-            <Text style={styles.kpiValue}>{payroll.net.toLocaleString("ar-EG")}</Text>
-            <Text style={styles.kpiLabel}>صافي المرتب المتوقع</Text>
-            <Text style={styles.kpiUnit}>ج.م</Text>
-          </View>
-        </View>
-
-        <View style={styles.analyticsRow}>
-          <View style={styles.chartCard}>
-            <View style={styles.cardHeader}>
-              <View><Text style={styles.cardTitle}>أداء الحضور</Text><Text style={styles.cardSubtitle}>معدل الالتزام خلال آخر 7 أيام</Text></View>
-              <View style={styles.periodPill}><Text style={styles.periodText}>هذا الأسبوع</Text><IconSymbol name="chevron.down" size={14} color="#7B817E" /></View>
-            </View>
-            <View style={styles.chartArea}>
-              <View style={styles.gridLine} /><View style={[styles.gridLine, { top: "33%" }]} /><View style={[styles.gridLine, { top: "66%" }]} />
-              <View style={styles.bars}>
-                {weeklyAttendance.map((item) => (
-                  <View key={item.day} style={styles.barColumn}>
-                    <View style={styles.barTrack}><View style={[styles.bar, { height: `${item.value}%` }]} /></View>
-                    <Text style={styles.barValue}>{item.value}</Text>
-                    <Text style={styles.barLabel}>{item.day.slice(0, 2)}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.statusCard}>
-            <View style={styles.cardHeader}>
-              <View><Text style={styles.cardTitle}>حالة الشهر</Text><Text style={styles.cardSubtitle}>حتى اليوم</Text></View>
-              <IconSymbol name="chart.bar" size={19} color="#7B817E" />
-            </View>
-            <View style={styles.donutWrap}>
-              <View style={styles.donutOuter}><View style={styles.donutInner}><Text style={styles.donutValue}>92%</Text><Text style={styles.donutLabel}>حضور</Text></View></View>
-            </View>
-            <View style={styles.statusRows}>
-              <View style={styles.statusRow}><View style={[styles.statusColor, { backgroundColor: "#2E7D68" }]} /><Text style={styles.statusName}>حاضر</Text><Text style={styles.statusPercent}>92%</Text></View>
-              <View style={styles.statusRow}><View style={[styles.statusColor, { backgroundColor: "#B18452" }]} /><Text style={styles.statusName}>متأخر</Text><Text style={styles.statusPercent}>5%</Text></View>
-              <View style={styles.statusRow}><View style={[styles.statusColor, { backgroundColor: "#1E2733" }]} /><Text style={styles.statusName}>غياب</Text><Text style={styles.statusPercent}>3%</Text></View>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.sectionHeading}>
-          <View><Text style={styles.sectionTitle}>تسجيل اليوم</Text><Text style={styles.sectionSub}>تحقق آمن من موقع الفرع</Text></View>
-        </View>
-
-        <View style={styles.attendanceCard}>
-          <View style={styles.attendanceTop}>
-            <View style={[styles.statusPill, { backgroundColor: isCheckedOut ? "#F3F0EA" : checkedIn ? "#E6F1EC" : "#F7EBDD" }]}>
-              <View style={[styles.statusDotSmall, { backgroundColor: isCheckedOut ? "#7B817E" : checkedIn ? "#2E7D68" : "#B18452" }]} />
-              <Text style={[styles.statusPillText, { color: isCheckedOut ? "#8A918D" : checkedIn ? "#2E7D68" : "#B18452" }]}>
-                {isCheckedOut ? "تم الانتهاء" : checkedIn ? "أنت داخل العمل" : "لم تسجل حضورك بعد"}
-              </Text>
-            </View>
-            <Text style={styles.gpsText}>{gpsMessage}</Text>
-          </View>
-          <Pressable
-            disabled={working || isCheckedOut || isWeeklyOff}
-            onPress={checkedIn ? handleCheckOut : handleCheckIn}
-            style={({ pressed }) => [styles.primaryButton, (working || isCheckedOut || isWeeklyOff) && styles.disabledButton, pressed && styles.pressed]}
-          >
-            <IconSymbol name={isWeeklyOff ? "checkmark" : checkedIn ? "logout" : "location"} size={20} color="#FFFFFF" />
-            <Text style={styles.primaryButtonText}>
-              {isWeeklyOff ? "إجازة أسبوعية مدفوعة" : working ? "جاري التحقق..." : isCheckedOut ? "تم تسجيل اليوم" : checkedIn ? "تسجيل الانصراف" : "تسجيل الحضور"}
-            </Text>
-          </Pressable>
-          <Text style={styles.securityNote}>
-            {isWeeklyOff ? "لن يتم احتساب غياب أو تأخير في هذا اليوم" : `يُسمح بالتسجيل داخل نطاق ${branch.radiusMeters} متر من ${branch.name}`}
-          </Text>
-        </View>
-
-        <View style={styles.sectionHeading}>
-          <View><Text style={styles.sectionTitle}>الوصول السريع</Text><Text style={styles.sectionSub}>كل أدواتك في مكان واحد</Text></View>
-        </View>
-        <View style={styles.quickGrid}>
-          {(role === "manager" ? [
-            { icon: "person.2.fill", label: "إدارة الفريق", route: "/manager" },
-            { icon: "banknote", label: "مسير الرواتب", route: "/payroll" },
-            { icon: "doc.text", label: "الطلبات المعلقة", route: "/requests" },
-            { icon: "chart.bar", label: "التقارير", route: "/reports" },
-          ] : [
-            { icon: "calendar", label: "سجل الحضور", route: "/attendance" },
-            { icon: "clock", label: "الورديات", route: "/schedule" },
-            { icon: "doc.text", label: "الطلبات", route: "/requests" },
-            { icon: "chart.bar", label: "التقارير", route: "/reports" },
-          ]).map((item) => (
-            <Pressable key={item.label} onPress={() => router.push(item.route as never)} style={({ pressed }) => [styles.quickCard, pressed && styles.pressed]}>
-              <View style={styles.quickIcon}><IconSymbol name={item.icon as never} size={19} color="#668C7F" /></View>
-              <Text style={styles.quickLabel}>{item.label}</Text>
-              <Text style={styles.quickArrow}>←</Text>
+          <View style={styles.heroAction}>
+            <Text style={styles.actionLabel}>{isCheckedOut ? "تم تسجيل الانصراف" : checkedIn ? "أنت داخل الوردية" : "ابدأ ورديتك"}</Text>
+            <Text style={styles.clock}>{currentTime()}</Text>
+            <Text style={styles.actionHint}>{gpsMessage}</Text>
+            <Pressable disabled={working || isWeeklyOff || isCheckedOut} onPress={checkedIn ? handleCheckOut : handleCheckIn} style={({pressed}) => [styles.attendanceButton, (working || isWeeklyOff || isCheckedOut) && styles.disabledButton, pressed && styles.pressed]}>
+              <IconSymbol name={checkedIn ? "arrow.right" : "checkmark"} size={18} color="#FFFFFF"/>
+              <Text style={styles.attendanceButtonText}>{working ? "جارٍ التحقق..." : checkedIn ? "تسجيل الانصراف" : "تسجيل الحضور"}</Text>
             </Pressable>
-          ))}
-        </View>
-
-        <View style={styles.insight}>
-          <View style={styles.insightIcon}><IconSymbol name="sparkles" size={19} color="#668C7F" /></View>
-          <View style={styles.insightCopy}>
-            <Text style={styles.insightTitle}>Insight ذكي</Text>
-            <Text style={styles.insightText}>أداؤك في الحضور أعلى من المتوسط هذا الشهر. استمر بنفس الالتزام.</Text>
           </View>
-          <View style={styles.insightBadge}><Text style={styles.insightBadgeText}>ممتاز</Text></View>
         </View>
 
-        <View style={styles.notice}>
-          <IconSymbol name="wallet" size={19} color="#B18452" />
-          <Text style={styles.noticeText}>الحساب مبدئي حتى اعتماد المرتب من المدير آخر الشهر.</Text>
+        <View style={styles.sectionHead}><View><Text style={styles.sectionTitle}>ملخص اليوم</Text><Text style={styles.sectionHint}>أهم الأرقام بدون زحمة</Text></View></View>
+        <View style={styles.metricGrid}>
+          <View style={styles.metric}><View style={[styles.metricIcon,{backgroundColor:"#E8F0EB"}]}><IconSymbol name="checkmark" size={17} color="#668C7F"/></View><Text style={styles.metricNumber}>{presentDays}</Text><Text style={styles.metricLabel}>أيام الحضور</Text><Text style={styles.metricFoot}>هذا الشهر</Text></View>
+          <View style={styles.metric}><View style={[styles.metricIcon,{backgroundColor:"#F4EEE5"}]}><IconSymbol name="clock" size={17} color="#B18452"/></View><Text style={styles.metricNumber}>{payrollInputs.lateMinutes?.toLocaleString("ar-EG") ?? "٠"}</Text><Text style={styles.metricLabel}>دقيقة تأخير</Text><Text style={styles.metricFoot}>إجمالي الشهر</Text></View>
+          <View style={styles.metric}><View style={[styles.metricIcon,{backgroundColor:"#EEF1EF"}]}><IconSymbol name="wallet" size={17} color="#668C7F"/></View><Text style={styles.metricNumber}>{payroll.net.toLocaleString("ar-EG")}</Text><Text style={styles.metricLabel}>صافي الراتب</Text><Text style={styles.metricFoot}>ج.م متوقع</Text></View>
+          <View style={styles.metric}><View style={[styles.metricIcon,{backgroundColor:"#F7ECEA"}]}><IconSymbol name="doc.text.fill" size={17} color="#B86F6B"/></View><Text style={styles.metricNumber}>{(notificationsQuery.data ?? []).filter(n=>!n.readAt).length}</Text><Text style={styles.metricLabel}>إشعارات جديدة</Text><Text style={styles.metricFoot}>تحتاج مراجعة</Text></View>
         </View>
 
-        {Platform.OS === "web" && (
-          <View style={styles.installCard}>
-            <IconSymbol name="plus" size={20} color="#668C7F" />
-            <View style={styles.installCopy}><Text style={styles.installTitle}>ثبّت حاضر على الآيفون</Text><Text style={styles.installText}>من Safari اضغط مشاركة ثم «إضافة إلى الشاشة الرئيسية» ليظهر كتطبيق.</Text></View>
+        <View style={styles.twoCol}>
+          <View style={styles.panel}>
+            <View style={styles.panelHead}><Text style={styles.panelTitle}>أداء الحضور</Text><Text style={styles.panelLink}>آخر 7 أيام</Text></View>
+            <View style={styles.chart}>{weeklyAttendance.map((item)=><View key={item.day} style={styles.chartItem}><Text style={styles.chartValue}>{item.value}</Text><View style={styles.track}><View style={[styles.fill,{height:item.value+"%"}]}/></View><Text style={styles.chartDay}>{item.day.slice(0,2)}</Text></View>)}</View>
           </View>
-        )}
+          <View style={styles.panel}>
+            <View style={styles.panelHead}><Text style={styles.panelTitle}>حالة اليوم</Text><Text style={styles.panelLink}>{dateLabel}</Text></View>
+            <View style={styles.statusBox}><View style={[styles.statusIcon,{backgroundColor:checkedIn?"#E8F0EB":"#F4EEE5"}]}><IconSymbol name={checkedIn?"checkmark":"clock"} size={21} color={checkedIn?"#668C7F":"#B18452"}/></View><View style={{flex:1}}><Text style={styles.statusTitle}>{checkedIn?"الوردية جارية":isWeeklyOff?"يوم إجازة":"لم تسجل الحضور بعد"}</Text><Text style={styles.statusText}>{checkedIn?"تم التحقق من موقعك بنجاح.":isWeeklyOff?"استمتع بيوم الراحة.":"اضغط تسجيل الحضور لبدء اليوم."}</Text></View></View>
+            <View style={styles.infoRow}><Text style={styles.infoValue}>{shift.start}</Text><Text style={styles.infoLabel}>بداية الوردية</Text></View>
+            <View style={styles.infoRow}><Text style={styles.infoValue}>{shift.end}</Text><Text style={styles.infoLabel}>نهاية الوردية</Text></View>
+          </View>
+        </View>
+
+        <View style={styles.sectionHead}><View><Text style={styles.sectionTitle}>الوصول السريع</Text><Text style={styles.sectionHint}>الأماكن التي تستخدمها أكثر</Text></View></View>
+        <View style={styles.quickGrid}>
+          {[["الحضور","calendar","/attendance"],["الطلبات","doc.text.fill","/requests"],["الجدول","calendar","/schedule"],["الإشعارات","notifications","/notifications"]].map(([label,icon,path])=><Pressable key={label} style={({pressed})=>[styles.quick,pressed&&styles.pressed]} onPress={()=>router.push(path as never)}><View style={styles.quickIcon}><IconSymbol name={icon as any} size={18} color="#668C7F"/></View><Text style={styles.quickText}>{label}</Text><Text style={styles.arrow}>‹</Text></Pressable>)}
+        </View>
       </ScrollView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 28, paddingBottom: 56, gap: 22, maxWidth: 1240, width: "100%", alignSelf: "center" },
-  header: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", marginBottom: 2 },
-  headerCopy: { flex: 1 },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: 10, marginLeft: 14 },
-  notificationButton: { width: 44, height: 44, borderRadius: 14, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7E2D9", alignItems: "center", justifyContent: "center", position: "relative" },
-  notificationDot: { position: "absolute", width: 7, height: 7, borderRadius: 4, backgroundColor: "#B86F6B", top: 8, right: 8, borderWidth: 2, borderColor: "#FFFFFF" },
-  eyebrow: { color: "#7B817E", fontSize: 12, marginBottom: 6, textAlign: "right" },
-  title: { color: "#303735", fontSize: 30, fontWeight: "900", textAlign: "right", letterSpacing: -0.4 },
-  subtitle: { color: "#7B817E", fontSize: 13, marginTop: 6, textAlign: "right" },
-  avatar: { width: 48, height: 48, borderRadius: 16, backgroundColor: "#668C7F", alignItems: "center", justifyContent: "center", marginLeft: 14 },
-  avatarText: { color: "#FFFFFF", fontWeight: "900", fontSize: 15 },
-  hero: { backgroundColor: "#FFFFFF", borderRadius: 22, padding: 22, overflow: "hidden", borderWidth: 1, borderColor: "#E7E2D9", shadowColor: "#303735", shadowOpacity: 0.035, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2 },
-  heroGlow: { position: "absolute", width: 190, height: 190, borderRadius: 95, backgroundColor: "#E8F0EB", opacity: 0.8, top: -105, left: -55 },
-  heroTop: { flexDirection: "row-reverse", alignItems: "center", gap: 13 },
-  heroIcon: { width: 48, height: 48, borderRadius: 15, backgroundColor: "#E8F0EB", alignItems: "center", justifyContent: "center" },
-  heroCopy: { flex: 1 },
-  heroEyebrow: { color: "#668C7F", fontSize: 11, fontWeight: "800", textAlign: "right" },
-  heroTitle: { color: "#303735", fontSize: 23, fontWeight: "900", marginTop: 3, textAlign: "right" },
-  heroMeta: { color: "#7B817E", fontSize: 12, marginTop: 5, textAlign: "right" },
-  heroTime: { alignItems: "flex-end" },
-  heroTimeLabel: { color: "#8A918D", fontSize: 10 },
-  heroTimeValue: { color: "#303735", fontSize: 18, fontWeight: "900", marginTop: 2 },
-  heroFooter: { marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: "#EEEAE2", flexDirection: "row-reverse", alignItems: "center", gap: 15 },
-  heroFooterLabel: { color: "#8A918D", fontSize: 10, textAlign: "right" },
-  heroFooterValue: { color: "#303735", fontSize: 20, fontWeight: "900", marginTop: 2, textAlign: "right" },
-  progressTrack: { flex: 1, height: 7, backgroundColor: "#EDF0ED", borderRadius: 10, overflow: "hidden" },
-  progressFill: { height: "100%", backgroundColor: "#668C7F", borderRadius: 10 },
-  sectionHeading: { flexDirection: "row-reverse", justifyContent: "space-between", alignItems: "center", marginTop: 2 },
-  sectionTitle: { color: "#303735", fontSize: 18, fontWeight: "900", textAlign: "right" },
-  sectionSub: { color: "#8A918D", fontSize: 11, marginTop: 3, textAlign: "right" },
-  liveBadge: { flexDirection: "row-reverse", alignItems: "center", gap: 5, backgroundColor: "#E8F0EB", borderRadius: 10, paddingHorizontal: 9, paddingVertical: 6 },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#2E7D68" },
-  liveText: { color: "#2E7D68", fontSize: 10, fontWeight: "900" },
-  kpiGrid: { flexDirection: "row-reverse", gap: 12 },
-  kpiCard: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 18, padding: 17, minHeight: 132, borderWidth: 1, borderColor: "#E7E2D9" },
-  kpiIcon: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center", marginBottom: 12 },
-  kpiValue: { color: "#303735", fontSize: 22, fontWeight: "900", textAlign: "right" },
-  kpiLabel: { color: "#7B817E", fontSize: 11, marginTop: 4, textAlign: "right" },
-  kpiTrend: { color: "#2E7D68", fontSize: 9, marginTop: 9, textAlign: "right" },
-  kpiTrendNeutral: { color: "#7B817E", fontSize: 9, marginTop: 9, textAlign: "right" },
-  kpiUnit: { color: "#8A918D", fontSize: 9, marginTop: 9, textAlign: "right" },
-  analyticsRow: { flexDirection: "row-reverse", gap: 14, flexWrap: "wrap" },
-  chartCard: { flex: 1.65, minWidth: 330, backgroundColor: "#FFFFFF", borderRadius: 18, padding: 18, borderWidth: 1, borderColor: "#E7E2D9" },
-  statusCard: { flex: 1, minWidth: 270, backgroundColor: "#FFFFFF", borderRadius: 18, padding: 18, borderWidth: 1, borderColor: "#E7E2D9" },
-  cardHeader: { flexDirection: "row-reverse", justifyContent: "space-between", alignItems: "center" },
-  cardTitle: { color: "#303735", fontSize: 14, fontWeight: "900", textAlign: "right" },
-  cardSubtitle: { color: "#8A918D", fontSize: 10, marginTop: 3, textAlign: "right" },
-  chartLegend: { flexDirection: "row-reverse", alignItems: "center", gap: 5 },
-  legendDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#668C7F" },
-  legendText: { color: "#7B817E", fontSize: 9 },
-  chartArea: { height: 215, marginTop: 10, position: "relative" },
-  chartLabels: { position: "absolute", left: 22, right: 22, bottom: 0, flexDirection: "row-reverse", justifyContent: "space-between" },
-  chartLabel: { color: "#8A918D", fontSize: 9 },
-  gridLine: { position: "absolute", left: 0, right: 0, top: 0, height: 1, backgroundColor: "#F0ECE5" },
-  bars: { flexDirection: "row-reverse", alignItems: "flex-end", justifyContent: "space-between", height: "100%", paddingHorizontal: 4 },
-  barColumn: { flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end", gap: 6 },
-  barTrack: { width: 22, height: 140, backgroundColor: "#F0ECE5", borderRadius: 8, justifyContent: "flex-end", overflow: "hidden" },
-  bar: { width: "100%", minHeight: 4, backgroundColor: "#668C7F", borderRadius: 8 },
-  barValue: { color: "#303735", fontSize: 10, fontWeight: "900" },
-  barLabel: { color: "#8A918D", fontSize: 9 },
-  periodPill: { flexDirection: "row-reverse", alignItems: "center", gap: 5, borderWidth: 1, borderColor: "#E7E2D9", borderRadius: 9, paddingHorizontal: 8, paddingVertical: 6 },
-  periodText: { color: "#7B817E", fontSize: 9 },
-  donutWrap: { alignItems: "center", marginTop: 12 },
-  donutOuter: { width: 120, height: 120, borderRadius: 60, borderWidth: 13, borderColor: "#668C7F", alignItems: "center", justifyContent: "center" },
-  donutInner: { alignItems: "center" },
-  donutValue: { color: "#303735", fontSize: 21, fontWeight: "900" },
-  donutLabel: { color: "#8A918D", fontSize: 9, marginTop: 2 },
-  statusRows: { gap: 8, marginTop: 10 },
-  statusRow: { flexDirection: "row-reverse", alignItems: "center", gap: 7 },
-  statusColor: { width: 7, height: 7, borderRadius: 4 },
-  statusName: { color: "#7B817E", fontSize: 10, flex: 1, textAlign: "right" },
-  statusPercent: { color: "#303735", fontSize: 10, fontWeight: "900" },
-  attendanceCard: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 18, borderWidth: 1, borderColor: "#E7E2D9" },
-  attendanceTop: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", gap: 10 },
-  statusPill: { flexDirection: "row-reverse", alignItems: "center", gap: 7, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },
-  statusDotSmall: { width: 7, height: 7, borderRadius: 4 },
-  statusPillText: { fontSize: 11, fontWeight: "900" },
-  gpsText: { color: "#7B817E", fontSize: 10, flex: 1, textAlign: "right" },
-  primaryButton: { minHeight: 52, borderRadius: 14, backgroundColor: "#668C7F", flexDirection: "row-reverse", alignItems: "center", justifyContent: "center", gap: 9, marginTop: 15 },
-  primaryButtonText: { color: "#FFFFFF", fontWeight: "900", fontSize: 14 },
-  disabledButton: { backgroundColor: "#DDE7E1" },
-  pressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },
-  securityNote: { color: "#8A918D", fontSize: 10, textAlign: "center", marginTop: 10 },
-  quickGrid: { flexDirection: "row-reverse", gap: 10, flexWrap: "wrap" },
-  quickCard: { flex: 1, minWidth: 180, backgroundColor: "#FFFFFF", borderRadius: 16, borderWidth: 1, borderColor: "#E7E2D9", padding: 15, flexDirection: "row-reverse", alignItems: "center", gap: 11 },
-  quickIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: "#E8F0EB", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#D6E2DC" },
-  quickLabel: { color: "#303735", fontSize: 13, fontWeight: "900", flex: 1, textAlign: "right" },
-  quickArrow: { color: "#8A918D", fontSize: 16 },
-  insight: { backgroundColor: "#EEF3EF", borderRadius: 16, padding: 14, borderWidth: 1, borderColor: "#D6E2DC", flexDirection: "row-reverse", alignItems: "center", gap: 10 },
-  insightIcon: { width: 37, height: 37, borderRadius: 12, backgroundColor: "#E8F0EB", alignItems: "center", justifyContent: "center" },
-  insightCopy: { flex: 1 },
-  insightTitle: { color: "#668C7F", fontSize: 11, fontWeight: "900", textAlign: "right" },
-  insightText: { color: "#66706B", fontSize: 10, lineHeight: 17, marginTop: 2, textAlign: "right" },
-  insightBadge: { backgroundColor: "#668C7F", borderRadius: 9, paddingHorizontal: 8, paddingVertical: 5 },
-  insightBadgeText: { color: "#FFFFFF", fontSize: 9, fontWeight: "900" },
-  notice: { backgroundColor: "#FBF4E9", borderRadius: 14, padding: 13, flexDirection: "row-reverse", alignItems: "center", gap: 8, borderWidth: 1, borderColor: "#EADBC7" },
-  noticeText: { color: "#9A7044", fontSize: 11, flex: 1, lineHeight: 17, textAlign: "right" },
-  installCard: { backgroundColor: "#FFFFFF", borderRadius: 14, padding: 13, flexDirection: "row-reverse", alignItems: "center", gap: 9, borderWidth: 1, borderColor: "#D6E2DC" },
-  installCopy: { flex: 1 },
-  installTitle: { color: "#668C7F", fontSize: 11, fontWeight: "900", textAlign: "right" },
-  installText: { color: "#7B817E", fontSize: 10, lineHeight: 16, marginTop: 3, textAlign: "right" },
+  page:{padding:28,paddingBottom:60,gap:20,maxWidth:1220,width:"100%",alignSelf:"center"},
+  topbar:{flexDirection:"row",alignItems:"center",justifyContent:"space-between"},
+  profileRow:{flexDirection:"row-reverse",alignItems:"center",gap:12},
+  avatar:{width:46,height:46,borderRadius:15,backgroundColor:"#668C7F",alignItems:"center",justifyContent:"center"},
+  avatarText:{color:"#fff",fontSize:14,fontWeight:"900"},muted:{color:"#8A918D",fontSize:11,textAlign:"right"},greeting:{color:"#303735",fontSize:23,fontWeight:"900",marginTop:3,textAlign:"right"},
+  iconButton:{width:44,height:44,borderRadius:14,borderWidth:1,borderColor:"#E7E2D9",backgroundColor:"#fff",alignItems:"center",justifyContent:"center",position:"relative"},notificationDot:{position:"absolute",right:8,top:8,width:7,height:7,borderRadius:4,backgroundColor:"#B86F6B",borderWidth:2,borderColor:"#fff"},
+  hero:{backgroundColor:"#FFFFFF",borderRadius:24,borderWidth:1,borderColor:"#E7E2D9",padding:22,flexDirection:"row-reverse",gap:18},heroMain:{flex:1,padding:4},eyebrowRow:{flexDirection:"row-reverse",alignItems:"center",gap:6},liveDot:{width:7,height:7,borderRadius:4,backgroundColor:"#668C7F"},eyebrow:{color:"#668C7F",fontSize:11,fontWeight:"900"},
+  heroTitle:{color:"#303735",fontSize:30,fontWeight:"900",lineHeight:37,marginTop:12,textAlign:"right"},heroText:{color:"#7B817E",fontSize:13,lineHeight:21,marginTop:8,maxWidth:620,textAlign:"right"},heroMetaRow:{flexDirection:"row-reverse",gap:34,marginTop:23,paddingTop:17,borderTopWidth:1,borderTopColor:"#EEEAE2"},metaLabel:{color:"#9AA09C",fontSize:10,textAlign:"right"},metaValue:{color:"#303735",fontSize:13,fontWeight:"900",marginTop:3,textAlign:"right"},
+  heroAction:{width:260,borderRadius:18,backgroundColor:"#F5F8F5",padding:17,justifyContent:"center"},actionLabel:{color:"#668C7F",fontSize:11,fontWeight:"900",textAlign:"right"},clock:{color:"#303735",fontSize:30,fontWeight:"900",marginTop:3,textAlign:"right"},actionHint:{color:"#8A918D",fontSize:9,lineHeight:15,marginTop:3,textAlign:"right"},
+  attendanceButton:{height:48,borderRadius:13,backgroundColor:"#668C7F",alignItems:"center",justifyContent:"center",flexDirection:"row-reverse",gap:7,marginTop:13},attendanceButtonText:{color:"#fff",fontSize:12,fontWeight:"900"},disabledButton:{backgroundColor:"#DDE7E1"},pressed:{opacity:.8,transform:[{scale:.985}]},
+  sectionHead:{flexDirection:"row-reverse",alignItems:"flex-end",justifyContent:"space-between",marginTop:3},sectionTitle:{color:"#303735",fontSize:18,fontWeight:"900",textAlign:"right"},sectionHint:{color:"#9AA09C",fontSize:10,marginTop:3,textAlign:"right"},
+  metricGrid:{flexDirection:"row-reverse",gap:12},metric:{flex:1,minWidth:150,backgroundColor:"#fff",borderRadius:18,borderWidth:1,borderColor:"#E7E2D9",padding:16},metricIcon:{width:36,height:36,borderRadius:12,alignItems:"center",justifyContent:"center"},metricNumber:{color:"#303735",fontSize:21,fontWeight:"900",marginTop:13,textAlign:"right"},metricLabel:{color:"#5F6864",fontSize:11,fontWeight:"800",marginTop:3,textAlign:"right"},metricFoot:{color:"#A0A6A2",fontSize:9,marginTop:6,textAlign:"right"},
+  twoCol:{flexDirection:"row-reverse",gap:14,flexWrap:"wrap"},panel:{flex:1,minWidth:320,backgroundColor:"#fff",borderRadius:20,borderWidth:1,borderColor:"#E7E2D9",padding:18},panelHead:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},panelTitle:{color:"#303735",fontSize:14,fontWeight:"900",textAlign:"right"},panelLink:{color:"#668C7F",fontSize:10,fontWeight:"800"},
+  chart:{height:205,marginTop:14,flexDirection:"row-reverse",alignItems:"flex-end",gap:8},chartItem:{flex:1,height:"100%",alignItems:"center",justifyContent:"flex-end",gap:5},chartValue:{color:"#66706B",fontSize:9,fontWeight:"800"},track:{width:24,height:140,borderRadius:8,backgroundColor:"#EEF1EE",justifyContent:"flex-end",overflow:"hidden"},fill:{width:"100%",backgroundColor:"#668C7F",borderRadius:8,minHeight:4},chartDay:{color:"#9AA09C",fontSize:9},
+  statusBox:{marginTop:17,padding:13,borderRadius:15,backgroundColor:"#F7F9F7",flexDirection:"row-reverse",alignItems:"center",gap:10},statusIcon:{width:42,height:42,borderRadius:13,alignItems:"center",justifyContent:"center"},statusTitle:{color:"#303735",fontSize:12,fontWeight:"900",textAlign:"right"},statusText:{color:"#7B817E",fontSize:10,lineHeight:16,marginTop:2,textAlign:"right"},infoRow:{flexDirection:"row-reverse",justifyContent:"space-between",paddingTop:12,marginTop:12,borderTopWidth:1,borderTopColor:"#F0ECE5"},infoLabel:{color:"#8A918D",fontSize:10},infoValue:{color:"#303735",fontSize:11,fontWeight:"900"},
+  quickGrid:{flexDirection:"row-reverse",gap:10,flexWrap:"wrap"},quick:{flex:1,minWidth:190,backgroundColor:"#fff",borderRadius:16,borderWidth:1,borderColor:"#E7E2D9",padding:14,flexDirection:"row-reverse",alignItems:"center",gap:10},quickIcon:{width:40,height:40,borderRadius:12,backgroundColor:"#E8F0EB",alignItems:"center",justifyContent:"center"},quickText:{color:"#303735",fontSize:12,fontWeight:"900",flex:1,textAlign:"right"},arrow:{color:"#9AA09C",fontSize:18}
 });
