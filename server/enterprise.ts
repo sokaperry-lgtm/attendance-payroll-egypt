@@ -395,14 +395,40 @@ export async function listEmployee360(actorId:number,targetId:number) {
   await assertStaffInCompany(actorId,targetId);
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const staff=await getStaffAccountById(targetId);
-  const [attendance,requests,adjustments,advances,documents]=await Promise.all([
+  if(!staff) throw new Error("الموظف غير موجود");
+
+  const safe = async <T>(query: Promise<T>, fallback: T): Promise<T> => {
+    try { return await query; } catch { return fallback; }
+  };
+
+  const attendance = await safe(
     db.select().from(attendanceRecords).where(eq(attendanceRecords.staffAccountId,targetId)).orderBy(desc(attendanceRecords.date)),
+    []
+  );
+  const requests = await safe(
     db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,targetId)).orderBy(desc(staffRequests.createdAt)),
+    []
+  );
+  const adjustments = await safe(
     db.select().from(salaryAdjustments).where(eq(salaryAdjustments.staffAccountId,targetId)).orderBy(desc(salaryAdjustments.createdAt)),
+    []
+  );
+  const advances = await safe(
     db.select().from(salaryAdvances).where(eq(salaryAdvances.staffAccountId,targetId)).orderBy(desc(salaryAdvances.createdAt)),
+    []
+  );
+  const documents = await safe(
     db.select().from(employeeDocuments).where(eq(employeeDocuments.staffAccountId,targetId)).orderBy(desc(employeeDocuments.createdAt)),
-  ]);
+    []
+  );
+
   const m=await getCompanyForStaff(actorId);
-  const payroll=m ? await db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.staffAccountId,targetId))).orderBy(desc(payrollRecords.month)) : [];
+  const payroll = m ? await safe(
+    db.select().from(payrollRecords)
+      .where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.staffAccountId,targetId)))
+      .orderBy(desc(payrollRecords.month)),
+    []
+  ) : [];
+
   return {staff,attendance,requests,adjustments,advances,documents,payroll};
 }
