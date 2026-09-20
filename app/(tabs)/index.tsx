@@ -247,7 +247,7 @@ export default function HomeScreen() {
         <View style={styles.twoCol}>
           <View style={styles.panel}>
             <View style={styles.panelHead}><Text style={styles.panelTitle}>أداء الحضور</Text><Text style={styles.panelLink}>آخر 7 أيام</Text></View>
-            <View style={styles.chart}>{weeklyAttendance.map((item)=><View key={item.day} style={styles.chartItem}><Text style={styles.chartValue}>{item.value}</Text><View style={styles.track}><View style={[styles.fill,{height:item.value+"%"}]}/></View><Text style={styles.chartDay}>{item.day.slice(0,2)}</Text></View>)}</View>
+            <View style={styles.chart}>{weeklyAttendance.map((item)=><View key={item.day} style={styles.chartItem}><Text style={styles.chartValue}>{item.value}</Text><View style={styles.track}><View style={[styles.fill,{height:(item.value + "%") as `${number}%`}]}/></View><Text style={styles.chartDay}>{item.day.slice(0,2)}</Text></View>)}</View>
           </View>
           <View style={styles.panel}>
             <View style={styles.panelHead}><Text style={styles.panelTitle}>حالة اليوم</Text><Text style={styles.panelLink}>{dateLabel}</Text></View>
