@@ -7,10 +7,10 @@ import { formatDate } from "@/lib/payroll";
 
 const statusColors: Record<string, { bg: string; text: string }> = {
   حاضر: { bg: "#122A1E", text: "#4ADE80" },
-  متأخر: { bg: "#2B2410", text: "#FBBF24" },
-  إجازة: { bg: "#1B2A45", text: "#7DD3FC" },
-  غياب: { bg: "#2B1618", text: "#FCA5A5" },
-  مأمورية: { bg: "#211A38", text: "#C4B5FD" },
+  متأخر: { bg: "#2B2410", text: "#B77A32" },
+  إجازة: { bg: "#E8EEE9", text: "#7DD3FC" },
+  غياب: { bg: "#F7E7E7", text: "#FCA5A5" },
+  مأمورية: { bg: "#EEE9F4", text: "#C4B5FD" },
 };
 
 export default function AttendanceScreen() {
@@ -32,7 +32,7 @@ export default function AttendanceScreen() {
             <PageHeader eyebrow="حساب الموظف" title="سجل الحضور" subtitle={`${employee.name} · سبتمبر 2026`} icon="calendar" />
 
             <View style={styles.heroCard}>
-              <View style={styles.heroIcon}><IconSymbol name="chart.bar.fill" size={23} color="#F5F7FA" /></View>
+              <View style={styles.heroIcon}><IconSymbol name="chart.bar.fill" size={23} color="#FFFFFF" /></View>
               <View style={styles.heroCopy}>
                 <Text style={styles.heroLabel}>معدل الالتزام</Text>
                 <Text style={styles.heroValue}>{records.length ? Math.round((present / records.length) * 100) : 0}%</Text>
@@ -59,7 +59,7 @@ export default function AttendanceScreen() {
 
             <View style={styles.insightCard}>
               <View style={styles.insightIcon}>
-                <IconSymbol name="chart.bar.fill" size={18} color="#5B9BFF" />
+                <IconSymbol name="chart.bar.fill" size={18} color="#4F7D70" />
               </View>
               <View style={styles.insightCopy}>
                 <Text style={styles.insightTitle}>ملخص سريع</Text>
@@ -117,39 +117,39 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 2,
   },
-  eyebrow: { color: "#97A3B6", fontSize: 13, textAlign: "right" },
+  eyebrow: { color: "#7A8088", fontSize: 13, textAlign: "right" },
   title: {
-    color: "#EEF2F8",
+    color: "#20262E",
     fontSize: 27,
     fontWeight: "800",
     marginTop: 5,
     textAlign: "right",
   },
   subtitle: {
-    color: "#97A3B6",
+    color: "#7A8088",
     fontSize: 12,
     marginTop: 5,
     textAlign: "right",
   },
   calendarIcon: {
-    backgroundColor: "#1B2A45",
+    backgroundColor: "#E8EEE9",
     width: 48,
     height: 48,
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
   },
-  heroCard: { backgroundColor: "#0B1220", borderRadius: 24, padding: 19, flexDirection: "row-reverse", alignItems: "center", gap: 13, overflow: "hidden" },
-  heroIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: "#3B82F6", alignItems: "center", justifyContent: "center" },
+  heroCard: { backgroundColor: "#263A36", borderRadius: 24, padding: 19, flexDirection: "row-reverse", alignItems: "center", gap: 13, overflow: "hidden" },
+  heroIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: "#355C52", alignItems: "center", justifyContent: "center" },
   heroCopy: { flex: 1 },
   heroLabel: { color: "#93C5FD", fontSize: 11, textAlign: "right" },
-  heroValue: { color: "#F5F7FA", fontSize: 30, fontWeight: "900", textAlign: "right", marginTop: 2 },
-  heroHint: { color: "#8592A6", fontSize: 10, marginTop: 2, textAlign: "right" },
-  heroRing: { width: 76, height: 76, borderRadius: 38, borderWidth: 7, borderColor: "#3B82F6", alignItems: "center", justifyContent: "center" },
-  heroRingText: { color: "#F5F7FA", fontSize: 18, fontWeight: "800" },
+  heroValue: { color: "#FFFFFF", fontSize: 30, fontWeight: "900", textAlign: "right", marginTop: 2 },
+  heroHint: { color: "#92989F", fontSize: 10, marginTop: 2, textAlign: "right" },
+  heroRing: { width: 76, height: 76, borderRadius: 38, borderWidth: 7, borderColor: "#355C52", alignItems: "center", justifyContent: "center" },
+  heroRingText: { color: "#FFFFFF", fontSize: 18, fontWeight: "800" },
   heroRingLabel: { color: "#8B96A8", fontSize: 9, marginTop: 1 },
   summary: {
-    backgroundColor: "#2E5FD9",
+    backgroundColor: "#4F7D70",
     borderRadius: 20,
     padding: 18,
     flexDirection: "row-reverse",
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   summaryValue: {
-    color: "#F5F7FA",
+    color: "#FFFFFF",
     fontSize: 25,
     fontWeight: "800",
     textAlign: "center",
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.25)",
   },
   insightCard: {
-    backgroundColor: "#15243D",
+    backgroundColor: "#E7EEEB",
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: "#1B2A45",
+    backgroundColor: "#E8EEE9",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -199,39 +199,39 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   insightText: {
-    color: "#8592A6",
+    color: "#92989F",
     fontSize: 11,
     lineHeight: 17,
     marginTop: 3,
     textAlign: "right",
   },
   sectionTitle: {
-    color: "#EEF2F8",
+    color: "#20262E",
     fontSize: 18,
     fontWeight: "800",
     textAlign: "right",
     marginTop: 4,
   },
   row: {
-    backgroundColor: "#131A24",
+    backgroundColor: "#FFFFFF",
     borderRadius: 18,
     padding: 13,
     flexDirection: "row-reverse",
     alignItems: "center",
     gap: 11,
     borderWidth: 1,
-    borderColor: "#232C3A",
+    borderColor: "#E6E1D8",
   },
   dateBox: {
     width: 43,
     height: 48,
-    backgroundColor: "#1A212C",
+    backgroundColor: "#F3F0EA",
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-  dateDay: { color: "#EEF2F8", fontWeight: "800", fontSize: 18 },
-  dateMonth: { color: "#97A3B6", fontSize: 10, marginTop: 1 },
+  dateDay: { color: "#20262E", fontWeight: "800", fontSize: 18 },
+  dateMonth: { color: "#7A8088", fontSize: 10, marginTop: 1 },
   rowMain: { flex: 1 },
   rowDate: {
     color: "#AAB4C4",
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   rowTime: {
-    color: "#8592A6",
+    color: "#92989F",
     fontSize: 11,
     marginTop: 5,
     textAlign: "right",
@@ -253,6 +253,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   badgeText: { fontSize: 11, fontWeight: "800" },
-  lateText: { color: "#FBBF24", fontSize: 9, marginTop: 2 },
-  empty: { color: "#97A3B6", textAlign: "center", padding: 30 },
+  lateText: { color: "#B77A32", fontSize: 9, marginTop: 2 },
+  empty: { color: "#7A8088", textAlign: "center", padding: 30 },
 });
