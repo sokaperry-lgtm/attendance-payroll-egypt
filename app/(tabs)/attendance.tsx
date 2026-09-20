@@ -6,11 +6,11 @@ import { useAppData } from "@/lib/app-data";
 import { formatDate } from "@/lib/payroll";
 
 const statusColors: Record<string, { bg: string; text: string }> = {
-  حاضر: { bg: "#122A1E", text: "#4ADE80" },
-  متأخر: { bg: "#2B2410", text: "#B77A32" },
-  إجازة: { bg: "#E8EEE9", text: "#7DD3FC" },
-  غياب: { bg: "#F7E7E7", text: "#FCA5A5" },
-  مأمورية: { bg: "#EEE9F4", text: "#C4B5FD" },
+  حاضر: { bg: "#EAF1F8", text: "#163A63" },
+  متأخر: { bg: "#EEF4FB", text: "#31577F" },
+  إجازة: { bg: "#EEF4FB", text: "#31577F" },
+  غياب: { bg: "#E6EDF5", text: "#0F2742" },
+  مأمورية: { bg: "#EEF4FB", text: "#31577F" },
 };
 
 export default function AttendanceScreen() {
@@ -59,7 +59,7 @@ export default function AttendanceScreen() {
 
             <View style={styles.insightCard}>
               <View style={styles.insightIcon}>
-                <IconSymbol name="chart.bar.fill" size={18} color="#668C7F" />
+                <IconSymbol name="chart.bar.fill" size={18} color="#163A63" />
               </View>
               <View style={styles.insightCopy}>
                 <Text style={styles.insightTitle}>ملخص سريع</Text>
@@ -117,22 +117,22 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 2,
   },
-  eyebrow: { color: "#7B817E", fontSize: 13, textAlign: "right" },
+  eyebrow: { color: "#667085", fontSize: 13, textAlign: "right" },
   title: {
-    color: "#303735",
+    color: "#172033",
     fontSize: 27,
     fontWeight: "800",
     marginTop: 5,
     textAlign: "right",
   },
   subtitle: {
-    color: "#7B817E",
+    color: "#667085",
     fontSize: 12,
     marginTop: 5,
     textAlign: "right",
   },
   calendarIcon: {
-    backgroundColor: "#E8EEE9",
+    backgroundColor: "#EEF4FB",
     width: 48,
     height: 48,
     borderRadius: 16,
@@ -140,16 +140,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   heroCard: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 19, flexDirection: "row-reverse", alignItems: "center", gap: 13, overflow: "hidden" },
-  heroIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: "#668C7F", alignItems: "center", justifyContent: "center" },
+  heroIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: "#163A63", alignItems: "center", justifyContent: "center" },
   heroCopy: { flex: 1 },
-  heroLabel: { color: "#93C5FD", fontSize: 11, textAlign: "right" },
+  heroLabel: { color: "#31577F", fontSize: 11, textAlign: "right" },
   heroValue: { color: "#FFFFFF", fontSize: 30, fontWeight: "900", textAlign: "right", marginTop: 2 },
-  heroHint: { color: "#8A918D", fontSize: 10, marginTop: 2, textAlign: "right" },
-  heroRing: { width: 76, height: 76, borderRadius: 38, borderWidth: 7, borderColor: "#668C7F", alignItems: "center", justifyContent: "center" },
+  heroHint: { color: "#667085", fontSize: 10, marginTop: 2, textAlign: "right" },
+  heroRing: { width: 76, height: 76, borderRadius: 38, borderWidth: 7, borderColor: "#163A63", alignItems: "center", justifyContent: "center" },
   heroRingText: { color: "#FFFFFF", fontSize: 18, fontWeight: "800" },
-  heroRingLabel: { color: "#8B96A8", fontSize: 9, marginTop: 1 },
+  heroRingLabel: { color: "#667085", fontSize: 9, marginTop: 1 },
   summary: {
-    backgroundColor: "#668C7F",
+    backgroundColor: "#163A63",
     borderRadius: 20,
     padding: 18,
     flexDirection: "row-reverse",
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   summaryLabel: {
-    color: "#BFDBFE",
+    color: "#D9E6F2",
     fontSize: 11,
     marginTop: 4,
     textAlign: "center",
@@ -174,11 +174,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.25)",
   },
   insightCard: {
-    backgroundColor: "#E7EEEB",
+    backgroundColor: "#F2F5F8",
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#D6E2DC",
+    borderColor: "#D9E6F2",
     flexDirection: "row-reverse",
     alignItems: "center",
     gap: 10,
@@ -187,26 +187,26 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: "#E8EEE9",
+    backgroundColor: "#EEF4FB",
     alignItems: "center",
     justifyContent: "center",
   },
   insightCopy: { flex: 1 },
   insightTitle: {
-    color: "#93C5FD",
+    color: "#31577F",
     fontSize: 12,
     fontWeight: "800",
     textAlign: "right",
   },
   insightText: {
-    color: "#8A918D",
+    color: "#667085",
     fontSize: 11,
     lineHeight: 17,
     marginTop: 3,
     textAlign: "right",
   },
   sectionTitle: {
-    color: "#303735",
+    color: "#172033",
     fontSize: 18,
     fontWeight: "800",
     textAlign: "right",
@@ -220,27 +220,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 11,
     borderWidth: 1,
-    borderColor: "#E7E2D9",
+    borderColor: "#F2F5F8",
   },
   dateBox: {
     width: 43,
     height: 48,
-    backgroundColor: "#F3F0EA",
+    backgroundColor: "#F7F9FC",
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-  dateDay: { color: "#303735", fontWeight: "800", fontSize: 18 },
-  dateMonth: { color: "#7B817E", fontSize: 10, marginTop: 1 },
+  dateDay: { color: "#172033", fontWeight: "800", fontSize: 18 },
+  dateMonth: { color: "#667085", fontSize: 10, marginTop: 1 },
   rowMain: { flex: 1 },
   rowDate: {
-    color: "#AAB4C4",
+    color: "#98A6B8",
     fontSize: 14,
     fontWeight: "700",
     textAlign: "right",
   },
   rowTime: {
-    color: "#8A918D",
+    color: "#667085",
     fontSize: 11,
     marginTop: 5,
     textAlign: "right",
@@ -253,6 +253,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   badgeText: { fontSize: 11, fontWeight: "800" },
-  lateText: { color: "#B77A32", fontSize: 9, marginTop: 2 },
-  empty: { color: "#7B817E", textAlign: "center", padding: 30 },
+  lateText: { color: "#31577F", fontSize: 9, marginTop: 2 },
+  empty: { color: "#667085", textAlign: "center", padding: 30 },
 });
