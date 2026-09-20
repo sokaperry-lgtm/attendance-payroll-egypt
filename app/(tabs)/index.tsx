@@ -1,12 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { showAlert } from "@/lib/alert";
 import * as Location from "expo-location";
 import * as Haptics from "expo-haptics";
@@ -17,270 +10,121 @@ import { PAYROLL_RULES } from "@/lib/payroll";
 import { calculateLateMinutes } from "@/lib/shift-utils";
 import { trpc } from "@/lib/trpc";
 import { useRouter } from "expo-router";
-import * as Auth from "@/lib/_core/auth";
 
-function distanceBetween(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const radius = 6371000;
-  const toRadians = (value: number) => (value * Math.PI) / 180;
-  const dLat = toRadians(lat2 - lat1);
-  const dLon = toRadians(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRadians(lat1)) *
-      Math.cos(toRadians(lat2)) *
-      Math.sin(dLon / 2) ** 2;
-  return Math.round(radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+function distanceBetween(lat1:number,lon1:number,lat2:number,lon2:number){
+  const r=6371000,toRad=(v:number)=>(v*Math.PI)/180,dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return Math.round(r*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
 }
-
-function currentTime() {
-  return new Intl.DateTimeFormat("ar-EG", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date());
+function currentTime(){return new Intl.DateTimeFormat("ar-EG",{hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date());}
+type Coordinates={latitude:number;longitude:number};
+function getBrowserLocation():Promise<Coordinates>{return new Promise((resolve,reject)=>{if(!navigator.geolocation){reject(new Error("المتصفح لا يدعم تحديد الموقع."));return;}navigator.geolocation.getCurrentPosition(p=>resolve({latitude:p.coords.latitude,longitude:p.coords.longitude}),e=>reject(new Error(e.code===e.PERMISSION_DENIED?"يجب السماح بالوصول إلى الموقع لتسجيل الحضور.":e.code===e.POSITION_UNAVAILABLE?"تعذر تحديد موقعك الحالي.":"انتهت مهلة تحديد الموقع.")),{enableHighAccuracy:true,timeout:15000,maximumAge:0});});}
+async function getCurrentCoordinates():Promise<Coordinates>{
+  if(Platform.OS==="web") return getBrowserLocation();
+  const permission=await Location.requestForegroundPermissionsAsync();
+  if(permission.status!=="granted") throw new Error("يجب السماح بالوصول إلى الموقع لتسجيل الحضور.");
+  if(!(await Location.hasServicesEnabledAsync())) throw new Error("فعّل خدمة الموقع في الهاتف ثم حاول مرة أخرى.");
+  const p=await Location.getCurrentPositionAsync({accuracy:Location.Accuracy.High});
+  return {latitude:p.coords.latitude,longitude:p.coords.longitude};
 }
+const weeklyAttendance=[86,94,78,91,88,96,70];
 
-type Coordinates = { latitude: number; longitude: number };
+export default function HomeScreen(){
+  const {role,employee,branch,shift,payroll,payrollInputs,records,checkedIn,todayRecord,checkIn,checkOut}=useAppData();
+  const router=useRouter();
+  const notificationsQuery=trpc.notifications.list.useQuery();
+  const [working,setWorking]=useState(false);
+  const [gpsMessage,setGpsMessage]=useState("الموقع جاهز للتحقق");
+  const isCheckedOut=Boolean(todayRecord?.checkOut),isWeeklyOff=shift.kind==="weekly_off";
+  const presentDays=records.filter(r=>r.status==="حاضر"||r.status==="متأخر").length;
+  const unread=(notificationsQuery.data??[]).filter(n=>!n.readAt).length;
+  const dateLabel=useMemo(()=>new Intl.DateTimeFormat("ar-EG",{weekday:"long",day:"numeric",month:"long"}).format(new Date()),[]);
 
-function getBrowserLocation(): Promise<Coordinates> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error("المتصفح لا يدعم تحديد الموقع."));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) =>
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        }),
-      (error) => {
-        if (error.code === error.PERMISSION_DENIED) {
-          reject(new Error("يجب السماح بالوصول إلى الموقع لتسجيل الحضور."));
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          reject(new Error("تعذر تحديد موقعك الحالي."));
-        } else {
-          reject(new Error("انتهت مهلة تحديد الموقع."));
-        }
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
-  });
-}
-
-async function getCurrentCoordinates(): Promise<Coordinates> {
-  if (Platform.OS === "web") return getBrowserLocation();
-  const permission = await Location.requestForegroundPermissionsAsync();
-  if (permission.status !== "granted") {
-    throw new Error("يجب السماح بالوصول إلى الموقع لتسجيل الحضور.");
+  async function handleCheckIn(){
+    if(isWeeklyOff)return;setWorking(true);
+    try{const c=await getCurrentCoordinates(),d=distanceBetween(branch.latitude,branch.longitude,c.latitude,c.longitude);
+      if(d>branch.radiusMeters)throw new Error(`أنت خارج نطاق الفرع بـ ${d} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`);
+      const lateMinutes=calculateLateMinutes(new Date(),shift.start,PAYROLL_RULES.graceMinutes);
+      await checkIn({time:currentTime(),distanceMeters:d,status:lateMinutes>0?"متأخر":"حاضر",lateMinutes});
+      setGpsMessage(`تم التحقق من الموقع — ${d} متر من الفرع`);
+      if(Platform.OS!=="web")await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }catch(e){const m=e instanceof Error?e.message:"تعذر التحقق من الموقع";setGpsMessage(m);showAlert("لم يتم تسجيل الحضور",m);}
+    finally{setWorking(false);}
   }
-  if (!(await Location.hasServicesEnabledAsync())) {
-    throw new Error("فعّل خدمة الموقع في الهاتف ثم حاول مرة أخرى.");
-  }
-  const position = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.High,
-  });
-  return {
-    latitude: position.coords.latitude,
-    longitude: position.coords.longitude,
-  };
-}
-
-const weeklyAttendance = [
-  { day: "السبت", value: 86 },
-  { day: "الأحد", value: 94 },
-  { day: "الإثنين", value: 78 },
-  { day: "الثلاثاء", value: 91 },
-  { day: "الأربعاء", value: 88 },
-  { day: "الخميس", value: 96 },
-  { day: "الجمعة", value: 70 },
-];
-
-export default function HomeScreen() {
-  const {
-    role,
-    employee,
-    branch,
-    shift,
-    payroll,
-    payrollInputs,
-    records,
-    checkedIn,
-    todayRecord,
-    checkIn,
-    checkOut,
-  } = useAppData();
-
-  const router = useRouter();
-  const logoutMutation = trpc.auth.logout.useMutation();
-  const notificationsQuery = trpc.notifications.list.useQuery();
-  const [working, setWorking] = useState(false);
-  const [gpsMessage, setGpsMessage] = useState("جاهز للتحقق من موقعك");
-
-  const isCheckedOut = Boolean(todayRecord?.checkOut);
-  const isWeeklyOff = shift.kind === "weekly_off";
-  const presentDays = records.filter(
-    (record) => record.status === "حاضر" || record.status === "متأخر",
-  ).length;
-
-  const dateLabel = useMemo(
-    () =>
-      new Intl.DateTimeFormat("ar-EG", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-      }).format(new Date()),
-    [],
-  );
-
-  async function handleCheckIn() {
-    if (isWeeklyOff) return;
+  async function handleCheckOut(){
     setWorking(true);
-    try {
-      const coordinates = await getCurrentCoordinates();
-      const distanceMeters = distanceBetween(
-        branch.latitude,
-        branch.longitude,
-        coordinates.latitude,
-        coordinates.longitude,
-      );
-      if (distanceMeters > branch.radiusMeters) {
-        throw new Error(
-          `أنت خارج نطاق الفرع بـ ${distanceMeters} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`,
-        );
-      }
-      const lateMinutes = calculateLateMinutes(
-        new Date(),
-        shift.start,
-        PAYROLL_RULES.graceMinutes,
-      );
-      await checkIn({
-        time: currentTime(),
-        distanceMeters,
-        status: lateMinutes > 0 ? "متأخر" : "حاضر",
-        lateMinutes,
-      });
-      setGpsMessage(
-        `تم التحقق من الموقع — أنت على بعد ${distanceMeters} متر من الفرع`,
-      );
-      if (Platform.OS !== "web") {
-        await Haptics.notificationAsync(
-          Haptics.NotificationFeedbackType.Success,
-        );
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "تعذر التحقق من الموقع";
-      setGpsMessage(message);
-      showAlert("لم يتم تسجيل الحضور", message);
-    } finally {
-      setWorking(false);
-    }
+    try{const c=await getCurrentCoordinates(),d=distanceBetween(branch.latitude,branch.longitude,c.latitude,c.longitude);
+      if(d>branch.radiusMeters)throw new Error(`أنت خارج نطاق الفرع بـ ${d} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`);
+      await checkOut({time:currentTime(),distanceMeters:d});setGpsMessage(`تم تسجيل الانصراف — ${d} متر من الفرع`);
+    }catch(e){showAlert("تعذر تسجيل الانصراف",e instanceof Error?e.message:"حدث خطأ غير متوقع.");}
+    finally{setWorking(false);}
   }
 
-  async function handleCheckOut() {
-    setWorking(true);
-    try {
-      const coordinates = await getCurrentCoordinates();
-      const distanceMeters = distanceBetween(branch.latitude, branch.longitude, coordinates.latitude, coordinates.longitude);
-      if (distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الفرع بـ ${distanceMeters} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`);
-      await checkOut({ time: currentTime(), distanceMeters });
-      setGpsMessage(`تم تسجيل الانصراف — أنت على بعد ${distanceMeters} متر من الفرع`);
-      if (Platform.OS !== "web") {
-        await Haptics.notificationAsync(
-          Haptics.NotificationFeedbackType.Success,
-        );
-      }
-    } catch (error) {
-      showAlert(
-        "تعذر تسجيل الانصراف",
-        error instanceof Error ? error.message : "حدث خطأ غير متوقع.",
-      );
-    } finally {
-      setWorking(false);
-    }
-  }
+  const quick=[["الحضور","calendar","/attendance"],["الطلبات","doc.text.fill","/requests"],["الجدول","calendar","/schedule"],["التقارير","chart.bar.fill","/reports"]];
 
-  return (
-    <ScreenContainer edges={["top","left","right"]}>
-      <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
-        <View style={styles.topbar}>
-          <View style={styles.profileRow}>
-            <View style={styles.avatar}><Text style={styles.avatarText}>{employee.initials}</Text></View>
-            <View><Text style={styles.muted}>{dateLabel}</Text><Text style={styles.greeting}>{role === "manager" ? "مساحة إدارة الفريق" : "أهلاً " + employee.name.split(" ")[0]}</Text></View>
-          </View>
-          <Pressable style={styles.iconButton} onPress={() => router.push("/notifications" as never)}>
-            <IconSymbol name="notifications" size={20} color="#172033" />
-            {(notificationsQuery.data ?? []).some((n) => !n.readAt) && <View style={styles.notificationDot} />}
+  return <ScreenContainer edges={["top","left","right"]}>
+    <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
+      <View style={styles.header}>
+        <View style={styles.brand}><View style={styles.logo}><Text style={styles.logoText}>HR</Text></View><View><Text style={styles.kicker}>WORKSPACE</Text><Text style={styles.company}>نظام إدارة الموظفين</Text></View></View>
+        <View style={styles.headerRight}><View style={styles.dateBlock}><Text style={styles.date}>{dateLabel}</Text><Text style={styles.welcome}>{role==="manager"?"مساحة الإدارة":"أهلاً، "+employee.name.split(" ")[0]}</Text></View><Pressable style={styles.bell} onPress={()=>router.push("/notifications" as never)}><IconSymbol name="notifications" size={20} color="#163A63"/>{unread>0&&<View style={styles.dot}/>}</Pressable></View>
+      </View>
+
+      <View style={styles.hero}>
+        <View style={styles.heroCopy}>
+          <View style={styles.live}><View style={styles.liveDot}/><Text style={styles.liveText}>النظام يعمل · اليوم</Text></View>
+          <Text style={styles.heroTitle}>{role==="manager"?"نظرة واحدة على يوم فريقك.":"كل ما تحتاجه ليوم عمل مرتب."}</Text>
+          <Text style={styles.heroSub}>{role==="manager"?"الحضور، الرواتب، الطلبات وأداء الفريق في مكان واحد.":"سجل حضورك وتابع ورديتك وراتبك من لوحة واحدة بسيطة."}</Text>
+          <View style={styles.heroStats}><View><Text style={styles.heroLabel}>الفرع</Text><Text style={styles.heroValue}>الفرع الرئيسي</Text></View><View><Text style={styles.heroLabel}>الوردية</Text><Text style={styles.heroValue}>{isWeeklyOff?"إجازة":shift.start+" — "+shift.end}</Text></View><View><Text style={styles.heroLabel}>الالتزام</Text><Text style={styles.heroValue}>92%</Text></View></View>
+        </View>
+        <View style={styles.attendanceCard}>
+          <Text style={styles.attendanceLabel}>{isCheckedOut?"تم إنهاء الوردية":checkedIn?"الوردية جارية":"ابدأ يومك"}</Text>
+          <Text style={styles.clock}>{currentTime()}</Text>
+          <View style={styles.locationRow}><View style={styles.locationIcon}><IconSymbol name="location.fill" size={14} color="#163A63"/></View><Text style={styles.locationText}>{gpsMessage}</Text></View>
+          <Pressable disabled={working||isWeeklyOff||isCheckedOut} onPress={checkedIn?handleCheckOut:handleCheckIn} style={({pressed})=>[styles.attendanceButton,(working||isWeeklyOff||isCheckedOut)&&styles.disabled,pressed&&styles.pressed]}>
+            <IconSymbol name={checkedIn?"arrow.right":"checkmark"} size={17} color="#FFFFFF"/><Text style={styles.attendanceButtonText}>{working?"جارٍ التحقق...":checkedIn?"تسجيل الانصراف":"تسجيل الحضور"}</Text>
           </Pressable>
         </View>
+      </View>
 
-        <View style={styles.hero}>
-          <View style={styles.heroMain}>
-            <View style={styles.eyebrowRow}><View style={styles.liveDot}/><Text style={styles.eyebrow}>نظام الحضور نشط</Text></View>
-            <Text style={styles.heroTitle}>{role === "manager" ? "كل ما يهمك عن فريقك، في شاشة واحدة." : "يوم عملك يبدأ من هنا."}</Text>
-            <Text style={styles.heroText}>{role === "manager" ? "راقب الحضور والطلبات والرواتب واتخاذ القرار بسرعة." : "سجل حضورك، تابع ورديتك، واعرف وضعك المالي بسهولة."}</Text>
-            <View style={styles.heroMetaRow}>
-              <View><Text style={styles.metaLabel}>الوردية</Text><Text style={styles.metaValue}>{isWeeklyOff ? "إجازة" : shift.start + " — " + shift.end}</Text></View>
-              <View><Text style={styles.metaLabel}>الفرع</Text><Text style={styles.metaValue}>الفرع الرئيسي</Text></View>
-              <View><Text style={styles.metaLabel}>الحضور</Text><Text style={styles.metaValue}>92%</Text></View>
-            </View>
-          </View>
-          <View style={styles.heroAction}>
-            <Text style={styles.actionLabel}>{isCheckedOut ? "تم تسجيل الانصراف" : checkedIn ? "أنت داخل الوردية" : "ابدأ ورديتك"}</Text>
-            <Text style={styles.clock}>{currentTime()}</Text>
-            <Text style={styles.actionHint}>{gpsMessage}</Text>
-            <Pressable disabled={working || isWeeklyOff || isCheckedOut} onPress={checkedIn ? handleCheckOut : handleCheckIn} style={({pressed}) => [styles.attendanceButton, (working || isWeeklyOff || isCheckedOut) && styles.disabledButton, pressed && styles.pressed]}>
-              <IconSymbol name={checkedIn ? "arrow.right" : "checkmark"} size={18} color="#FFFFFF"/>
-              <Text style={styles.attendanceButtonText}>{working ? "جارٍ التحقق..." : checkedIn ? "تسجيل الانصراف" : "تسجيل الحضور"}</Text>
-            </Pressable>
-          </View>
-        </View>
+      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>لوحة اليوم</Text><Text style={styles.sectionSub}>أرقامك الأساسية في لمحة</Text></View></View>
+      <View style={styles.kpis}>
+        <Kpi icon="person.2.fill" value={String(presentDays)} label="أيام الحضور" note="هذا الشهر"/>
+        <Kpi icon="clock" value={String(payrollInputs.lateMinutes??0)} label="دقائق التأخير" note="إجمالي الشهر"/>
+        <Kpi icon="banknote" value={payroll.net.toLocaleString("ar-EG")} label="صافي الراتب" note="جنيه مصري"/>
+        <Kpi icon="notifications" value={String(unread)} label="تنبيهات جديدة" note="تحتاج مراجعة"/>
+      </View>
 
-        <View style={styles.sectionHead}><View><Text style={styles.sectionTitle}>ملخص اليوم</Text><Text style={styles.sectionHint}>أهم الأرقام بدون زحمة</Text></View></View>
-        <View style={styles.metricGrid}>
-          <View style={styles.metric}><View style={[styles.metricIcon,{backgroundColor:"#EAF0F7"}]}><IconSymbol name="checkmark" size={17} color="#163A63"/></View><Text style={styles.metricNumber}>{presentDays}</Text><Text style={styles.metricLabel}>أيام الحضور</Text><Text style={styles.metricFoot}>هذا الشهر</Text></View>
-          <View style={styles.metric}><View style={[styles.metricIcon,{backgroundColor:"#F4F6F8"}]}><IconSymbol name="clock" size={17} color="#B7791F"/></View><Text style={styles.metricNumber}>{payrollInputs.lateMinutes?.toLocaleString("ar-EG") ?? "٠"}</Text><Text style={styles.metricLabel}>دقيقة تأخير</Text><Text style={styles.metricFoot}>إجمالي الشهر</Text></View>
-          <View style={styles.metric}><View style={[styles.metricIcon,{backgroundColor:"#EEF1EF"}]}><IconSymbol name="wallet" size={17} color="#163A63"/></View><Text style={styles.metricNumber}>{payroll.net.toLocaleString("ar-EG")}</Text><Text style={styles.metricLabel}>صافي الراتب</Text><Text style={styles.metricFoot}>ج.م متوقع</Text></View>
-          <View style={styles.metric}><View style={[styles.metricIcon,{backgroundColor:"#F7ECEA"}]}><IconSymbol name="doc.text.fill" size={17} color="#C05656"/></View><Text style={styles.metricNumber}>{(notificationsQuery.data ?? []).filter(n=>!n.readAt).length}</Text><Text style={styles.metricLabel}>إشعارات جديدة</Text><Text style={styles.metricFoot}>تحتاج مراجعة</Text></View>
+      <View style={styles.grid}>
+        <View style={[styles.card,styles.attendancePanel]}>
+          <View style={styles.cardHeader}><Text style={styles.cardTitle}>أداء الحضور</Text><Text style={styles.cardMeta}>آخر 7 أيام</Text></View>
+          <View style={styles.chart}>{weeklyAttendance.map((v,i)=><View key={i} style={styles.barItem}><Text style={styles.barValue}>{v}%</Text><View style={styles.barTrack}><View style={[styles.barFill,{height:(v+"%") as `${number}%`,opacity:i===6?.55:1}]}/></View><Text style={styles.barDay}>{["س","ح","ن","ث","ر","خ","ج"][i]}</Text></View>)}</View>
         </View>
+        <View style={[styles.card,styles.todayPanel]}>
+          <View style={styles.cardHeader}><Text style={styles.cardTitle}>حالة اليوم</Text><Text style={styles.cardMeta}>{dateLabel}</Text></View>
+          <View style={styles.todayStatus}><View style={styles.statusCircle}><IconSymbol name={checkedIn?"checkmark":"clock"} size={22} color="#FFFFFF"/></View><View style={styles.statusCopy}><Text style={styles.statusTitle}>{checkedIn?"الوردية جارية":"في انتظار تسجيل الحضور"}</Text><Text style={styles.statusSub}>{checkedIn?"تم التحقق من موقعك بنجاح.":"اضغط على تسجيل الحضور لبدء الوردية."}</Text></View></View>
+          <View style={styles.timeRows}><TimeRow label="بداية الوردية" value={shift.start}/><TimeRow label="نهاية الوردية" value={shift.end}/></View>
+        </View>
+      </View>
 
-        <View style={styles.twoCol}>
-          <View style={styles.panel}>
-            <View style={styles.panelHead}><Text style={styles.panelTitle}>أداء الحضور</Text><Text style={styles.panelLink}>آخر 7 أيام</Text></View>
-            <View style={styles.chart}>{weeklyAttendance.map((item)=><View key={item.day} style={styles.chartItem}><Text style={styles.chartValue}>{item.value}</Text><View style={styles.track}><View style={[styles.fill,{height:(item.value + "%") as `${number}%`}]}/></View><Text style={styles.chartDay}>{item.day.slice(0,2)}</Text></View>)}</View>
-          </View>
-          <View style={styles.panel}>
-            <View style={styles.panelHead}><Text style={styles.panelTitle}>حالة اليوم</Text><Text style={styles.panelLink}>{dateLabel}</Text></View>
-            <View style={styles.statusBox}><View style={[styles.statusIcon,{backgroundColor:checkedIn?"#EAF0F7":"#F4F6F8"}]}><IconSymbol name={checkedIn?"checkmark":"clock"} size={21} color={checkedIn?"#163A63":"#B7791F"}/></View><View style={{flex:1}}><Text style={styles.statusTitle}>{checkedIn?"الوردية جارية":isWeeklyOff?"يوم إجازة":"لم تسجل الحضور بعد"}</Text><Text style={styles.statusText}>{checkedIn?"تم التحقق من موقعك بنجاح.":isWeeklyOff?"استمتع بيوم الراحة.":"اضغط تسجيل الحضور لبدء اليوم."}</Text></View></View>
-            <View style={styles.infoRow}><Text style={styles.infoValue}>{shift.start}</Text><Text style={styles.infoLabel}>بداية الوردية</Text></View>
-            <View style={styles.infoRow}><Text style={styles.infoValue}>{shift.end}</Text><Text style={styles.infoLabel}>نهاية الوردية</Text></View>
-          </View>
-        </View>
-
-        <View style={styles.sectionHead}><View><Text style={styles.sectionTitle}>الوصول السريع</Text><Text style={styles.sectionHint}>الأماكن التي تستخدمها أكثر</Text></View></View>
-        <View style={styles.quickGrid}>
-          {[["الحضور","calendar","/attendance"],["الطلبات","doc.text.fill","/requests"],["الجدول","calendar","/schedule"],["الإشعارات","notifications","/notifications"]].map(([label,icon,path])=><Pressable key={label} style={({pressed})=>[styles.quick,pressed&&styles.pressed]} onPress={()=>router.push(path as never)}><View style={styles.quickIcon}><IconSymbol name={icon as any} size={18} color="#163A63"/></View><Text style={styles.quickText}>{label}</Text><Text style={styles.arrow}>‹</Text></Pressable>)}
-        </View>
-      </ScrollView>
-    </ScreenContainer>
-  );
+      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>وصول سريع</Text><Text style={styles.sectionSub}>اختصارات للمهام اليومية</Text></View></View>
+      <View style={styles.quickGrid}>{quick.map(([label,icon,path])=><Pressable key={label} onPress={()=>router.push(path as never)} style={({pressed})=>[styles.quick,pressed&&styles.pressed]}><View style={styles.quickIcon}><IconSymbol name={icon as any} size={18} color="#163A63"/></View><View style={styles.quickCopy}><Text style={styles.quickTitle}>{label}</Text><Text style={styles.quickSub}>فتح القسم</Text></View><Text style={styles.chevron}>‹</Text></Pressable>)}</View>
+    </ScrollView>
+  </ScreenContainer>;
 }
 
-const styles = StyleSheet.create({
-  page:{padding:28,paddingBottom:60,gap:20,maxWidth:1220,width:"100%",alignSelf:"center"},
-  topbar:{flexDirection:"row",alignItems:"center",justifyContent:"space-between"},
-  profileRow:{flexDirection:"row-reverse",alignItems:"center",gap:12},
-  avatar:{width:46,height:46,borderRadius:15,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},
-  avatarText:{color:"#fff",fontSize:14,fontWeight:"900"},muted:{color:"#98A2B3",fontSize:11,textAlign:"right"},greeting:{color:"#172033",fontSize:23,fontWeight:"900",marginTop:3,textAlign:"right"},
-  iconButton:{width:44,height:44,borderRadius:14,borderWidth:1,borderColor:"#E4E7EC",backgroundColor:"#fff",alignItems:"center",justifyContent:"center",position:"relative"},notificationDot:{position:"absolute",right:8,top:8,width:7,height:7,borderRadius:4,backgroundColor:"#C05656",borderWidth:2,borderColor:"#fff"},
-  hero:{backgroundColor:"#FFFFFF",borderRadius:24,borderWidth:1,borderColor:"#E4E7EC",padding:22,flexDirection:"row-reverse",gap:18},heroMain:{flex:1,padding:4},eyebrowRow:{flexDirection:"row-reverse",alignItems:"center",gap:6},liveDot:{width:7,height:7,borderRadius:4,backgroundColor:"#163A63"},eyebrow:{color:"#163A63",fontSize:11,fontWeight:"900"},
-  heroTitle:{color:"#172033",fontSize:30,fontWeight:"900",lineHeight:37,marginTop:12,textAlign:"right"},heroText:{color:"#667085",fontSize:13,lineHeight:21,marginTop:8,maxWidth:620,textAlign:"right"},heroMetaRow:{flexDirection:"row-reverse",gap:34,marginTop:23,paddingTop:17,borderTopWidth:1,borderTopColor:"#EAECF0"},metaLabel:{color:"#98A2B3",fontSize:10,textAlign:"right"},metaValue:{color:"#172033",fontSize:13,fontWeight:"900",marginTop:3,textAlign:"right"},
-  heroAction:{width:260,borderRadius:18,backgroundColor:"#F4F7FB",padding:17,justifyContent:"center"},actionLabel:{color:"#163A63",fontSize:11,fontWeight:"900",textAlign:"right"},clock:{color:"#172033",fontSize:30,fontWeight:"900",marginTop:3,textAlign:"right"},actionHint:{color:"#98A2B3",fontSize:9,lineHeight:15,marginTop:3,textAlign:"right"},
-  attendanceButton:{height:48,borderRadius:13,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center",flexDirection:"row-reverse",gap:7,marginTop:13},attendanceButtonText:{color:"#fff",fontSize:12,fontWeight:"900"},disabledButton:{backgroundColor:"#CBD5E1"},pressed:{opacity:.8,transform:[{scale:.985}]},
-  sectionHead:{flexDirection:"row-reverse",alignItems:"flex-end",justifyContent:"space-between",marginTop:3},sectionTitle:{color:"#172033",fontSize:18,fontWeight:"900",textAlign:"right"},sectionHint:{color:"#98A2B3",fontSize:10,marginTop:3,textAlign:"right"},
-  metricGrid:{flexDirection:"row-reverse",gap:12},metric:{flex:1,minWidth:150,backgroundColor:"#fff",borderRadius:18,borderWidth:1,borderColor:"#E4E7EC",padding:16},metricIcon:{width:36,height:36,borderRadius:12,alignItems:"center",justifyContent:"center"},metricNumber:{color:"#172033",fontSize:21,fontWeight:"900",marginTop:13,textAlign:"right"},metricLabel:{color:"#475467",fontSize:11,fontWeight:"800",marginTop:3,textAlign:"right"},metricFoot:{color:"#98A2B3",fontSize:9,marginTop:6,textAlign:"right"},
-  twoCol:{flexDirection:"row-reverse",gap:14,flexWrap:"wrap"},panel:{flex:1,minWidth:320,backgroundColor:"#fff",borderRadius:20,borderWidth:1,borderColor:"#E4E7EC",padding:18},panelHead:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},panelTitle:{color:"#172033",fontSize:14,fontWeight:"900",textAlign:"right"},panelLink:{color:"#163A63",fontSize:10,fontWeight:"800"},
-  chart:{height:205,marginTop:14,flexDirection:"row-reverse",alignItems:"flex-end",gap:8},chartItem:{flex:1,height:"100%",alignItems:"center",justifyContent:"flex-end",gap:5},chartValue:{color:"#66706B",fontSize:9,fontWeight:"800"},track:{width:24,height:140,borderRadius:8,backgroundColor:"#EEF2F6",justifyContent:"flex-end",overflow:"hidden"},fill:{width:"100%",backgroundColor:"#163A63",borderRadius:8,minHeight:4},chartDay:{color:"#98A2B3",fontSize:9},
-  statusBox:{marginTop:17,padding:13,borderRadius:15,backgroundColor:"#F8FAFC",flexDirection:"row-reverse",alignItems:"center",gap:10},statusIcon:{width:42,height:42,borderRadius:13,alignItems:"center",justifyContent:"center"},statusTitle:{color:"#172033",fontSize:12,fontWeight:"900",textAlign:"right"},statusText:{color:"#667085",fontSize:10,lineHeight:16,marginTop:2,textAlign:"right"},infoRow:{flexDirection:"row-reverse",justifyContent:"space-between",paddingTop:12,marginTop:12,borderTopWidth:1,borderTopColor:"#EAECF0"},infoLabel:{color:"#98A2B3",fontSize:10},infoValue:{color:"#172033",fontSize:11,fontWeight:"900"},
-  quickGrid:{flexDirection:"row-reverse",gap:10,flexWrap:"wrap"},quick:{flex:1,minWidth:190,backgroundColor:"#fff",borderRadius:16,borderWidth:1,borderColor:"#E4E7EC",padding:14,flexDirection:"row-reverse",alignItems:"center",gap:10},quickIcon:{width:40,height:40,borderRadius:12,backgroundColor:"#EAF0F7",alignItems:"center",justifyContent:"center"},quickText:{color:"#172033",fontSize:12,fontWeight:"900",flex:1,textAlign:"right"},arrow:{color:"#98A2B3",fontSize:18}
+function Kpi({icon,value,label,note}:{icon:any;value:string;label:string;note:string}){return <View style={styles.kpi}><View style={styles.kpiTop}><View style={styles.kpiIcon}><IconSymbol name={icon} size={17} color="#163A63"/></View><View style={styles.kpiLine}/></View><Text style={styles.kpiValue}>{value}</Text><Text style={styles.kpiLabel}>{label}</Text><Text style={styles.kpiNote}>{note}</Text></View>}
+function TimeRow({label,value}:{label:string;value:string}){return <View style={styles.timeRow}><Text style={styles.timeValue}>{value}</Text><Text style={styles.timeLabel}>{label}</Text></View>}
+
+const styles=StyleSheet.create({
+  page:{padding:30,paddingBottom:70,gap:22,maxWidth:1280,width:"100%",alignSelf:"center"},
+  header:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},
+  brand:{flexDirection:"row-reverse",alignItems:"center",gap:11},logo:{width:44,height:44,borderRadius:13,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},logoText:{color:"#fff",fontSize:12,fontWeight:"900"},kicker:{fontSize:9,color:"#98A2B3",fontWeight:"900",letterSpacing:1,textAlign:"right"},company:{fontSize:14,color:"#172033",fontWeight:"900",marginTop:2,textAlign:"right"},
+  headerRight:{flexDirection:"row-reverse",alignItems:"center",gap:15},dateBlock:{alignItems:"flex-end"},date:{fontSize:10,color:"#98A2B3"},welcome:{fontSize:12,color:"#172033",fontWeight:"800",marginTop:3},bell:{width:44,height:44,borderRadius:13,borderWidth:1,borderColor:"#E4E7EC",backgroundColor:"#fff",alignItems:"center",justifyContent:"center",position:"relative"},dot:{position:"absolute",right:8,top:8,width:7,height:7,borderRadius:4,backgroundColor:"#C05656",borderWidth:2,borderColor:"#fff"},
+  hero:{backgroundColor:"#163A63",borderRadius:26,padding:24,flexDirection:"row-reverse",gap:22,shadowColor:"#163A63",shadowOpacity:.14,shadowRadius:20,shadowOffset:{width:0,height:8},elevation:4},heroCopy:{flex:1,paddingVertical:5},live:{flexDirection:"row-reverse",alignItems:"center",gap:7},liveDot:{width:7,height:7,borderRadius:4,backgroundColor:"#60A5FA"},liveText:{color:"#BFD7F5",fontSize:10,fontWeight:"800"},heroTitle:{color:"#fff",fontSize:30,fontWeight:"900",lineHeight:38,marginTop:13,textAlign:"right"},heroSub:{color:"#C8D5E6",fontSize:12,lineHeight:20,marginTop:7,maxWidth:650,textAlign:"right"},heroStats:{flexDirection:"row-reverse",gap:32,borderTopWidth:1,borderTopColor:"rgba(255,255,255,.12)",marginTop:24,paddingTop:15},heroLabel:{color:"#8FA9C7",fontSize:9,textAlign:"right"},heroValue:{color:"#fff",fontSize:12,fontWeight:"800",marginTop:3,textAlign:"right"},
+  attendanceCard:{width:285,backgroundColor:"#fff",borderRadius:20,padding:18,justifyContent:"center"},attendanceLabel:{color:"#667085",fontSize:10,fontWeight:"800",textAlign:"right"},clock:{color:"#172033",fontSize:31,fontWeight:"900",textAlign:"right",marginTop:3},locationRow:{flexDirection:"row-reverse",alignItems:"center",gap:7,marginTop:7},locationIcon:{width:28,height:28,borderRadius:9,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},locationText:{color:"#667085",fontSize:9,flex:1,textAlign:"right"},attendanceButton:{height:47,borderRadius:12,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center",flexDirection:"row-reverse",gap:7,marginTop:13},attendanceButtonText:{color:"#fff",fontSize:11,fontWeight:"900"},disabled:{backgroundColor:"#AAB8C8"},pressed:{opacity:.82,transform:[{scale:.985}]},
+  sectionHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"flex-end"},sectionTitle:{fontSize:18,color:"#172033",fontWeight:"900",textAlign:"right"},sectionSub:{fontSize:10,color:"#98A2B3",marginTop:3,textAlign:"right"},
+  kpis:{flexDirection:"row-reverse",gap:13},kpi:{flex:1,minWidth:170,backgroundColor:"#fff",borderRadius:18,borderWidth:1,borderColor:"#E4E7EC",padding:16},kpiTop:{flexDirection:"row-reverse",alignItems:"center",gap:8},kpiIcon:{width:36,height:36,borderRadius:11,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},kpiLine:{height:1,backgroundColor:"#F0F2F5",flex:1},kpiValue:{fontSize:22,color:"#172033",fontWeight:"900",marginTop:14,textAlign:"right"},kpiLabel:{fontSize:11,color:"#475467",fontWeight:"800",marginTop:3,textAlign:"right"},kpiNote:{fontSize:9,color:"#98A2B3",marginTop:5,textAlign:"right"},
+  grid:{flexDirection:"row-reverse",gap:14,flexWrap:"wrap"},card:{backgroundColor:"#fff",borderRadius:20,borderWidth:1,borderColor:"#E4E7EC",padding:18},attendancePanel:{flex:1,minWidth:420},todayPanel:{flex:1,minWidth:340},cardHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},cardTitle:{fontSize:14,color:"#172033",fontWeight:"900",textAlign:"right"},cardMeta:{fontSize:9,color:"#98A2B3"},chart:{height:205,marginTop:13,flexDirection:"row-reverse",alignItems:"flex-end",gap:9},barItem:{flex:1,height:"100%",alignItems:"center",justifyContent:"flex-end",gap:5},barValue:{fontSize:8,color:"#667085",fontWeight:"800"},barTrack:{width:24,height:140,backgroundColor:"#F2F4F7",borderRadius:8,justifyContent:"flex-end",overflow:"hidden"},barFill:{width:"100%",backgroundColor:"#163A63",borderRadius:8,minHeight:4},barDay:{fontSize:9,color:"#98A2B3"},
+  todayStatus:{backgroundColor:"#F8FAFC",borderRadius:15,padding:13,marginTop:17,flexDirection:"row-reverse",alignItems:"center",gap:10},statusCircle:{width:43,height:43,borderRadius:13,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},statusCopy:{flex:1},statusTitle:{fontSize:12,color:"#172033",fontWeight:"900",textAlign:"right"},statusSub:{fontSize:9,color:"#667085",marginTop:3,lineHeight:15,textAlign:"right"},timeRows:{marginTop:13},timeRow:{flexDirection:"row-reverse",justifyContent:"space-between",borderTopWidth:1,borderTopColor:"#EAECF0",paddingTop:11,marginTop:11},timeLabel:{fontSize:10,color:"#98A2B3"},timeValue:{fontSize:11,color:"#172033",fontWeight:"900"},
+  quickGrid:{flexDirection:"row-reverse",gap:11,flexWrap:"wrap"},quick:{flex:1,minWidth:190,backgroundColor:"#fff",borderWidth:1,borderColor:"#E4E7EC",borderRadius:16,padding:13,flexDirection:"row-reverse",alignItems:"center",gap:10},quickIcon:{width:39,height:39,borderRadius:11,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},quickCopy:{flex:1},quickTitle:{fontSize:12,color:"#172033",fontWeight:"900",textAlign:"right"},quickSub:{fontSize:9,color:"#98A2B3",marginTop:2,textAlign:"right"},chevron:{fontSize:19,color:"#98A2B3"}
 });
