@@ -43,8 +43,8 @@ function RoleAwareTabs() {
           tabBarPosition: isDesktopWeb ? "right" : "bottom",
           tabBarVariant: isDesktopWeb ? "material" : "uikit",
           tabBarLabelPosition: isDesktopWeb ? "beside-icon" : "below-icon",
-          tabBarActiveTintColor: isDesktopWeb ? "#FFFFFF" : colors.primary,
-          tabBarInactiveTintColor: isDesktopWeb ? "#92989F" : colors.muted,
+          tabBarActiveTintColor: isDesktopWeb ? "#55786D" : colors.primary,
+          tabBarInactiveTintColor: isDesktopWeb ? "#7B817E" : colors.muted,
           headerShown: false,
           tabBarButton: HapticTab,
           tabBarLabelStyle: {
@@ -69,11 +69,11 @@ function RoleAwareTabs() {
           tabBarStyle: isDesktopWeb
             ? {
                 width: 252,
-                backgroundColor: "#263A36",
-                borderLeftColor: "#B6C0D1",
+                backgroundColor: "#FFFCF7",
+                borderLeftColor: "#E7E2D9",
                 borderLeftWidth: 1,
-                paddingVertical: 18,
-                paddingHorizontal: 12,
+                paddingVertical: 22,
+                paddingHorizontal: 14,
                 borderTopWidth: 0,
                 borderBottomWidth: 0,
               }
