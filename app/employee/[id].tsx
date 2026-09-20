@@ -1,46 +1,72 @@
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useAppData } from "@/lib/app-data";
-import { formatMoney } from "@/lib/payroll";
 import { trpc } from "@/lib/trpc";
+import { formatMoney } from "@/lib/payroll";
 
 export default function EmployeeProfileScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
   const staffAccountId = Number(rawId);
-  const { staffMembers, role } = useAppData();
-  const employee = staffMembers.find((item) => Number(item.id) === staffAccountId);
-  const canLoad = (role === "manager" || role === "supervisor") && Number.isInteger(staffAccountId) && staffAccountId > 0;
+
+  // This route lives outside /(tabs), so it must NOT use useAppData().
+  // Read the session directly, then load the real Employee 360 record.
+  const me = trpc.auth.me.useQuery(undefined, { retry: false });
+  const canLoad = (me.data?.role === "manager" || me.data?.role === "supervisor")
+    && Number.isInteger(staffAccountId)
+    && staffAccountId > 0;
 
   const profile = trpc.hrTools.employee360.useQuery(
     { staffAccountId },
     { enabled: canLoad, retry: false }
   );
 
-  if (!canLoad) {
-    return <State title="رابط الموظف غير صحيح" message="تعذر تحديد الموظف المطلوب." onBack={() => router.back()} />;
+  if (me.isLoading) {
+    return <Screen><Loading text="جاري التحقق من صلاحية الحساب..." /></Screen>;
   }
 
+  if (!me.data) {
+    return <State title="انتهت جلسة الدخول" message="سجل الدخول مرة أخرى ثم افتح ملف الموظف." onBack={() => router.replace("/login" as never)} />;
+  }
+
+  if (!canLoad) {
+    return <State title="رابط الموظف غير صحيح" message="تعذر تحديد الموظف المطلوب أو لا تملك صلاحية عرضه." onBack={() => router.back()} />;
+  }
+
+  if (profile.isLoading) {
+    return <Screen><Loading text="جاري تحميل بيانات الموظف..." /></Screen>;
+  }
+
+  if (profile.isError) {
+    return (
+      <Screen>
+        <View style={styles.center}>
+          <Text style={styles.title}>تعذر تحميل التفاصيل</Text>
+          <Text style={styles.muted}>{profile.error?.message || "حدث خطأ أثناء تحميل بيانات الموظف."}</Text>
+          <Pressable onPress={() => profile.refetch()} style={styles.button}>
+            <Text style={styles.buttonText}>إعادة المحاولة</Text>
+          </Pressable>
+          <Pressable onPress={() => router.back()}>
+            <Text style={styles.back}>رجوع للموظفين</Text>
+          </Pressable>
+        </View>
+      </Screen>
+    );
+  }
+
+  const data = profile.data;
+  const employee = data?.staff;
   if (!employee) {
     return <State title="الموظف غير موجود" message={`رقم الموظف: ${String(rawId || "غير معروف")}`} onBack={() => router.back()} />;
   }
 
-  if (profile.isLoading) {
-    return <Screen><View style={styles.center}><ActivityIndicator size="large" color="#163A63" /><Text style={styles.title}>جاري تحميل بيانات الموظف...</Text></View></Screen>;
-  }
+  const attendance = data.attendance ?? [];
+  const requests = data.requests ?? [];
+  const payroll = data.payroll ?? [];
+  const documents = data.documents ?? [];
+  const adjustments = data.adjustments ?? [];
+  const advances = data.advances ?? [];
 
-  if (profile.isError) {
-    return <Screen><View style={styles.center}><Text style={styles.title}>تعذر تحميل التفاصيل</Text><Text style={styles.muted}>{profile.error?.message || "حدث خطأ أثناء تحميل بيانات الموظف."}</Text><Pressable onPress={() => profile.refetch()} style={styles.button}><Text style={styles.buttonText}>إعادة المحاولة</Text></Pressable><Pressable onPress={() => router.back()}><Text style={styles.back}>رجوع للموظفين</Text></Pressable></View></Screen>;
-  }
-
-  const data = profile.data;
-  const attendance = data?.attendance ?? [];
-  const requests = data?.requests ?? [];
-  const payroll = data?.payroll ?? [];
-  const documents = data?.documents ?? [];
-  const adjustments = data?.adjustments ?? [];
-  const advances = data?.advances ?? [];
   const present = attendance.filter((r) => r.status === "حاضر" || r.status === "متأخر").length;
   const absent = attendance.filter((r) => r.status === "غياب").length;
   const late = attendance.reduce((sum, r) => sum + Number(r.lateMinutes || 0), 0);
@@ -48,9 +74,14 @@ export default function EmployeeProfileScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
-        <Pressable onPress={() => router.back()}><Text style={styles.back}>‹ رجوع للموظفين</Text></Pressable>
+        <Pressable onPress={() => router.back()}>
+          <Text style={styles.back}>‹ رجوع للموظفين</Text>
+        </Pressable>
+
         <View style={styles.hero}>
-          <View style={styles.avatar}><Text style={styles.avatarText}>{employee.initials || "م"}</Text></View>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials(employee.name)}</Text>
+          </View>
           <View style={styles.heroText}>
             <Text style={styles.kicker}>EMPLOYEE 360</Text>
             <Text style={styles.name}>{employee.name}</Text>
@@ -59,17 +90,72 @@ export default function EmployeeProfileScreen() {
         </View>
 
         <View style={styles.grid}>
-          <Card title="بيانات الموظف"><Row label="الهاتف" value={employee.phone || "—"} /><Row label="القسم" value={employee.department || "—"} /><Row label="الوظيفة" value={employee.title || "—"} /><Row label="الراتب الأساسي" value={formatMoney(employee.baseSalary)} /></Card>
-          <Card title="ملخص الحضور"><Row label="أيام الحضور" value={String(present)} /><Row label="أيام الغياب" value={String(absent)} /><Row label="دقائق التأخير" value={String(late)} /><Row label="سجلات الحضور" value={String(attendance.length)} /></Card>
+          <Card title="بيانات الموظف">
+            <Row label="الهاتف" value={employee.phone || "—"} />
+            <Row label="القسم" value={employee.department || "—"} />
+            <Row label="الوظيفة" value={employee.title || "—"} />
+            <Row label="الراتب الأساسي" value={formatMoney(employee.baseSalary)} />
+          </Card>
+
+          <Card title="ملخص الحضور">
+            <Row label="أيام الحضور" value={String(present)} />
+            <Row label="أيام الغياب" value={String(absent)} />
+            <Row label="دقائق التأخير" value={String(late)} />
+            <Row label="سجلات الحضور" value={String(attendance.length)} />
+          </Card>
         </View>
 
-        <Card title="الحضور">{attendance.length ? attendance.slice(0, 20).map((r) => <Row key={r.id} label={String(r.date)} value={r.checkIn && r.checkOut ? `${r.checkIn} → ${r.checkOut}` : String(r.status || "—")} />) : <Empty text="لا توجد سجلات حضور." />}</Card>
-        <Card title="الطلبات">{requests.length ? requests.slice(0, 12).map((r) => <Row key={r.id} label={`${r.type} · ${r.fromDate}`} value={String(r.status || "—")} />) : <Empty text="لا توجد طلبات." />}</Card>
-        <Card title="الرواتب">{payroll.length ? payroll.slice(0, 12).map((r) => <Row key={r.id} label={String(r.month)} value={formatMoney(Number(r.netSalary || 0))} />) : <Empty text="لا توجد مسيرات مسجلة." />}</Card>
-        <Card title="التعديلات والسلف"><Row label="تعديلات الراتب" value={String(adjustments.length)} /><Row label="السلف" value={String(advances.length)} /></Card>
-        <Card title="المستندات">{documents.length ? documents.map((d) => <Row key={d.id} label={`${d.type} · ${d.title}`} value={d.expiryDate ? String(d.expiryDate) : "—"} />) : <Empty text="لا توجد مستندات." />}</Card>
+        <Card title="الحضور">
+          {attendance.length
+            ? attendance.slice(0, 20).map((r) => (
+                <Row key={r.id} label={String(r.date)} value={r.checkIn && r.checkOut ? `${r.checkIn} → ${r.checkOut}` : String(r.status || "—")} />
+              ))
+            : <Empty text="لا توجد سجلات حضور." />}
+        </Card>
+
+        <Card title="الطلبات">
+          {requests.length
+            ? requests.slice(0, 12).map((r) => (
+                <Row key={r.id} label={`${r.type} · ${r.fromDate}`} value={String(r.status || "—")} />
+              ))
+            : <Empty text="لا توجد طلبات." />}
+        </Card>
+
+        <Card title="الرواتب">
+          {payroll.length
+            ? payroll.slice(0, 12).map((r) => (
+                <Row key={r.id} label={String(r.month)} value={formatMoney(Number(r.netSalary || 0))} />
+              ))
+            : <Empty text="لا توجد مسيرات مسجلة." />}
+        </Card>
+
+        <Card title="التعديلات والسلف">
+          <Row label="تعديلات الراتب" value={String(adjustments.length)} />
+          <Row label="السلف" value={String(advances.length)} />
+        </Card>
+
+        <Card title="المستندات">
+          {documents.length
+            ? documents.map((d) => (
+                <Row key={d.id} label={`${d.type} · ${d.title}`} value={d.expiryDate ? String(d.expiryDate) : "—"} />
+              ))
+            : <Empty text="لا توجد مستندات." />}
+        </Card>
       </ScrollView>
     </Screen>
+  );
+}
+
+function initials(name: string) {
+  return name.split(" ").slice(0, 2).map((part) => part[0] ?? "").join("");
+}
+
+function Loading({ text }: { text: string }) {
+  return (
+    <View style={styles.center}>
+      <ActivityIndicator size="large" color="#163A63" />
+      <Text style={styles.title}>{text}</Text>
+    </View>
   );
 }
 
@@ -78,15 +164,35 @@ function Screen({ children }: { children: React.ReactNode }) {
 }
 
 function State({ title, message, onBack }: { title: string; message: string; onBack: () => void }) {
-  return <Screen><View style={styles.center}><Text style={styles.title}>{title}</Text><Text style={styles.muted}>{message}</Text><Pressable onPress={onBack} style={styles.button}><Text style={styles.buttonText}>رجوع</Text></Pressable></View></Screen>;
+  return (
+    <Screen>
+      <View style={styles.center}>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.muted}>{message}</Text>
+        <Pressable onPress={onBack} style={styles.button}>
+          <Text style={styles.buttonText}>رجوع</Text>
+        </Pressable>
+      </View>
+    </Screen>
+  );
 }
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return <View style={styles.card}><Text style={styles.cardTitle}>{title}</Text>{children}</View>;
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>{title}</Text>
+      {children}
+    </View>
+  );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
-  return <View style={styles.row}><Text style={styles.value}>{value}</Text><Text style={styles.label}>{label}</Text></View>;
+  return (
+    <View style={styles.row}>
+      <Text style={styles.value}>{value}</Text>
+      <Text style={styles.label}>{label}</Text>
+    </View>
+  );
 }
 
 function Empty({ text }: { text: string }) {
