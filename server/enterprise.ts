@@ -365,6 +365,32 @@ export async function listCompanyAdvances(actorId:number) {
   const m=await getCompanyForStaff(actorId); if(!m) return [];
   return db.select().from(salaryAdvances).where(eq(salaryAdvances.companyId,m.companyId)).orderBy(desc(salaryAdvances.createdAt));
 }
+export async function listEmployeeDocuments(actorId:number,targetId:number) {
+  await assertStaffInCompany(actorId,targetId);
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  return db.select().from(employeeDocuments).where(eq(employeeDocuments.staffAccountId,targetId)).orderBy(desc(employeeDocuments.createdAt));
+}
+
+export async function createEmployeeDocument(actorId:number,input:{staffAccountId:number;type:string;title:string;documentNumber?:string;expiryDate?:string;note?:string}) {
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const m=await getCompanyForStaff(actorId);
+  if(!m || m.role!=="owner") throw new Error("غير مصرح");
+  await assertStaffInCompany(actorId,input.staffAccountId);
+  const result=await db.insert(employeeDocuments).values({...input,companyId:m.companyId,createdBy:actorId,status:"active"});
+  await writeAudit(actorId,m.companyId,"employee_document.created","employee_document",String(result[0].insertId),input);
+  return (await db.select().from(employeeDocuments).where(eq(employeeDocuments.id,Number(result[0].insertId))).limit(1))[0];
+}
+
+export async function deleteEmployeeDocument(actorId:number,documentId:number) {
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const m=await getCompanyForStaff(actorId); if(!m || m.role!=="owner") throw new Error("غير مصرح");
+  const row=(await db.select().from(employeeDocuments).where(eq(employeeDocuments.id,documentId)).limit(1))[0];
+  if(!row || row.companyId!==m.companyId) throw new Error("المستند غير موجود.");
+  await db.delete(employeeDocuments).where(eq(employeeDocuments.id,documentId));
+  await writeAudit(actorId,m.companyId,"employee_document.deleted","employee_document",String(documentId),{staffAccountId:row.staffAccountId,title:row.title});
+  return {success:true};
+}
+
 export async function listEmployee360(actorId:number,targetId:number) {
   await assertStaffInCompany(actorId,targetId);
   const db=await getDb(); if(!db) throw new Error("Database not available");
