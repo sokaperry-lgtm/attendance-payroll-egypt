@@ -15,7 +15,7 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { summarizeAttendance, summarizeRequests } from "../lib/report-utils";
-import { companyMembers, salaryAdjustments, salaryAdvances, employeeDocuments } from "../drizzle/schema";
+import { companyMembers, salaryAdjustments, salaryAdvances, employeeDocuments, payrollRecords } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -149,7 +149,12 @@ export async function updateStaffAccount(id: number, input: { phone?: string; na
   if (input.active !== undefined) values.active = input.active;
   if (input.role !== undefined) values.role = input.role;
   if (input.password) values.passwordHash = hashPassword(input.password);
-  if (Object.keys(values).length) await db.update(staffAccounts).set({ ...values, updatedAt: new Date() }).where(eq(staffAccounts.id, id));
+  if (Object.keys(values).length) {
+    await db.update(staffAccounts).set({ ...values, updatedAt: new Date() }).where(eq(staffAccounts.id, id));
+    if (input.password !== undefined || input.active === false) {
+      await db.delete(staffSessions).where(eq(staffSessions.staffAccountId, id));
+    }
+  }
   return getStaffAccountById(id);
 }
 
