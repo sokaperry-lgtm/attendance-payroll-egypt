@@ -68,12 +68,12 @@ function RoleAwareTabs() {
           },
           tabBarStyle: isDesktopWeb
             ? {
-                width: 252,
+                width: 276,
                 backgroundColor: "#FFFCF7",
                 borderLeftColor: "#E7E2D9",
                 borderLeftWidth: 1,
-                paddingVertical: 22,
-                paddingHorizontal: 14,
+                paddingVertical: 28,
+                paddingHorizontal: 18,
                 borderTopWidth: 0,
                 borderBottomWidth: 0,
               }
