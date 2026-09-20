@@ -90,18 +90,18 @@ export default function HomeScreen(){
 
       <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>لوحة اليوم</Text><Text style={styles.sectionSub}>أرقامك الأساسية في لمحة</Text></View></View>
       <View style={[styles.kpis, isMobile && styles.kpisMobile]}>
-        <Kpi icon="person.2.fill" value={String(presentDays)} label="أيام الحضور" note="هذا الشهر"/>
-        <Kpi icon="clock" value={String(payrollInputs.lateMinutes??0)} label="دقائق التأخير" note="إجمالي الشهر"/>
-        <Kpi icon="banknote" value={payroll.net.toLocaleString("ar-EG")} label="صافي الراتب" note="جنيه مصري"/>
-        <Kpi icon="notifications" value={String(unread)} label="تنبيهات جديدة" note="تحتاج مراجعة"/>
+        <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="person.2.fill" value={String(presentDays)} label="أيام الحضور" note="هذا الشهر"/></View>
+        <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="clock" value={String(payrollInputs.lateMinutes??0)} label="دقائق التأخير" note="إجمالي الشهر"/></View>
+        <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="banknote" value={payroll.net.toLocaleString("ar-EG")} label="صافي الراتب" note="جنيه مصري"/></View>
+        <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="notifications" value={String(unread)} label="تنبيهات جديدة" note="تحتاج مراجعة"/></View>
       </View>
 
       <View style={[styles.grid, isMobile && styles.gridMobile]}>
-        <View style={[styles.card,styles.attendancePanel]}>
+        <View style={[styles.card,styles.attendancePanel,isMobile&&styles.panelMobile]}>
           <View style={styles.cardHeader}><Text style={styles.cardTitle}>أداء الحضور</Text><Text style={styles.cardMeta}>آخر 7 أيام</Text></View>
           <View style={styles.chart}>{weeklyAttendance.map((v,i)=><View key={i} style={styles.barItem}><Text style={styles.barValue}>{v}%</Text><View style={styles.barTrack}><View style={[styles.barFill,{height:(v+"%") as `${number}%`,opacity:i===6?.55:1}]}/></View><Text style={styles.barDay}>{["س","ح","ن","ث","ر","خ","ج"][i]}</Text></View>)}</View>
         </View>
-        <View style={[styles.card,styles.todayPanel]}>
+        <View style={[styles.card,styles.todayPanel,isMobile&&styles.panelMobile]}>
           <View style={styles.cardHeader}><Text style={styles.cardTitle}>حالة اليوم</Text><Text style={styles.cardMeta}>{dateLabel}</Text></View>
           <View style={styles.todayStatus}><View style={styles.statusCircle}><IconSymbol name={checkedIn?"checkmark":"clock"} size={22} color="#FFFFFF"/></View><View style={styles.statusCopy}><Text style={styles.statusTitle}>{checkedIn?"الوردية جارية":"في انتظار تسجيل الحضور"}</Text><Text style={styles.statusSub}>{checkedIn?"تم التحقق من موقعك بنجاح.":"اضغط على تسجيل الحضور لبدء الوردية."}</Text></View></View>
           <View style={styles.timeRows}><TimeRow label="بداية الوردية" value={shift.start}/><TimeRow label="نهاية الوردية" value={shift.end}/></View>
@@ -109,7 +109,7 @@ export default function HomeScreen(){
       </View>
 
       <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>وصول سريع</Text><Text style={styles.sectionSub}>اختصارات للمهام اليومية</Text></View></View>
-      <View style={[styles.quickGrid, isMobile && styles.quickGridMobile]}>{quick.map(([label,icon,path])=><Pressable key={label} onPress={()=>router.push(path as never)} style={({pressed})=>[styles.quick,pressed&&styles.pressed]}><View style={styles.quickIcon}><IconSymbol name={icon as any} size={18} color="#163A63"/></View><View style={styles.quickCopy}><Text style={styles.quickTitle}>{label}</Text><Text style={styles.quickSub}>فتح القسم</Text></View><Text style={styles.chevron}>‹</Text></Pressable>)}</View>
+      <View style={[styles.quickGrid, isMobile && styles.quickGridMobile]}>{quick.map(([label,icon,path])=><Pressable key={label} onPress={()=>router.push(path as never)} style={({pressed})=>[styles.quick,isMobile&&styles.quickMobile,pressed&&styles.pressed]}><View style={styles.quickIcon}><IconSymbol name={icon as any} size={18} color="#163A63"/></View><View style={styles.quickCopy}><Text style={styles.quickTitle}>{label}</Text><Text style={styles.quickSub}>فتح القسم</Text></View><Text style={styles.chevron}>‹</Text></Pressable>)}</View>
     </ScrollView>
   </ScreenContainer>;
 }
@@ -124,6 +124,9 @@ const styles=StyleSheet.create({
   heroMobile:{flexDirection:"column",padding:16,borderRadius:20,gap:14},
   heroStatsMobile:{flexDirection:"row-reverse",justifyContent:"space-between",gap:8,marginTop:18,paddingTop:12},
   kpisMobile:{flexDirection:"row-reverse",flexWrap:"wrap",gap:9},
+  kpiMobile:{minWidth:0,flexBasis:"47%"},
+  panelMobile:{minWidth:0,width:"100%"},
+  quickMobile:{minWidth:0,width:"100%"},
   gridMobile:{flexDirection:"column",gap:10},
   quickGridMobile:{flexDirection:"column",gap:9},
 
