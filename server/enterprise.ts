@@ -231,6 +231,31 @@ export async function getPayroll(staffAccountId:number, month:string) {
   return db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.month,month))).orderBy(desc(payrollRecords.netSalary));
 }
 
+export async function assertPayrollEditable(staffAccountId:number, month:string) {
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const m=await getCompanyForStaff(staffAccountId); if(!m) throw new Error("Company not found");
+  const approved=(await db.select({id:payrollRecords.id}).from(payrollRecords).where(and(
+    eq(payrollRecords.companyId,m.companyId),
+    eq(payrollRecords.month,month),
+    eq(payrollRecords.status,"approved")
+  )).limit(1))[0];
+  if(approved) throw new Error("مسير هذا الشهر تم اعتماده ولا يمكن تعديل الحضور بعد الإغلاق.");
+  return true;
+}
+
+export async function syncCompanyMemberRole(actorId:number,targetId:number,role:"manager"|"supervisor"|"employee") {
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const actor=await getCompanyForStaff(actorId);
+  if(!actor || actor.role!=="owner") throw new Error("غير مصرح");
+  const target=await assertStaffInCompany(actorId,targetId);
+  const companyRole=role==="manager"?"owner":role;
+  await db.update(companyMembers).set({role:companyRole,updatedAt:new Date()}).where(and(
+    eq(companyMembers.id,target.target.id),
+    eq(companyMembers.companyId,actor.companyId)
+  ));
+  return getMembership(targetId);
+}
+
 export async function writeAudit(staffAccountId:number, companyId:number, action:string, entity?:string, entityId?:string, metadata?:unknown) {
   const db=await getDb(); if(!db) return;
   await db.insert(auditLogs).values({staffAccountId,companyId,action,entity:entity??null,entityId:entityId??null,metadata:metadata?JSON.stringify(metadata):null});
