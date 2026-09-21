@@ -75,7 +75,7 @@ export default function PayrollScreen() {
   const printQuery = trpc.payroll.payslip.useQuery({ id: printPayrollId ?? 0 }, { enabled: printPayrollId !== null });
 
   const rows = query.data ?? [];
-  const salaryRows = staffMembers.filter(s => s.active !== false);
+  const salaryRows = [employee, ...staffMembers.filter(s => s.id !== employee.id)].filter(s => s.active !== false);
   const printData = printQuery.data;
   useEffect(() => { if (printData) { const timer = setTimeout(() => { printPayslip(printData, month); setPrintPayrollId(null); }, 100); return () => clearTimeout(timer); } }, [printData, month]);
   const filteredRows = useMemo(
@@ -209,15 +209,15 @@ export default function PayrollScreen() {
               </View>
             )
           ) : filteredRows.map(r => {
-            const deductions = r.absenceDeduction + r.lateDeduction;
+            const deductions = r.absenceDeduction + r.lateDeduction + r.otherDeductions + r.advances;
             const gross = r.grossSalary;
             const isSelected = String(selectedRowId) === String(r.id);
             return (
               <View key={r.id} style={[styles.employeeRow, isSelected && styles.employeeRowSelected]}>
                 <View style={styles.avatar}><Text style={styles.avatarText}>{String(r.staffAccountId).slice(-2)}</Text></View>
                 <Pressable onPress={() => setSelectedRowId(r.id)} style={styles.employeeCopy}>
-                  <Text style={styles.employeeName}>موظف #{r.staffAccountId}</Text>
-                  <Text style={styles.employeeMeta}>إجمالي {formatMoney(gross)} · خصومات {formatMoney(deductions)}</Text>
+                  <Text style={styles.employeeName}>{staffMembers.find(s => String(s.id) === String(r.staffAccountId))?.name ?? (String(employee.id) === String(r.staffAccountId) ? employee.name : `موظف #${r.staffAccountId}`)}</Text>
+                  <Text style={styles.employeeMeta}>{staffMembers.find(s => String(s.id) === String(r.staffAccountId))?.title ?? (String(employee.id) === String(r.staffAccountId) ? employee.title : "موظف")} · إجمالي {formatMoney(gross)} · خصومات {formatMoney(deductions)}</Text>
                 </Pressable>
                 <Pressable onPress={() => setSelectedRowId(r.id)} style={styles.netBox}><Text style={styles.netLabel}>الصافي</Text><Text style={styles.netValue}>{formatMoney(r.netSalary)}</Text><StatusBadge label={r.status === "approved" ? "معتمد" : "مسودة"} tone={r.status === "approved" ? "success" : "warning"} /><Text style={styles.viewSalary}>عرض الراتب</Text></Pressable>
                 <Pressable disabled={r.status === "approved" || approve.isPending} onPress={() => approve.mutate({ id: r.id })} style={[styles.approveButton, r.status === "approved" && styles.approvedButton]}><Text style={styles.approveText}>{r.status === "approved" ? "✓" : "اعتماد"}</Text></Pressable>
