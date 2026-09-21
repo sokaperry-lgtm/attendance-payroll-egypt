@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback } from "react";
 import { useMemo, useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -15,6 +16,26 @@ function monthLabel(value: string) {
   const [y, m] = value.split("-").map(Number);
   return new Intl.DateTimeFormat("ar-EG", { month: "long", year: "numeric" }).format(new Date(y, m - 1, 1));
 }
+
+function printPayslip(p: any, month: string, employeeName: string) {
+  if (typeof window === "undefined") return;
+  const rows = [
+    ["الراتب الأساسي", p.baseSalary], ["البدلات", p.allowances], ["الحوافز والمكافآت", p.bonuses],
+    ["الإضافي", p.overtime], ["إجمالي المستحقات", p.grossSalary], ["التأمينات الاجتماعية", p.employeeSocialInsurance],
+    ["ضريبة الدخل", p.employeeIncomeTax], ["خصم الغياب", p.absenceDeduction], ["خصم التأخير", p.lateDeduction],
+    ["خصومات أخرى", p.otherDeductions], ["السلف والأقساط", p.advances], ["صافي الراتب", p.netSalary]
+  ];
+  const money=(v:number)=>formatMoney(Number(v||0));
+  const body=rows.map(([label,value])=>`<tr><td>${label}</td><td>${money(value as number)}</td></tr>`).join("");
+  const status=p.status==="approved"?"معتمد":"مسودة";
+  const html=`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>قسيمة راتب - ${employeeName}</title><style>
+  body{font-family:Arial,Tahoma,sans-serif;background:#f4f7fb;margin:0;padding:32px;color:#172033}.sheet{max-width:760px;margin:auto;background:#fff;border-radius:22px;padding:32px;box-shadow:0 8px 30px #dce3eb}.top{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #edf1f5;padding-bottom:20px}.brand{font-size:24px;font-weight:900;color:#163A63}.muted{color:#667085;font-size:12px;margin-top:5px}.badge{background:#eaf8f1;color:#147a4b;padding:8px 12px;border-radius:10px;font-weight:800;font-size:12px}h1{font-size:26px;margin:24px 0 4px}table{width:100%;border-collapse:collapse;margin-top:20px}td{padding:13px 10px;border-bottom:1px solid #eef1f4}td:last-child{text-align:left;font-weight:800;color:#163A63}.total td{font-size:18px;font-weight:900;background:#f3f8fd}.footer{margin-top:22px;color:#98a6b8;font-size:10px;text-align:center}@media print{body{background:#fff;padding:0}.sheet{box-shadow:none;max-width:none;border-radius:0}}
+  </style></head><body><div class="sheet"><div class="top"><div><div class="brand">حاضر · HR & Payroll</div><div class="muted">قسيمة راتب شهر ${monthLabel(month)}</div></div><div class="badge">${status}</div></div><h1>${employeeName}</h1><div class="muted">كشف تفصيلي للراتب والمستحقات والخصومات</div><table>${body.replace('<tr><td>صافي الراتب</td>','<tr class="total"><td>صافي الراتب</td>')}</table><div class="footer">تم إنشاء قسيمة الراتب من نظام حاضر · جميع القيم بالجنيه المصري</div></div><script>window.onload=()=>window.print()</script></body></html>`;
+  const w=window.open("", "_blank", "width=900,height=1100");
+  if(!w){ window.alert("اسمح بفتح النوافذ المنبثقة لطباعة قسيمة الراتب."); return; }
+  w.document.write(html); w.document.close();
+}
+
 function shiftMonth(value: string, delta: number) {
   const [y, m] = value.split("-").map(Number);
   const d = new Date(y, m - 1 + delta, 1);
@@ -34,6 +55,7 @@ export default function PayrollScreen() {
   const approve = trpc.payroll.approve.useMutation({ onSuccess: () => query.refetch() });
   const adjustments = trpc.hrTools.adjustments.useQuery({ month }, { enabled: isAdmin });
   const advances = trpc.hrTools.advances.useQuery(undefined, { enabled: isAdmin });
+  const selfService = trpc.selfService.me.useQuery({ month }, { enabled: !isAdmin });
 
   const rows = query.data ?? [];
   const filteredRows = useMemo(
@@ -53,38 +75,45 @@ export default function PayrollScreen() {
   }
 
   if (!isAdmin) {
-    const gross = employee.baseSalary + payroll.overtimeValue;
-    const deductions = payroll.absenceDeduction + payroll.lateDeduction;
+    const p = selfService.data?.payroll;
+    const gross = p?.grossSalary ?? (employee.baseSalary + payroll.overtimeValue);
+    const deductions = p ? p.employeeSocialInsurance + p.employeeIncomeTax + p.absenceDeduction + p.lateDeduction + p.otherDeductions + p.advances : payroll.absenceDeduction + payroll.lateDeduction;
+    const net = p?.netSalary ?? payroll.net;
     return (
       <ScreenContainer>
         <ScrollView contentContainerStyle={styles.content}>
-          <Header title="راتبي" subtitle="ملخص راتبك ومكوناته لهذا الشهر." icon="banknote" />
+          <Header title="راتبي" subtitle="قسيمة راتبك التفصيلية لهذا الشهر." icon="banknote" />
           <View style={styles.hero}>
-            <View style={styles.heroCopy}>
-              <Text style={styles.heroKicker}>NET SALARY</Text>
-              <Text style={styles.heroValue}>{formatMoney(payroll.net)}</Text>
-              <Text style={styles.heroMeta}>{monthLabel(month)} · صافي متوقع</Text>
-            </View>
+            <View style={styles.heroCopy}><Text style={styles.heroKicker}>NET SALARY</Text><Text style={styles.heroValue}>{formatMoney(net)}</Text><Text style={styles.heroMeta}>{monthLabel(month)} · {p?.status === "approved" ? "راتب معتمد" : "قيد المراجعة"}</Text></View>
             <View style={styles.heroIcon}><IconSymbol name="banknote" size={25} color="#FFFFFF" /></View>
           </View>
-          <View style={styles.kpiGrid}>
-            <Kpi label="الإجمالي" value={formatMoney(gross)} />
-            <Kpi label="الخصومات" value={formatMoney(deductions)} />
-            <Kpi label="أوفر تايم" value={formatMoney(payroll.overtimeValue)} />
+          <View style={styles.monthBar}>
+            <Pressable onPress={() => setMonth(shiftMonth(month, -1))} style={styles.monthButton}><Text style={styles.monthArrow}>‹</Text><Text style={styles.monthButtonLabel}>السابق</Text></Pressable>
+            <View style={styles.monthCenter}><Text style={styles.monthKicker}>PAYSLIP PERIOD</Text><Text style={styles.monthTitle}>{monthLabel(month)}</Text></View>
+            <Pressable onPress={() => setMonth(shiftMonth(month, 1))} style={styles.monthButton}><Text style={styles.monthButtonLabel}>التالي</Text><IconSymbol name="arrow.right" size={16} color="#163A63" /></Pressable>
           </View>
-          <Section title="تفاصيل الراتب" subtitle="المكونات التي دخلت في حساب الصافي" />
+          <View style={styles.kpiGrid}><Kpi label="إجمالي المستحقات" value={formatMoney(gross)} /><Kpi label="إجمالي الخصومات" value={formatMoney(deductions)} /><Kpi label="الأوفر تايم" value={formatMoney(p?.overtime ?? payroll.overtimeValue)} /></View>
+          <Section title="قسيمة الراتب" subtitle="تفصيل كامل للمستحقات والخصومات والتأمين والضريبة" />
           <View style={styles.detailCard}>
-            <Row label="الراتب الأساسي" value={formatMoney(employee.baseSalary)} />
-            <Row label="الأوفر تايم المعتمد" value={formatMoney(payroll.overtimeValue)} />
-            <Row label="خصم الغياب" value={formatMoney(payroll.absenceDeduction)} />
-            <Row label="خصم التأخير" value={formatMoney(payroll.lateDeduction)} />
-            <Row label="الصافي" value={formatMoney(payroll.net)} strong />
+            <Row label="الراتب الأساسي" value={formatMoney(p?.baseSalary ?? employee.baseSalary)} />
+            <Row label="البدلات" value={formatMoney(p?.allowances ?? 0)} />
+            <Row label="الحوافز والمكافآت" value={formatMoney(p?.bonuses ?? 0)} />
+            <Row label="الأوفر تايم" value={formatMoney(p?.overtime ?? payroll.overtimeValue)} />
+            <Row label="إجمالي المستحقات" value={formatMoney(gross)} />
+            <Row label="التأمينات الاجتماعية" value={formatMoney(p?.employeeSocialInsurance ?? 0)} />
+            <Row label="ضريبة الدخل" value={formatMoney(p?.employeeIncomeTax ?? 0)} />
+            <Row label="خصم الغياب" value={formatMoney(p?.absenceDeduction ?? payroll.absenceDeduction)} />
+            <Row label="خصم التأخير" value={formatMoney(p?.lateDeduction ?? payroll.lateDeduction)} />
+            <Row label="خصومات أخرى" value={formatMoney(p?.otherDeductions ?? 0)} />
+            <Row label="السلف والأقساط" value={formatMoney(p?.advances ?? 0)} />
+            <Row label="صافي الراتب" value={formatMoney(net)} strong />
           </View>
           <View style={styles.statusCard}>
             <View style={styles.statusIcon}><IconSymbol name="checkmark" size={18} color="#1677D2" /></View>
-            <View style={styles.statusCopy}><Text style={styles.statusTitle}>حالة المسير</Text><Text style={styles.statusText}>سيظهر اعتماد الإدارة هنا بعد مراجعة مسير الشهر.</Text></View>
-            <StatusBadge label="قيد المراجعة" tone="warning" />
+            <View style={styles.statusCopy}><Text style={styles.statusTitle}>حالة المسير</Text><Text style={styles.statusText}>{p?.status === "approved" ? "تم اعتماد مسير هذا الشهر." : "المسير ما زال قيد المراجعة والاعتماد."}</Text></View>
+            <StatusBadge label={p?.status === "approved" ? "معتمد" : "قيد المراجعة"} tone={p?.status === "approved" ? "success" : "warning"} />
           </View>
+          <Pressable disabled={!p} onPress={() => p && printPayslip(p, month, employee.name || "الموظف")} style={[styles.printButton, !p && styles.printButtonDisabled]}><IconSymbol name="arrow.down" size={16} color="#FFFFFF" /><Text style={styles.printText}>{p ? "طباعة / حفظ PDF" : "لا توجد قسيمة لهذا الشهر"}</Text></Pressable>
         </ScrollView>
       </ScreenContainer>
     );
@@ -160,18 +189,29 @@ export default function PayrollScreen() {
         {selectedRowId !== null && (() => {
           const selected = rows.find(r => String(r.id) === String(selectedRowId));
           if (!selected) return null;
-          const deductions = selected.absenceDeduction + selected.lateDeduction;
+          const deductions = selected.employeeSocialInsurance + selected.employeeIncomeTax + selected.absenceDeduction + selected.lateDeduction + selected.otherDeductions + selected.advances;
           return (
             <View style={styles.selectedCard}>
               <View style={styles.selectedHeader}>
                 <Pressable onPress={() => setSelectedRowId(null)} style={styles.closeSelected}><Text style={styles.closeSelectedText}>×</Text></Pressable>
-                <View><Text style={styles.selectedKicker}>EMPLOYEE PAYSLIP</Text><Text style={styles.selectedTitle}>تفاصيل راتب الموظف #{selected.staffAccountId}</Text></View>
+                <View><Text style={styles.selectedKicker}>EMPLOYEE PAYSLIP</Text><Text style={styles.selectedTitle}>قسيمة راتب الموظف #{selected.staffAccountId}</Text></View>
               </View>
               <View style={styles.selectedGrid}>
                 <Kpi label="الأساسي" value={formatMoney(selected.baseSalary)} />
-                <Kpi label="أوفر تايم" value={formatMoney(selected.overtime)} />
-                <Kpi label="الخصومات" value={formatMoney(deductions)} />
+                <Kpi label="البدلات" value={formatMoney(selected.allowances)} />
+                <Kpi label="المكافآت" value={formatMoney(selected.bonuses)} />
+                <Kpi label="الأوفر تايم" value={formatMoney(selected.overtime)} />
+                <Kpi label="الإجمالي" value={formatMoney(selected.grossSalary)} />
+                <Kpi label="التأمينات" value={formatMoney(selected.employeeSocialInsurance)} />
+                <Kpi label="الضريبة" value={formatMoney(selected.employeeIncomeTax)} />
+                <Kpi label="الغياب والتأخير" value={formatMoney(selected.absenceDeduction + selected.lateDeduction)} />
+                <Kpi label="خصومات أخرى" value={formatMoney(selected.otherDeductions)} />
+                <Kpi label="السلف" value={formatMoney(selected.advances)} />
                 <Kpi label="الصافي" value={formatMoney(selected.netSalary)} />
+              </View>
+              <View style={styles.payslipActions}>
+                <Pressable onPress={() => printPayslip(selected, month, `الموظف #${selected.staffAccountId}`)} style={styles.printButton}><IconSymbol name="arrow.down" size={16} color="#FFFFFF" /><Text style={styles.printText}>طباعة / حفظ PDF</Text></Pressable>
+                <StatusBadge label={selected.status === "approved" ? "معتمد" : "مسودة"} tone={selected.status === "approved" ? "success" : "warning"} />
               </View>
             </View>
           );
