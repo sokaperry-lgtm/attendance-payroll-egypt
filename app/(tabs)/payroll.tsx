@@ -226,7 +226,7 @@ export default function PayrollScreen() {
                 <Kpi label="الصافي" value={formatMoney(selected.netSalary)} />
               </View>
               <View style={styles.payslipActions}>
-                <Pressable onPress={() => setPrintPayrollId(selected.id)} style={styles.printButton}><IconSymbol name="arrow.down" size={16} color="#FFFFFF" /><Text style={styles.printText}>طباعة / حفظ PDF</Text></Pressable>
+                <Pressable onPress={() => setPrintPayrollId(selected.id)} style={styles.printButton}><IconSymbol name="banknote" size={16} color="#FFFFFF" /><Text style={styles.printText}>طباعة / حفظ PDF</Text></Pressable>
                 <StatusBadge label={selected.status === "approved" ? "معتمد" : "مسودة"} tone={selected.status === "approved" ? "success" : "warning"} />
               </View>
             </View>
