@@ -2,7 +2,7 @@ import { z } from "zod";
 import { parse as parseCookieHeader } from "cookie";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { INTERNAL_SESSION_COOKIE } from "../shared/const";
-import { companyAdminProcedure, managerProcedure, supervisorProcedure, publicProcedure, router, staffProcedure } from "./_core/trpc";
+import { companyAdminProcedure, payrollAdminProcedure, managerProcedure, supervisorProcedure, publicProcedure, router, staffProcedure } from "./_core/trpc";
 import * as enterprise from "./enterprise";
 import * as db from "./db";
 import { PAYROLL_RULES } from "../lib/payroll";
@@ -136,9 +136,9 @@ export const appRouter = router({
     balance: staffProcedure.input(z.object({ year: z.number().int().min(2024).max(2100) })).query(({ ctx, input }) => enterprise.getLeaveBalance(ctx.staffUser.id, input.year)),
   }),
   payroll: router({
-    list: companyAdminProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).query(({ ctx, input }) => enterprise.getPayroll(ctx.staffUser.id, input.month)),
-    generate: companyAdminProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).mutation(({ ctx, input }) => enterprise.generatePayroll(ctx.staffUser.id, input.month)),
-    approve: companyAdminProcedure.input(z.object({ id: z.number().int() })).mutation(({ ctx, input }) => enterprise.approvePayroll(ctx.staffUser.id, input.id)),
+    list: payrollAdminProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).query(({ ctx, input }) => enterprise.getPayroll(ctx.staffUser.id, input.month)),
+    generate: payrollAdminProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).mutation(({ ctx, input }) => enterprise.generatePayroll(ctx.staffUser.id, input.month)),
+    approve: payrollAdminProcedure.input(z.object({ id: z.number().int() })).mutation(({ ctx, input }) => enterprise.approvePayroll(ctx.staffUser.id, input.id)),
     payslip: staffProcedure.input(z.object({ id: z.number().int() })).query(({ ctx, input }) => enterprise.getPayrollPayslip(ctx.staffUser.id, input.id)),
   }),
   notifications: router({
