@@ -22,7 +22,7 @@ export default function PayrollScreen() {
   const isAdmin = role === "manager";
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
   const [filter, setFilter] = useState<"all" | "draft" | "approved">("all");
-  const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
+  const [selectedRowId, setSelectedRowId] = useState<number | string | null>(null);
   const query = trpc.payroll.list.useQuery({ month }, { enabled: isAdmin });
   const generate = trpc.payroll.generate.useMutation({ onSuccess: () => query.refetch() });
   const approve = trpc.payroll.approve.useMutation({ onSuccess: () => query.refetch() });
