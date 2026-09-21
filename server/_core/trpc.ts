@@ -40,7 +40,16 @@ const requireCompanyAdmin = t.middleware(async (opts) => {
   return opts.next({ ctx: { ...opts.ctx, staffUser: opts.ctx.staffUser, membership } });
 });
 
+const requirePayrollAdmin = t.middleware(async (opts) => {
+  if (!opts.ctx.staffUser) throw new TRPCError({ code: "UNAUTHORIZED", message: "يجب تسجيل الدخول بحساب الشركة." });
+  const membership = await getMembership(opts.ctx.staffUser.id);
+  if (!membership || !["owner", "manager", "hr", "accountant"].includes(membership.role)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+  }
+  return opts.next({ ctx: { ...opts.ctx, staffUser: opts.ctx.staffUser, membership } });
+});
+
 export const managerProcedure = t.procedure.use(requireManager);
 export const supervisorProcedure = t.procedure.use(requireSupervisor);
-export const companyAdminProcedure = t.procedure.use(requireCompanyAdmin);
+export const companyAdminProcedure = t.procedure.use(requireCompanyAdmin);\nexport const payrollAdminProcedure = t.procedure.use(requirePayrollAdmin);
 export const adminProcedure = t.procedure.use(requireManager);
