@@ -51,5 +51,6 @@ const requirePayrollAdmin = t.middleware(async (opts) => {
 
 export const managerProcedure = t.procedure.use(requireManager);
 export const supervisorProcedure = t.procedure.use(requireSupervisor);
-export const companyAdminProcedure = t.procedure.use(requireCompanyAdmin);\nexport const payrollAdminProcedure = t.procedure.use(requirePayrollAdmin);
+export const companyAdminProcedure = t.procedure.use(requireCompanyAdmin);
+export const payrollAdminProcedure = t.procedure.use(requirePayrollAdmin);
 export const adminProcedure = t.procedure.use(requireManager);
