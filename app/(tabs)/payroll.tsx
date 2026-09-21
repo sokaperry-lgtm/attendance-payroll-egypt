@@ -58,7 +58,8 @@ function shiftMonth(value: string, delta: number) {
 
 export default function PayrollScreen() {
   const { role, employee, payroll } = useAppData();
-  const isAdmin = role === "manager";
+  const payrollAccess = trpc.companyAdmin.payrollAccess.useQuery();
+  const isAdmin = payrollAccess.data?.canManagePayroll === true;
   const [month, setMonth] = useState(currentMonth());
   const [filter, setFilter] = useState<"all" | "draft" | "approved">("all");
   const [selectedRowId, setSelectedRowId] = useState<number | string | null>(null);
