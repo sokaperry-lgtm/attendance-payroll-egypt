@@ -1,5 +1,4 @@
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useCallback } from "react";
 import { useMemo, useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -63,8 +62,8 @@ export default function PayrollScreen() {
     [rows, filter]
   );
   const stats = useMemo(() => {
-    const gross = rows.reduce((s, r) => s + r.baseSalary + r.overtime, 0);
-    const deductions = rows.reduce((s, r) => s + r.absenceDeduction + r.lateDeduction, 0);
+    const gross = rows.reduce((s, r) => s + r.grossSalary, 0);
+    const deductions = rows.reduce((s, r) => s + r.employeeSocialInsurance + r.employeeIncomeTax + r.absenceDeduction + r.lateDeduction + r.otherDeductions + r.advances, 0);
     const net = rows.reduce((s, r) => s + r.netSalary, 0);
     const approved = rows.filter(r => r.status === "approved").length;
     return { gross, deductions, net, approved };
@@ -113,7 +112,7 @@ export default function PayrollScreen() {
             <View style={styles.statusCopy}><Text style={styles.statusTitle}>حالة المسير</Text><Text style={styles.statusText}>{p?.status === "approved" ? "تم اعتماد مسير هذا الشهر." : "المسير ما زال قيد المراجعة والاعتماد."}</Text></View>
             <StatusBadge label={p?.status === "approved" ? "معتمد" : "قيد المراجعة"} tone={p?.status === "approved" ? "success" : "warning"} />
           </View>
-          <Pressable disabled={!p} onPress={() => p && printPayslip(p, month, employee.name || "الموظف")} style={[styles.printButton, !p && styles.printButtonDisabled]}><IconSymbol name="arrow.down" size={16} color="#FFFFFF" /><Text style={styles.printText}>{p ? "طباعة / حفظ PDF" : "لا توجد قسيمة لهذا الشهر"}</Text></Pressable>
+          <Pressable disabled={!p} onPress={() => p && printPayslip(p, month, employee.name || "الموظف")} style={[styles.printButton, !p && styles.printButtonDisabled]}><IconSymbol name="banknote" size={16} color="#FFFFFF" /><Text style={styles.printText}>{p ? "طباعة / حفظ PDF" : "لا توجد قسيمة لهذا الشهر"}</Text></Pressable>
         </ScrollView>
       </ScreenContainer>
     );
@@ -170,7 +169,7 @@ export default function PayrollScreen() {
             <View style={styles.empty}><IconSymbol name="banknote" size={25} color="#A1ACBA" /><Text style={styles.emptyTitle}>لا توجد نتائج</Text><Text style={styles.emptyText}>جرّب فلترًا آخر أو احسب مسير الشهر.</Text></View>
           ) : filteredRows.map(r => {
             const deductions = r.absenceDeduction + r.lateDeduction;
-            const gross = r.baseSalary + r.overtime;
+            const gross = r.grossSalary;
             const isSelected = String(selectedRowId) === String(r.id);
             return (
               <View key={r.id} style={[styles.employeeRow, isSelected && styles.employeeRowSelected]}>
