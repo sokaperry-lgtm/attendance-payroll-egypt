@@ -142,7 +142,7 @@ export default function PayrollScreen() {
                 <Pressable onPress={() => setSelectedRowId(r.id)} style={styles.employeeCopy}>
                   <Text style={styles.employeeName}>موظف #{r.staffAccountId}</Text>
                   <Text style={styles.employeeMeta}>إجمالي {formatMoney(gross)} · خصومات {formatMoney(deductions)}</Text>
-                </View>
+                </Pressable>
                 <View style={styles.netBox}><Text style={styles.netLabel}>الصافي</Text><Text style={styles.netValue}>{formatMoney(r.netSalary)}</Text><StatusBadge label={r.status === "approved" ? "معتمد" : "مسودة"} tone={r.status === "approved" ? "success" : "warning"} /></View>
                 <Pressable disabled={r.status === "approved" || approve.isPending} onPress={() => approve.mutate({ id: r.id })} style={[styles.approveButton, r.status === "approved" && styles.approvedButton]}><Text style={styles.approveText}>{r.status === "approved" ? "✓" : "اعتماد"}</Text></Pressable>
               </View>
