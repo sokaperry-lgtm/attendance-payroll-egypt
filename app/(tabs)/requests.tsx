@@ -55,12 +55,12 @@ export default function RequestsScreen() {
 }
 
 const styles = StyleSheet.create({
-  detailModal:{backgroundColor:"#FFFFFF",borderTopLeftRadius:26,borderTopRightRadius:26,padding:20,gap:10},detailHead:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},detailTitle:{color:"#172033",fontSize:20,fontWeight:"900"},closeText:{color:"#163A63",fontSize:11},detailType:{color:"#163A63",fontSize:18,fontWeight:"800",textAlign:"right"},detailDates:{color:"#667085",fontSize:12,textAlign:"right"},detailStatus:{alignSelf:"flex-end",backgroundColor:"#EEF4FB",borderRadius:99,paddingHorizontal:12,paddingVertical:6},detailStatusText:{color:"#31577F",fontSize:10,fontWeight:"800"},detailLabel:{color:"#667085",fontSize:10,fontWeight:"700",textAlign:"right",marginTop:10},detailReason:{color:"#172033",fontSize:13,lineHeight:20,textAlign:"right"},timeline:{backgroundColor:"#172033",borderRadius:14,padding:13,marginTop:8},timelineTitle:{color:"#172033",fontSize:12,fontWeight:"800",textAlign:"right"},timelineText:{color:"#667085",fontSize:11,lineHeight:18,textAlign:"right",marginTop:4},
-  requestsHero: { backgroundColor: "#FFFFFF", borderRadius: 23, padding: 18, flexDirection: "row-reverse", alignItems: "center", gap: 12 },
+  detailModal:{backgroundColor:"#FFFFFF",borderTopLeftRadius:26,borderTopRightRadius:26,padding:20,gap:10},detailHead:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},detailTitle:{color:"#172033",fontSize:20,fontWeight:"900"},closeText:{color:"#163A63",fontSize:11},detailType:{color:"#163A63",fontSize:18,fontWeight:"800",textAlign:"right"},detailDates:{color:"#667085",fontSize:12,textAlign:"right"},detailStatus:{alignSelf:"flex-end",backgroundColor:"#EEF4FB",borderRadius:99,paddingHorizontal:12,paddingVertical:6},detailStatusText:{color:"#31577F",fontSize:10,fontWeight:"800"},detailLabel:{color:"#667085",fontSize:10,fontWeight:"700",textAlign:"right",marginTop:10},detailReason:{color:"#172033",fontSize:13,lineHeight:20,textAlign:"right"},timeline:{backgroundColor:"#172033",borderRadius:14,padding:13,marginTop:8},timelineTitle:{color:"#FFFFFF",fontSize:12,fontWeight:"800",textAlign:"right"},timelineText:{color:"#D9E6F2",fontSize:11,lineHeight:18,textAlign:"right",marginTop:4},
+  requestsHero: { backgroundColor: "#163A63", borderRadius: 23, padding: 18, flexDirection: "row-reverse", alignItems: "center", gap: 12 },
   requestsHeroIcon: { width: 45, height: 45, borderRadius: 14, backgroundColor: "#163A63", alignItems: "center", justifyContent: "center" },
   requestsHeroCopy: { flex: 1 },
   requestsHeroTitle: { color: "#FFFFFF", fontSize: 16, fontWeight: "800", textAlign: "right" },
-  requestsHeroText: { color: "#667085", fontSize: 10, marginTop: 3, textAlign: "right" },
+  requestsHeroText: { color: "#D9E6F2", fontSize: 10, marginTop: 3, textAlign: "right" },
   requestsHeroBadge: { alignItems: "center" },
   requestsHeroNumber: { color: "#31577F", fontSize: 24, fontWeight: "900" },
   requestsHeroLabel: { color: "#667085", fontSize: 9 },
