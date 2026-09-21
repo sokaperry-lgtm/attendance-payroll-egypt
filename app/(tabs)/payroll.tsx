@@ -98,7 +98,7 @@ export default function PayrollScreen() {
         </View>
 
         <View style={styles.monthBar}>
-          <Pressable onPress={() => setMonth(shiftMonth(month, -1))} style={styles.monthButton}><IconSymbol name="arrow.left" size={16} color="#163A63" /><Text style={styles.monthButtonLabel}>السابق</Text></Pressable>
+          <Pressable onPress={() => setMonth(shiftMonth(month, -1))} style={styles.monthButton}><Text style={styles.monthArrow}>‹</Text><Text style={styles.monthButtonLabel}>السابق</Text></Pressable>
           <View style={styles.monthCenter}><Text style={styles.monthKicker}>PAYROLL PERIOD</Text><Text style={styles.monthTitle}>{monthLabel(month)}</Text><Text style={styles.monthHint}>السابق ←  الشهر الحالي  → التالي</Text></View>
           <Pressable onPress={() => setMonth(shiftMonth(month, 1))} style={styles.monthButton}><Text style={styles.monthButtonLabel}>التالي</Text><IconSymbol name="arrow.right" size={16} color="#163A63" /></Pressable>
         </View>
