@@ -97,14 +97,16 @@ export function calculateEgyptPayroll(input: EgyptPayrollInput) {
   const annualFunds = Math.max(0, input.employeeInsuranceFunds ?? 0) * 12;
   const tax = calculateEgyptAnnualIncomeTax({ annualTaxableBeforeExemptions: annualGross, employeeSocialInsurance: annualSocial, employeeInsuranceFunds: annualFunds, rules });
   const other = Math.max(0, input.monthlyOtherDeductions ?? 0);
+  // Income tax is settled separately by the employer and must not be withheld from the employee salary.
+  const payrollIncomeTax = 0;
   return {
     gross: Math.round(monthlyGross),
     insuranceWage: Math.round(insuranceWage),
     employeeSocialInsurance,
     employerSocialInsurance,
-    employeeIncomeTax: tax.monthlyTax,
+    employeeIncomeTax: payrollIncomeTax,
     otherDeductions: Math.round(other),
-    net: Math.max(0, Math.round(monthlyGross - employeeSocialInsurance - tax.monthlyTax - other)),
+    net: Math.max(0, Math.round(monthlyGross - employeeSocialInsurance - payrollIncomeTax - other)),
     annualTaxableIncome: tax.taxableIncome,
     annualTax: tax.annualTax,
     taxYear: rules.taxYear,
