@@ -229,7 +229,11 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const activeAdvances=await db.select().from(salaryAdvances).where(and(eq(salaryAdvances.staffAccountId,s.id),eq(salaryAdvances.status,"active")));
     const advanceInstallment=activeAdvances.filter(a=>a.startMonth<=month && a.remainingAmount>0).reduce((sum,a)=>sum+Math.min(a.installmentAmount,a.remainingAmount),0);
     const gross=s.baseSalary+overtimeValue+bonuses;
-    const egypt = calculateEgyptPayroll({ monthlyGross: gross, employeeSocialInsurance: 0, monthlyOtherDeductions: 0 });
+    const egypt = calculateEgyptPayroll({
+      monthlyGross: gross,
+      insuranceWage: s.baseSalary,
+      monthlyOtherDeductions: 0,
+    });
     const net=Math.max(0, egypt.net-absenceDeduction-lateDeduction-extraDeductions-advanceInstallment);
     const values={companyId:m.companyId,staffAccountId:s.id,month,baseSalary:s.baseSalary,allowances:0,bonuses,overtime:overtimeValue,absenceDeduction,lateDeduction,otherDeductions:extraDeductions,advances:advanceInstallment,employeeSocialInsurance:egypt.employeeSocialInsurance,employeeIncomeTax:egypt.employeeIncomeTax,grossSalary:gross,netSalary:net,status:"draft"};
     if(existing) await db.update(payrollRecords).set({...values,updatedAt:new Date()}).where(eq(payrollRecords.id,existing.id));
