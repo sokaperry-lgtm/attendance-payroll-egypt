@@ -24,9 +24,18 @@ function shiftLabel(s: ShiftTemplate | null | undefined) {
 }
 function tone(s: ShiftTemplate | null | undefined) {
   if (!s) return { bg: "#F6F8FA", accent: "#A1ACBA", text: "#667085" };
-  if (s.kind === "weekly_off") return { bg: "#FFF7E8", accent: "#B7791F", text: "#8A5A12" };
-  if (s.crossesMidnight) return { bg: "#F2EEFF", accent: "#7257C7", text: "#59449F" };
-  return { bg: "#EAF3FF", accent: "#2F6DB3", text: "#1F5B96" };
+  if (s.kind === "weekly_off") return { bg: "#FFF0E1", accent: "#E05A33", text: "#A33A20" };
+  if (s.crossesMidnight) return { bg: "#EEE8FF", accent: "#7655D6", text: "#5135A8" };
+  const palettes = [
+    { bg: "#E2F0FF", accent: "#1677D2", text: "#0D4F93" },
+    { bg: "#E3F8EF", accent: "#149A67", text: "#08704A" },
+    { bg: "#FFF0F0", accent: "#D94A5B", text: "#9F2638" },
+    { bg: "#FFF3D6", accent: "#D58A00", text: "#965E00" },
+    { bg: "#EDE8FF", accent: "#7655D6", text: "#5135A8" },
+  ];
+  const key = String(s.id ?? s.name ?? "");
+  const index = [...key].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % palettes.length;
+  return palettes[index];
 }
 
 export default function ScheduleScreen() {
@@ -104,7 +113,7 @@ export default function ScheduleScreen() {
         <View style={styles.rosterCard}>
           <View style={styles.rosterHeader}>
             <View style={styles.legend}>
-              <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#2F6DB3" }]} /><Text>وردية</Text></View>
+              <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#1677D2" }]} /><Text>وردية</Text></View>
               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#B7791F" }]} /><Text>إجازة</Text></View>
               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#A1ACBA" }]} /><Text>فارغ</Text></View>
             </View>
