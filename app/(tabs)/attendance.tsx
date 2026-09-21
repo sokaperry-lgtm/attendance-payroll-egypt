@@ -1,9 +1,10 @@
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, Text, View, Pressable } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { PageHeader, SectionTitle, StatusBadge } from "@/components/ui/design-system";
 import { useAppData } from "@/lib/app-data";
 import { formatDate } from "@/lib/payroll";
+import { trpc } from "@/lib/trpc";
 
 const statusTone: Record<string, "success" | "warning" | "danger" | "neutral"> = {
   حاضر: "success",
@@ -15,6 +16,12 @@ const statusTone: Record<string, "success" | "warning" | "danger" | "neutral"> =
 
 export default function AttendanceScreen() {
   const { records, employee } = useAppData();
+  const month = "2026-09";
+  const workSummary = trpc.attendance.workSummary.useQuery({ month });
+  const syncAttendance = trpc.attendance.sync.useMutation({ onSuccess: () => workSummary.refetch() });
+  const mySummary = workSummary.data?.employees?.find((x: any) => x.staffAccountId === employee.id);
+  const workHours = mySummary?.workHours ?? 0;
+  const overtimeHours = mySummary?.overtimeHours ?? 0;
 
   const present = records.filter(r => r.status === "حاضر" || r.status === "متأخر").length;
   const late = records.filter(r => r.status === "متأخر").length;
@@ -90,7 +97,7 @@ export default function AttendanceScreen() {
               </View>
             </View>
 
-            <SectionTitle title="سجل الأيام" subtitle="آخر تسجيلات الحضور والانصراف" />
+            <View style={styles.syncRow}>\n              <View style={styles.syncCopy}>\n                <Text style={styles.syncTitle}>مزامنة الحضور</Text>\n                <Text style={styles.syncText}>تسجيل الغياب التلقائي وتحديث ساعات العمل والإضافي.</Text>\n              </View>\n              <Pressable style={styles.syncButton} onPress={() => syncAttendance.mutate({ month })} disabled={syncAttendance.isPending}>\n                <Text style={styles.syncButtonText}>{syncAttendance.isPending ? "جاري..." : "مزامنة الآن"}</Text>\n              </Pressable>\n            </View>\n            <SectionTitle title="سجل الأيام" subtitle="آخر تسجيلات الحضور والانصراف" />
           </>
         }
         renderItem={({ item }) => (
@@ -189,5 +196,5 @@ const styles = StyleSheet.create({
   lateText: { color: "#31577F", fontSize: 10, fontWeight: "700", marginTop: 4, textAlign: "right" },
   empty: { alignItems: "center", paddingVertical: 40, gap: 7 },
   emptyTitle: { color: "#172033", fontSize: 15, fontWeight: "800" },
-  emptyText: { color: "#98A6B8", fontSize: 11 },
+  emptyText: { color: "#98A6B8", fontSize: 11 },\n  syncRow: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#E8EDF3", flexDirection: "row-reverse", alignItems: "center", gap: 12 },\n  syncCopy: { flex: 1 },\n  syncTitle: { color: "#172033", fontSize: 12, fontWeight: "800", textAlign: "right" },\n  syncText: { color: "#667085", fontSize: 10, lineHeight: 16, marginTop: 3, textAlign: "right" },\n  syncButton: { backgroundColor: "#163A63", borderRadius: 12, paddingVertical: 10, paddingHorizontal: 13 },\n  syncButtonText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
 });
