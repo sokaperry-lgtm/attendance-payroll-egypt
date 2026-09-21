@@ -259,6 +259,18 @@ export async function approvePayroll(staffAccountId:number, id:number) {
   return row;
 }
 
+export async function getPayrollPayslip(staffAccountId:number, payrollId:number) {
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const m=await getCompanyForStaff(staffAccountId); if(!m) throw new Error("Company not found");
+  const payroll=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,payrollId),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
+  if(!payroll) throw new Error("قسيمة الراتب غير موجودة");
+  const staff=(await db.select().from(staffAccounts).where(eq(staffAccounts.id,payroll.staffAccountId)).limit(1))[0];
+  if(!staff) throw new Error("الموظف غير موجود");
+  const company=(await db.select().from(companies).where(eq(companies.id,m.companyId)).limit(1))[0];
+  const branch=m.branchId ? (await db.select().from(branches).where(eq(branches.id,m.branchId)).limit(1))[0] : undefined;
+  return { payroll, staff, company, branch, employeeId: staff.id, issuedAt: payroll.approvedAt ?? payroll.updatedAt ?? payroll.createdAt };
+}
+
 export async function getPayroll(staffAccountId:number, month:string) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
