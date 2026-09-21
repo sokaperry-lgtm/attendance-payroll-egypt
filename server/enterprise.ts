@@ -202,14 +202,164 @@ export async function updateSubscription(staffAccountId: number, plan: string) {
   return getSubscription(staffAccountId);
 }
 
+function minutesOf(time: string) {
+  const [h, m] = time.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+function shiftMinutes(start: string, end: string, crossesMidnight = false) {
+  const a = minutesOf(start);
+  let b = minutesOf(end);
+  if (crossesMidnight || b < a) b += 24 * 60;
+  return Math.max(0, b - a);
+}
+
+function dateRange(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const days = new Date(year, monthNumber, 0).getDate();
+  return Array.from({ length: days }, (_, index) => `${month}-${String(index + 1).padStart(2, "0")}`);
+}
+
+function isApprovedLeave(requests: Array<typeof staffRequests.$inferSelect>, staffAccountId: number, date: string) {
+  return requests.some(request =>
+    request.staffAccountId === staffAccountId &&
+    request.status === "مقبول" &&
+    request.fromDate <= date &&
+    request.toDate >= date &&
+    (request.type.includes("إجاز") || request.type.includes("اجاز") || request.type.includes("مرض"))
+  );
+}
+
+export async function syncMonthlyAttendance(staffAccountId: number, month: string) {
+  const db = await getDb(); if (!db) throw new Error("Database not available");
+  const m = await getCompanyForStaff(staffAccountId); if (!m) throw new Error("Company not found");
+
+  const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
+  const ids = new Set(members.map(x => x.staffAccountId));
+  const staff = (await db.select().from(staffAccounts).where(eq(staffAccounts.active, true))).filter(x => ids.has(x.id));
+  const schedules = await db.select().from(weeklySchedules);
+  const shifts = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
+  const requests = await db.select().from(staffRequests);
+  const existing = await db.select().from(attendanceRecords);
+
+  let createdAbsences = 0;
+  let markedLeaves = 0;
+
+  for (const employee of staff) {
+    for (const date of dateRange(month)) {
+      const today = new Date().toISOString().slice(0, 10);
+      if (date > today) continue;
+
+      const scheduled = schedules.find(x => x.staffAccountId === employee.id && x.scheduleDate === date);
+      const shift = scheduled ? shifts.find(x => x.id === scheduled.shiftTemplateId) : undefined;
+
+      // An explicit weekly-off schedule always wins.
+      if (shift?.kind === "weekly_off") continue;
+
+      const day = new Date(`${date}T12:00:00`).getDay();
+      // If no explicit schedule exists, use the employee's normal Mon-Fri work week.
+      const isWorkday = scheduled ? true : day !== 5 && day !== 6;
+      if (!isWorkday) continue;
+
+      const record = existing.find(x => x.staffAccountId === employee.id && x.date === date);
+      const onLeave = isApprovedLeave(requests, employee.id, date);
+
+      if (onLeave) {
+        if (!record) {
+          await dbQueries.upsertAttendance({
+            staffAccountId: employee.id,
+            date,
+            checkIn: null,
+            checkOut: null,
+            status: "إجازة",
+            lateMinutes: 0,
+            distanceMeters: null,
+            note: "إجازة معتمدة",
+          });
+          markedLeaves++;
+        } else if (record.status === "غياب" && !record.checkIn && !record.checkOut) {
+          await dbQueries.upsertAttendance({ ...record, status: "إجازة", note: "إجازة معتمدة", updatedAt: new Date() });
+          markedLeaves++;
+        }
+        continue;
+      }
+
+      if (!record) {
+        await dbQueries.upsertAttendance({
+          staffAccountId: employee.id,
+          date,
+          checkIn: null,
+          checkOut: null,
+          status: "غياب",
+          lateMinutes: 0,
+          distanceMeters: null,
+          note: "غياب تلقائي — لا يوجد تسجيل حضور",
+        });
+        createdAbsences++;
+      }
+    }
+  }
+
+  if (createdAbsences || markedLeaves) {
+    await writeAudit(staffAccountId, m.companyId, "attendance.auto_sync", "attendance", month, { createdAbsences, markedLeaves });
+  }
+
+  return { month, createdAbsences, markedLeaves };
+}
+
+export async function getAttendanceWorkSummary(staffAccountId: number, month: string) {
+  const db = await getDb(); if (!db) return { employees: [], totalWorkMinutes: 0, totalOvertimeMinutes: 0 };
+  const m = await getCompanyForStaff(staffAccountId); if (!m) return { employees: [], totalWorkMinutes: 0, totalOvertimeMinutes: 0 };
+
+  const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
+  const ids = new Set(members.map(x => x.staffAccountId));
+  const staff = (await db.select().from(staffAccounts).where(eq(staffAccounts.active, true))).filter(x => ids.has(x.id));
+  const attendance = (await db.select().from(attendanceRecords)).filter(x => x.date.startsWith(month) && ids.has(x.staffAccountId));
+  const schedules = await db.select().from(weeklySchedules);
+  const shifts = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
+
+  const employees = staff.map(employee => {
+    const rows = attendance.filter(x => x.staffAccountId === employee.id && x.checkIn && x.checkOut);
+    let workMinutes = 0;
+    let overtimeMinutes = 0;
+
+    for (const row of rows) {
+      const schedule = schedules.find(x => x.staffAccountId === employee.id && x.scheduleDate === row.date);
+      const shift = schedule ? shifts.find(x => x.id === schedule.shiftTemplateId) : undefined;
+      const start = row.checkIn!;
+      const end = row.checkOut!;
+      const actual = shiftMinutes(start, end);
+      const scheduledMinutes = shift ? shiftMinutes(shift.startTime, shift.endTime, shift.crossesMidnight) : shiftMinutes(employee.shiftStart, employee.shiftEnd);
+      workMinutes += actual;
+      overtimeMinutes += Math.max(0, actual - scheduledMinutes);
+    }
+
+    return {
+      staffAccountId: employee.id,
+      name: employee.name,
+      workMinutes,
+      workHours: Number((workMinutes / 60).toFixed(2)),
+      overtimeMinutes,
+      overtimeHours: Number((overtimeMinutes / 60).toFixed(2)),
+    };
+  });
+
+  return {
+    employees,
+    totalWorkMinutes: employees.reduce((sum, x) => sum + x.workMinutes, 0),
+    totalOvertimeMinutes: employees.reduce((sum, x) => sum + x.overtimeMinutes, 0),
+  };
+}
+
 export async function generatePayroll(staffAccountId: number, month: string) {
   const db = await getDb(); if (!db) throw new Error("Database not available");
+  await syncMonthlyAttendance(staffAccountId, month);
   const m = await getCompanyForStaff(staffAccountId); if (!m || !["owner","hr","accountant","manager","supervisor"].includes(m.role)) throw new Error("غير مصرح");
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
   const ids = new Set(members.map(x=>x.staffAccountId));
   const staff = await db.select().from(staffAccounts).where(eq(staffAccounts.active,true));
   const attendance = await db.select().from(attendanceRecords);
-  const schedules = await db.select().from(weeklySchedules).where(eq(weeklySchedules.staffAccountId, staffAccountId));
+  const schedules = await db.select().from(weeklySchedules);
   const shifts = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
   const approvedOvertime = await db.select().from(staffRequests).where(and(eq(staffRequests.type,"أوفر تايم"),eq(staffRequests.status,"مقبول")));
   const result=[];
@@ -234,7 +384,17 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     }, 0);
     const earlyDeduction=Math.round((s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours/60)*earlyMinutes);
     const absenceDeduction=Math.round((s.baseSalary/PAYROLL_RULES.calendarDays)*PAYROLL_RULES.absencePenaltyDays*absences);
-    const overtimeHours=approvedOvertime.filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month)).reduce((sum,r)=>sum+Number(r.hours??0),0);
+    const approvedOvertimeHours=approvedOvertime.filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month)).reduce((sum,r)=>sum+Number(r.hours??0),0);
+    const employeeSchedules=schedules.filter(r=>r.staffAccountId===s.id);
+    const employeeShifts=shifts;
+    const automaticOvertimeHours=records.reduce((sum, record) => {
+      if (!record.checkIn || !record.checkOut) return sum;
+      const schedule=employeeSchedules.find(item=>item.scheduleDate===record.date);
+      const shift=schedule ? employeeShifts.find(item=>item.id===schedule.shiftTemplateId) : undefined;
+      const scheduledMinutes=shift ? shiftMinutes(shift.startTime, shift.endTime, shift.crossesMidnight) : shiftMinutes(s.shiftStart, s.shiftEnd);
+      return sum + Math.max(0, shiftMinutes(record.checkIn, record.checkOut) - scheduledMinutes) / 60;
+    }, 0);
+    const overtimeHours=Math.max(approvedOvertimeHours, automaticOvertimeHours);
     const overtimeRate=s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours;
     const overtimeValue=Math.round(overtimeHours*overtimeRate);
     const adjustments=await db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.staffAccountId,s.id),eq(salaryAdjustments.month,month)));
