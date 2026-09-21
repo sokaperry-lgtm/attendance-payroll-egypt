@@ -204,25 +204,14 @@ export default function PayrollScreen() {
         </View>
 
         <View style={styles.table}>
-          {filteredRows.length === 0 ? (
-            salaryRows.length === 0 ? (
-              <View style={styles.empty}><IconSymbol name="banknote" size={25} color="#A1ACBA" /><Text style={styles.emptyTitle}>لا توجد بيانات موظفين</Text><Text style={styles.emptyText}>لم تصل بيانات الاستاف. افتح إدارة الموظفين وتأكد من وجود الموظفين.</Text></View>
-            ) : (
-              <View>
-                <View style={styles.salaryNotice}><Text style={styles.salaryNoticeTitle}>رواتب الاستاف الأساسية</Text><Text style={styles.salaryNoticeText}>دي الرواتب المسجلة للموظفين حتى قبل تشغيل مسير الشهر. اضغط «حساب المسير» لإنشاء صافي راتب الشهر.</Text></View>
-                {salaryRows.map(s => (
-                  <View key={s.id} style={styles.employeeRow}>
-                    <View style={styles.avatar}><Text style={styles.avatarText}>{s.initials || String(s.id).slice(-2)}</Text></View>
-                    <View style={styles.employeeCopy}>
-                      <Text style={styles.employeeName}>{s.name}</Text>
-                      <Text style={styles.employeeMeta}>{s.title} · {s.department}</Text>
-                    </View>
-                    <View style={styles.netBox}><Text style={styles.netLabel}>الراتب الأساسي</Text><Text style={styles.netValue}>{formatMoney(s.baseSalary)}</Text><Text style={styles.viewSalary}>مسجل في ملف الموظف</Text></View>
-                  </View>
-                ))}
-              </View>
-            )
-          ) : filteredRows.map(r => {
+          {filteredRows.length === 0 && salaryRows.length === 0 ? (
+            <View style={styles.empty}><IconSymbol name="banknote" size={25} color="#A1ACBA" /><Text style={styles.emptyTitle}>لا توجد بيانات موظفين</Text><Text style={styles.emptyText}>لم تصل بيانات الاستاف. افتح إدارة الموظفين وتأكد من وجود الموظفين.</Text></View>
+          ) : (
+            <View>
+              {salaryRows.some(s => !rows.some(r => String(r.staffAccountId) === String(s.id))) && (
+                <View style={styles.salaryNotice}><Text style={styles.salaryNoticeTitle}>رواتب أساسية لم تدخل المسير بعد</Text><Text style={styles.salaryNoticeText}>أي موظف ظاهر هنا لديه راتب مسجل في ملفه، لكن لم يتم إنشاء سجل مسير لهذا الشهر بعد. اضغط «حساب المسير» لإضافته للمسير.</Text></View>
+              )}
+              {filteredRows.map(r => {
             const deductions = r.absenceDeduction + r.lateDeduction + r.otherDeductions + r.advances;
             const gross = r.grossSalary;
             const isSelected = String(selectedRowId) === String(r.id);
@@ -238,6 +227,18 @@ export default function PayrollScreen() {
               </View>
             );
           })}
+              {salaryRows.filter(s => !rows.some(r => String(r.staffAccountId) === String(s.id))).map(s => (
+                <View key={`salary-${s.id}`} style={styles.employeeRow}>
+                  <View style={styles.avatar}><Text style={styles.avatarText}>{s.initials || String(s.id).slice(-2)}</Text></View>
+                  <View style={styles.employeeCopy}>
+                    <Text style={styles.employeeName}>{s.name}</Text>
+                    <Text style={styles.employeeMeta}>{s.title} · {s.department}</Text>
+                  </View>
+                  <View style={styles.netBox}><Text style={styles.netLabel}>الراتب الأساسي</Text><Text style={styles.netValue}>{formatMoney(s.baseSalary)}</Text><Text style={styles.viewSalary}>جاهز للحساب</Text></View>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         {selectedRowId !== null && (() => {
