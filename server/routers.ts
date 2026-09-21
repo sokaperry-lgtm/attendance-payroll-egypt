@@ -164,7 +164,11 @@ export const appRouter = router({
     security: staffProcedure.query(({ ctx }) => enterprise.getSecuritySummary(ctx.staffUser.id)),
     payrollAccess: staffProcedure.query(async ({ ctx }) => {
       const membership = await enterprise.getMembership(ctx.staffUser.id);
-      return { role: membership?.role ?? "employee", canManagePayroll: ["owner", "manager", "hr", "accountant"].includes(membership?.role ?? "") };
+      const role = membership?.role ?? "employee";
+      const canManagePayroll =
+        ["owner", "manager", "hr", "accountant"].includes(role) ||
+        ctx.staffUser.role === "manager";
+      return { role, canManagePayroll };
     }),
   }),
   reports: router({
