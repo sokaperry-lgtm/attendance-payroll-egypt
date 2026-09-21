@@ -232,7 +232,10 @@ export async function getStaffBySessionToken(token: string | null | undefined) {
   const sessions = await db.select().from(staffSessions).where(and(eq(staffSessions.tokenHash, hashSessionToken(token)), gt(staffSessions.expiresAt, new Date()))).limit(1);
   const session = sessions[0];
   if (!session) return undefined;
-  return getStaffAccountById(session.staffAccountId);
+  const staff = await getStaffAccountById(session.staffAccountId);
+  // A session must never revive an account that is no longer active.
+  if (!staff?.active) return undefined;
+  return staff;
 }
 
 export async function deleteStaffSession(token: string | null | undefined) {
