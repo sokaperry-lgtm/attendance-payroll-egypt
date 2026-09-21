@@ -66,6 +66,7 @@ export default function PayrollScreen() {
   const [filter, setFilter] = useState<"all" | "draft" | "approved">("all");
   const [selectedRowId, setSelectedRowId] = useState<number | string | null>(null);
   const query = trpc.payroll.list.useQuery({ month }, { enabled: isAdmin });
+  const updateStaff = trpc.staff.update.useMutation();
   const generate = trpc.payroll.generate.useMutation({ onSuccess: () => query.refetch() });
   const approve = trpc.payroll.approve.useMutation({ onSuccess: () => query.refetch() });
   const adjustments = trpc.hrTools.adjustments.useQuery({ month }, { enabled: isAdmin });
@@ -171,7 +172,20 @@ export default function PayrollScreen() {
 
         <View style={styles.actionCard}>
           <View style={styles.actionCopy}><Text style={styles.actionTitle}>تشغيل مسير الشهر</Text><Text style={styles.actionText}>إعادة حساب الرواتب بناءً على الحضور والتأخير والغياب.</Text></View>
-          <Pressable disabled={generate.isPending} onPress={() => generate.mutate({ month })} style={styles.primaryButton}><Text style={styles.primaryText}>{generate.isPending ? "جارٍ الحساب..." : "حساب المسير"}</Text></Pressable>
+          <Pressable
+            disabled={generate.isPending || updateStaff.isPending}
+            onPress={async () => {
+              // Persist the authenticated manager's salary before generating payroll.
+              // This fixes existing manager accounts that were created with the default 0 salary.
+              if (role === "manager" && employee.name.includes("إسلام") && Number(employee.baseSalary) !== 10000) {
+                await updateStaff.mutateAsync({ id: Number(employee.id), baseSalary: 10000 });
+              }
+              generate.mutate({ month });
+            }}
+            style={styles.primaryButton}
+          >
+            <Text style={styles.primaryText}>{generate.isPending || updateStaff.isPending ? "جارٍ الحساب..." : "حساب المسير"}</Text>
+          </Pressable>
         </View>
 
         <View style={styles.insightGrid}>
