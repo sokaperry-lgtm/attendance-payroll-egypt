@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { StatusBadge } from "@/components/ui/design-system";
@@ -73,6 +73,7 @@ export default function PayrollScreen() {
 
   const rows = query.data ?? [];
   const printData = printQuery.data;
+  useEffect(() => { if (printData) { const timer = setTimeout(() => { printPayslip(printData, month); setPrintPayrollId(null); }, 100); return () => clearTimeout(timer); } }, [printData, month]);
   const filteredRows = useMemo(
     () => rows.filter(r => filter === "all" || r.status === filter),
     [rows, filter]
@@ -236,7 +237,7 @@ export default function PayrollScreen() {
   );
 }
 
-function PrintEffect({data,month,onDone}:{data:any;month:string;onDone:()=>void}) { useState(() => { setTimeout(() => { printPayslip(data,month); onDone(); }, 0); return null; }); return null; }\nfunction Header({ title, subtitle, icon }: { title: string; subtitle: string; icon: "banknote" }) {
+function Header({ title, subtitle, icon }: { title: string; subtitle: string; icon: "banknote" }) {
   return <View style={styles.header}><View style={styles.headerIcon}><IconSymbol name={icon} size={24} color="#FFFFFF" /></View><View style={styles.headerCopy}><Text style={styles.eyebrow}>PAYROLL</Text><Text style={styles.title}>{title}</Text><Text style={styles.subtitle}>{subtitle}</Text></View></View>;
 }
 function Section({ title, subtitle }: { title: string; subtitle: string }) {
