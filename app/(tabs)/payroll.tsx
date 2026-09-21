@@ -57,7 +57,7 @@ function shiftMonth(value: string, delta: number) {
 }
 
 export default function PayrollScreen() {
-  const { role, employee, payroll } = useAppData();
+  const { role, employee, payroll, staffMembers } = useAppData();
   const payrollAccess = trpc.companyAdmin.payrollAccess.useQuery();
   // Fallback to the authenticated app role so a stale/missing company-membership row
   // cannot push a manager or supervisor into the employee self-service payroll screen.
@@ -75,6 +75,7 @@ export default function PayrollScreen() {
   const printQuery = trpc.payroll.payslip.useQuery({ id: printPayrollId ?? 0 }, { enabled: printPayrollId !== null });
 
   const rows = query.data ?? [];
+  const salaryRows = staffMembers.filter(s => s.active !== false);
   const printData = printQuery.data;
   useEffect(() => { if (printData) { const timer = setTimeout(() => { printPayslip(printData, month); setPrintPayrollId(null); }, 100); return () => clearTimeout(timer); } }, [printData, month]);
   const filteredRows = useMemo(
@@ -190,7 +191,23 @@ export default function PayrollScreen() {
 
         <View style={styles.table}>
           {filteredRows.length === 0 ? (
-            <View style={styles.empty}><IconSymbol name="banknote" size={25} color="#A1ACBA" /><Text style={styles.emptyTitle}>لا توجد نتائج</Text><Text style={styles.emptyText}>جرّب فلترًا آخر أو احسب مسير الشهر.</Text></View>
+            salaryRows.length === 0 ? (
+              <View style={styles.empty}><IconSymbol name="banknote" size={25} color="#A1ACBA" /><Text style={styles.emptyTitle}>لا توجد بيانات موظفين</Text><Text style={styles.emptyText}>لم تصل بيانات الاستاف. افتح إدارة الموظفين وتأكد من وجود الموظفين.</Text></View>
+            ) : (
+              <View>
+                <View style={styles.salaryNotice}><Text style={styles.salaryNoticeTitle}>رواتب الاستاف الأساسية</Text><Text style={styles.salaryNoticeText}>دي الرواتب المسجلة للموظفين حتى قبل تشغيل مسير الشهر. اضغط «حساب المسير» لإنشاء صافي راتب الشهر.</Text></View>
+                {salaryRows.map(s => (
+                  <View key={s.id} style={styles.employeeRow}>
+                    <View style={styles.avatar}><Text style={styles.avatarText}>{s.initials || String(s.id).slice(-2)}</Text></View>
+                    <View style={styles.employeeCopy}>
+                      <Text style={styles.employeeName}>{s.name}</Text>
+                      <Text style={styles.employeeMeta}>{s.title} · {s.department}</Text>
+                    </View>
+                    <View style={styles.netBox}><Text style={styles.netLabel}>الراتب الأساسي</Text><Text style={styles.netValue}>{formatMoney(s.baseSalary)}</Text><Text style={styles.viewSalary}>مسجل في ملف الموظف</Text></View>
+                  </View>
+                ))}
+              </View>
+            )
           ) : filteredRows.map(r => {
             const deductions = r.absenceDeduction + r.lateDeduction;
             const gross = r.grossSalary;
@@ -269,6 +286,6 @@ const styles = StyleSheet.create({
   actionCard:{backgroundColor:"#F3F8FD",borderWidth:1,borderColor:"#D9E9F7",borderRadius:18,padding:15,flexDirection:"row-reverse",alignItems:"center",justifyContent:"space-between",gap:12},actionCopy:{flex:1},actionTitle:{color:"#172033",fontSize:13,fontWeight:"900",textAlign:"right"},actionText:{color:"#667085",fontSize:9,lineHeight:16,textAlign:"right",marginTop:4},primaryButton:{backgroundColor:"#163A63",borderRadius:12,paddingHorizontal:16,paddingVertical:12},primaryText:{color:"#FFFFFF",fontSize:10,fontWeight:"900"},
   insightGrid:{flexDirection:"row-reverse",gap:10},insight:{flex:1,backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:16,padding:14},insightValue:{color:"#163A63",fontSize:16,fontWeight:"900",textAlign:"right"},insightTitle:{color:"#172033",fontSize:10,fontWeight:"900",textAlign:"right",marginTop:7},insightMeta:{color:"#98A6B8",fontSize:8,textAlign:"right",marginTop:3},
   sectionHeader:{gap:10},section:{},sectionTitle:{color:"#172033",fontSize:16,fontWeight:"900",textAlign:"right"},sectionSubtitle:{color:"#98A6B8",fontSize:9,textAlign:"right",marginTop:3},filters:{flexDirection:"row-reverse",gap:7},filter:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E1E7ED",borderRadius:10,paddingHorizontal:12,paddingVertical:8},filterActive:{backgroundColor:"#163A63",borderColor:"#163A63"},filterText:{color:"#667085",fontSize:9,fontWeight:"800"},filterTextActive:{color:"#FFFFFF"},
-  table:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,overflow:"hidden"},employeeRow:{minHeight:88,padding:12,flexDirection:"row-reverse",alignItems:"center",gap:10,borderBottomWidth:1,borderBottomColor:"#EEF1F4"},employeeRowSelected:{backgroundColor:"#F1F7FD",borderColor:"#BFD8EE"},avatar:{width:38,height:38,borderRadius:12,backgroundColor:"#EAF1F8",alignItems:"center",justifyContent:"center"},avatarText:{color:"#31577F",fontSize:10,fontWeight:"900"},employeeCopy:{flex:1,paddingVertical:4},employeeName:{color:"#172033",fontSize:11,fontWeight:"900",textAlign:"right"},employeeMeta:{color:"#98A6B8",fontSize:8,textAlign:"right",marginTop:4},netBox:{minWidth:110,alignItems:"flex-end"},netLabel:{color:"#98A6B8",fontSize:8},netValue:{color:"#163A63",fontSize:12,fontWeight:"900",marginTop:2},approveButton:{backgroundColor:"#163A63",borderRadius:10,paddingHorizontal:12,paddingVertical:9},approvedButton:{backgroundColor:"#EAF8F1"},approveText:{color:"#FFFFFF",fontSize:9,fontWeight:"900"},viewSalary:{color:"#1677D2",fontSize:7,fontWeight:"900",marginTop:3},selectedCard:{backgroundColor:"#FFFFFF",borderWidth:2,borderColor:"#163A63",borderRadius:20,padding:16,gap:10},selectedHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},selectedKicker:{color:"#7B8798",fontSize:8,fontWeight:"900",textAlign:"right"},selectedTitle:{color:"#172033",fontSize:15,fontWeight:"900",textAlign:"right",marginTop:3},closeSelected:{width:32,height:32,borderRadius:10,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},closeSelectedText:{color:"#667085",fontSize:22,lineHeight:24},selectedGrid:{flexDirection:"row-reverse",gap:8,flexWrap:"wrap"},empty:{padding:35,alignItems:"center"},emptyTitle:{color:"#172033",fontSize:13,fontWeight:"900",marginTop:9},emptyText:{color:"#98A6B8",fontSize:9,marginTop:4},
+  table:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,overflow:"hidden"},salaryNotice:{backgroundColor:"#F3F8FD",borderBottomWidth:1,borderBottomColor:"#D9E9F7",padding:14},salaryNoticeTitle:{color:"#163A63",fontSize:12,fontWeight:"900",textAlign:"right"},salaryNoticeText:{color:"#667085",fontSize:9,lineHeight:16,textAlign:"right",marginTop:4},employeeRow:{minHeight:88,padding:12,flexDirection:"row-reverse",alignItems:"center",gap:10,borderBottomWidth:1,borderBottomColor:"#EEF1F4"},employeeRowSelected:{backgroundColor:"#F1F7FD",borderColor:"#BFD8EE"},avatar:{width:38,height:38,borderRadius:12,backgroundColor:"#EAF1F8",alignItems:"center",justifyContent:"center"},avatarText:{color:"#31577F",fontSize:10,fontWeight:"900"},employeeCopy:{flex:1,paddingVertical:4},employeeName:{color:"#172033",fontSize:11,fontWeight:"900",textAlign:"right"},employeeMeta:{color:"#98A6B8",fontSize:8,textAlign:"right",marginTop:4},netBox:{minWidth:110,alignItems:"flex-end"},netLabel:{color:"#98A6B8",fontSize:8},netValue:{color:"#163A63",fontSize:12,fontWeight:"900",marginTop:2},approveButton:{backgroundColor:"#163A63",borderRadius:10,paddingHorizontal:12,paddingVertical:9},approvedButton:{backgroundColor:"#EAF8F1"},approveText:{color:"#FFFFFF",fontSize:9,fontWeight:"900"},viewSalary:{color:"#1677D2",fontSize:7,fontWeight:"900",marginTop:3},selectedCard:{backgroundColor:"#FFFFFF",borderWidth:2,borderColor:"#163A63",borderRadius:20,padding:16,gap:10},selectedHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},selectedKicker:{color:"#7B8798",fontSize:8,fontWeight:"900",textAlign:"right"},selectedTitle:{color:"#172033",fontSize:15,fontWeight:"900",textAlign:"right",marginTop:3},closeSelected:{width:32,height:32,borderRadius:10,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},closeSelectedText:{color:"#667085",fontSize:22,lineHeight:24},selectedGrid:{flexDirection:"row-reverse",gap:8,flexWrap:"wrap"},empty:{padding:35,alignItems:"center"},emptyTitle:{color:"#172033",fontSize:13,fontWeight:"900",marginTop:9},emptyText:{color:"#98A6B8",fontSize:9,marginTop:4},
   detailCard:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,padding:16},row:{flexDirection:"row-reverse",justifyContent:"space-between",paddingVertical:12,borderBottomWidth:1,borderBottomColor:"#F1F4F7"},rowLabel:{color:"#667085",fontSize:10},rowValue:{color:"#172033",fontSize:11,fontWeight:"800"},rowStrong:{color:"#163A63",fontSize:14},statusCard:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,padding:15,flexDirection:"row-reverse",alignItems:"center",gap:10},statusIcon:{width:40,height:40,borderRadius:12,backgroundColor:"#EEF6FF",alignItems:"center",justifyContent:"center"},statusCopy:{flex:1},statusTitle:{color:"#172033",fontSize:11,fontWeight:"900",textAlign:"right"},statusText:{color:"#667085",fontSize:9,lineHeight:16,textAlign:"right",marginTop:3},state:{flex:1,alignItems:"center",justifyContent:"center",gap:12},stateText:{color:"#667085",fontSize:11}
 });
