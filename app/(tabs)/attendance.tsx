@@ -196,5 +196,11 @@ const styles = StyleSheet.create({
   lateText: { color: "#31577F", fontSize: 10, fontWeight: "700", marginTop: 4, textAlign: "right" },
   empty: { alignItems: "center", paddingVertical: 40, gap: 7 },
   emptyTitle: { color: "#172033", fontSize: 15, fontWeight: "800" },
-  emptyText: { color: "#98A6B8", fontSize: 11 },\n  syncRow: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#E8EDF3", flexDirection: "row-reverse", alignItems: "center", gap: 12 },\n  syncCopy: { flex: 1 },\n  syncTitle: { color: "#172033", fontSize: 12, fontWeight: "800", textAlign: "right" },\n  syncText: { color: "#667085", fontSize: 10, lineHeight: 16, marginTop: 3, textAlign: "right" },\n  syncButton: { backgroundColor: "#163A63", borderRadius: 12, paddingVertical: 10, paddingHorizontal: 13 },\n  syncButtonText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
+  emptyText: { color: "#98A6B8", fontSize: 11 },
+  syncRow: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#E8EDF3", flexDirection: "row-reverse", alignItems: "center", gap: 12 },
+  syncCopy: { flex: 1 },
+  syncTitle: { color: "#172033", fontSize: 12, fontWeight: "800", textAlign: "right" },
+  syncText: { color: "#667085", fontSize: 10, lineHeight: 16, marginTop: 3, textAlign: "right" },
+  syncButton: { backgroundColor: "#163A63", borderRadius: 12, paddingVertical: 10, paddingHorizontal: 13 },
+  syncButtonText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
 });
