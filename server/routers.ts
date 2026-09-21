@@ -161,7 +161,11 @@ export const appRouter = router({
     role: managerProcedure.input(z.object({ staffAccountId:z.number().int(), role:z.enum(["owner","hr","manager","supervisor","accountant","employee"]) })).mutation(({ ctx,input }) => enterprise.setMemberRole(ctx.staffUser.id,input.staffAccountId,input.role)),
     subscription: staffProcedure.query(({ ctx }) => enterprise.getSubscription(ctx.staffUser.id)),
     changePlan: managerProcedure.input(z.object({ plan:z.enum(["trial","starter","growth","scale"]) })).mutation(({ ctx,input }) => enterprise.updateSubscription(ctx.staffUser.id,input.plan)),
-    security: staffProcedure.query(({ ctx }) => enterprise.getSecuritySummary(ctx.staffUser.id)),\n    payrollAccess: staffProcedure.query(async ({ ctx }) => {\n      const membership = await enterprise.getMembership(ctx.staffUser.id);\n      return { role: membership?.role ?? "employee", canManagePayroll: ["owner", "manager", "hr", "accountant"].includes(membership?.role ?? "") };\n    }),
+    security: staffProcedure.query(({ ctx }) => enterprise.getSecuritySummary(ctx.staffUser.id)),
+    payrollAccess: staffProcedure.query(async ({ ctx }) => {
+      const membership = await enterprise.getMembership(ctx.staffUser.id);
+      return { role: membership?.role ?? "employee", canManagePayroll: ["owner", "manager", "hr", "accountant"].includes(membership?.role ?? "") };
+    }),
   }),
   reports: router({
     month: supervisorProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(({ ctx, input }) => enterprise.getMonthlyStaffReports(ctx.staffUser.id, input.month)),
