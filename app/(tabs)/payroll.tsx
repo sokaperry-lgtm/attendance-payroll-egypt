@@ -59,7 +59,9 @@ function shiftMonth(value: string, delta: number) {
 export default function PayrollScreen() {
   const { role, employee, payroll } = useAppData();
   const payrollAccess = trpc.companyAdmin.payrollAccess.useQuery();
-  // Fallback to the authenticated app role so a stale/missing company-membership row\n  // cannot push a manager or supervisor into the employee self-service payroll screen.\n  const isAdmin = payrollAccess.data?.canManagePayroll === true || role === "manager" || role === "supervisor";
+  // Fallback to the authenticated app role so a stale/missing company-membership row
+  // cannot push a manager or supervisor into the employee self-service payroll screen.
+  const isAdmin = payrollAccess.data?.canManagePayroll === true || role === "manager" || role === "supervisor";
   const [month, setMonth] = useState(currentMonth());
   const [filter, setFilter] = useState<"all" | "draft" | "approved">("all");
   const [selectedRowId, setSelectedRowId] = useState<number | string | null>(null);
