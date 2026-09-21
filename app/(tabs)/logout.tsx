@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -9,23 +9,31 @@ export default function LogoutScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const logoutMutation = trpc.auth.logout.useMutation();
+  const startedRef = useRef(false);
 
   useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
     let active = true;
     (async () => {
-      // Invalidate the server session while the current Bearer token is still available.
-      // Local cleanup remains the fallback so logout cannot get stuck if the request fails.
+      // Revoke the server session before removing the local Bearer token.
       try {
         await logoutMutation.mutateAsync();
       } catch (error) {
         console.warn("[Auth] Server logout failed; continuing with local logout.", error);
       }
+
       await Auth.removeSessionToken();
       await Auth.clearUserInfo();
       queryClient.clear();
+
       if (active) router.replace("/login" as never);
     })();
-    return () => { active = false; };
+
+    return () => {
+      active = false;
+    };
   }, [logoutMutation, queryClient, router]);
 
   return (
