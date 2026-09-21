@@ -224,18 +224,19 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const overtimeRate=s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours;
     const overtimeValue=Math.round(overtimeHours*overtimeRate);
     const adjustments=await db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.staffAccountId,s.id),eq(salaryAdjustments.month,month)));
+    const allowances=adjustments.filter(a=>a.type==="allowance").reduce((sum,a)=>sum+a.amount,0);
     const bonuses=adjustments.filter(a=>a.type==="bonus"||a.type==="incentive").reduce((sum,a)=>sum+a.amount,0);
     const extraDeductions=adjustments.filter(a=>a.type==="penalty"||a.type==="deduction").reduce((sum,a)=>sum+a.amount,0);
     const activeAdvances=await db.select().from(salaryAdvances).where(and(eq(salaryAdvances.staffAccountId,s.id),eq(salaryAdvances.status,"active")));
     const advanceInstallment=activeAdvances.filter(a=>a.startMonth<=month && a.remainingAmount>0).reduce((sum,a)=>sum+Math.min(a.installmentAmount,a.remainingAmount),0);
-    const gross=s.baseSalary+overtimeValue+bonuses;
+    const gross=s.baseSalary+allowances+overtimeValue+bonuses;
     const egypt = calculateEgyptPayroll({
       monthlyGross: gross,
       insuranceWage: s.baseSalary,
       monthlyOtherDeductions: 0,
     });
     const net=Math.max(0, egypt.net-absenceDeduction-lateDeduction-extraDeductions-advanceInstallment);
-    const values={companyId:m.companyId,staffAccountId:s.id,month,baseSalary:s.baseSalary,allowances:0,bonuses,overtime:overtimeValue,absenceDeduction,lateDeduction,otherDeductions:extraDeductions,advances:advanceInstallment,employeeSocialInsurance:egypt.employeeSocialInsurance,employeeIncomeTax:egypt.employeeIncomeTax,grossSalary:gross,netSalary:net,status:"draft"};
+    const values={companyId:m.companyId,staffAccountId:s.id,month,baseSalary:s.baseSalary,allowances,bonuses,overtime:overtimeValue,absenceDeduction,lateDeduction,otherDeductions:extraDeductions,advances:advanceInstallment,employeeSocialInsurance:egypt.employeeSocialInsurance,employeeIncomeTax:egypt.employeeIncomeTax,grossSalary:gross,netSalary:net,status:"draft"};
     if(existing) await db.update(payrollRecords).set({...values,updatedAt:new Date()}).where(eq(payrollRecords.id,existing.id));
     else await db.insert(payrollRecords).values(values);
     result.push(values);
@@ -374,10 +375,11 @@ export async function listCompanySalaryAdjustments(staffAccountId:number, month?
   return month ? db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.companyId,m.companyId),eq(salaryAdjustments.month,month))).orderBy(desc(salaryAdjustments.createdAt))
     : db.select().from(salaryAdjustments).where(eq(salaryAdjustments.companyId,m.companyId)).orderBy(desc(salaryAdjustments.createdAt));
 }
-export async function createSalaryAdjustment(actorId:number,input:{staffAccountId:number;month:string;type:"bonus"|"incentive"|"penalty"|"deduction";title:string;amount:number;note?:string}) {
+export async function createSalaryAdjustment(actorId:number,input:{staffAccountId:number;month:string;type:"allowance"|"bonus"|"incentive"|"penalty"|"deduction";title:string;amount:number;note?:string}) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId); if(!m || m.role!=="owner") throw new Error("غير مصرح");
   await assertStaffInCompany(actorId,input.staffAccountId);
+  await assertPayrollEditable(actorId,input.month);
   const result=await db.insert(salaryAdjustments).values({...input,companyId:m.companyId,createdBy:actorId});
   await writeAudit(actorId,m.companyId,"salary_adjustment.created","salary_adjustment",String(result[0].insertId),input);
   await createNotification(input.staffAccountId,"payroll","إضافة جديدة على راتبك",input.title+": "+input.amount.toLocaleString()+" جنيه.");
@@ -387,6 +389,7 @@ export async function createSalaryAdvance(actorId:number,input:{staffAccountId:n
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId); if(!m || m.role!=="owner") throw new Error("غير مصرح");
   await assertStaffInCompany(actorId,input.staffAccountId);
+  await assertPayrollEditable(actorId,input.startMonth);
   if(input.amount<=0 || input.installmentAmount<=0) throw new Error("قيمة السلفة والقسط يجب أن تكون أكبر من صفر.");
   const result=await db.insert(salaryAdvances).values({...input,remainingAmount:input.amount,companyId:m.companyId,createdBy:actorId});
   await writeAudit(actorId,m.companyId,"salary_advance.created","salary_advance",String(result[0].insertId),input);
