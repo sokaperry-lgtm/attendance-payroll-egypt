@@ -264,6 +264,7 @@ export async function getPayrollPayslip(staffAccountId:number, payrollId:number)
   const m=await getCompanyForStaff(staffAccountId); if(!m) throw new Error("Company not found");
   const payroll=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,payrollId),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
   if(!payroll) throw new Error("قسيمة الراتب غير موجودة");
+  if(m.role==="employee" && payroll.staffAccountId!==staffAccountId) throw new Error("غير مصرح بالوصول إلى قسيمة موظف آخر");
   const staff=(await db.select().from(staffAccounts).where(eq(staffAccounts.id,payroll.staffAccountId)).limit(1))[0];
   if(!staff) throw new Error("الموظف غير موجود");
   const company=(await db.select().from(companies).where(eq(companies.id,m.companyId)).limit(1))[0];
