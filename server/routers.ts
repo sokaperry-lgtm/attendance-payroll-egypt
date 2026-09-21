@@ -136,8 +136,8 @@ export const appRouter = router({
     balance: staffProcedure.input(z.object({ year: z.number().int().min(2024).max(2100) })).query(({ ctx, input }) => enterprise.getLeaveBalance(ctx.staffUser.id, input.year)),
   }),
   payroll: router({
-    list: payrollAdminProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).query(({ ctx, input }) => enterprise.getPayroll(ctx.staffUser.id, input.month)),
-    generate: payrollAdminProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).mutation(({ ctx, input }) => enterprise.generatePayroll(ctx.staffUser.id, input.month)),
+    list: payrollAdminProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(({ ctx, input }) => enterprise.getPayroll(ctx.staffUser.id, input.month)),
+    generate: payrollAdminProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).mutation(({ ctx, input }) => enterprise.generatePayroll(ctx.staffUser.id, input.month)),
     approve: payrollAdminProcedure.input(z.object({ id: z.number().int() })).mutation(({ ctx, input }) => enterprise.approvePayroll(ctx.staffUser.id, input.id)),
     payslip: staffProcedure.input(z.object({ id: z.number().int() })).query(({ ctx, input }) => enterprise.getPayrollPayslip(ctx.staffUser.id, input.id)),
   }),
