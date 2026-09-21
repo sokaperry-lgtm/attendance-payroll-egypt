@@ -112,10 +112,39 @@ export async function listCompanySchedules(staffAccountId: number) {
 
 export async function setMemberRole(actorId: number, staffAccountId: number, role: CompanyRole) {
   const db = await getDb(); if (!db) throw new Error("Database not available");
-  const actor = await getCompanyForStaff(actorId); if (!actor || actor.role !== "owner") throw new Error("غير مصرح");
-  const target = await getMembership(staffAccountId); if (!target || target.companyId !== actor.companyId) throw new Error("الموظف غير موجود في الشركة");
-  await db.update(companyMembers).set({ role, updatedAt: new Date() }).where(eq(companyMembers.staffAccountId, staffAccountId));
-  await db.update(staffAccounts).set({ role: role === "employee" ? "employee" : role === "supervisor" ? "supervisor" : "manager", updatedAt: new Date() }).where(eq(staffAccounts.id, staffAccountId));
+  const actor = await getCompanyForStaff(actorId);
+  if (!actor || actor.role !== "owner") throw new Error("غير مصرح");
+
+  // Never allow privilege escalation through the membership role picker.
+  // "owner" is reserved for the original tenant owner and cannot be assigned
+  // from the regular staff-management flow.
+  if (role === "owner") throw new Error("لا يمكن تعيين دور المالك من شاشة الموظفين.");
+
+  const target = await getMembership(staffAccountId);
+  if (!target || target.companyId !== actor.companyId || !target.active) {
+    throw new Error("الموظف غير موجود في الشركة");
+  }
+  if (staffAccountId === actorId) {
+    throw new Error("لا يمكن تغيير دور حسابك من هذه الشاشة.");
+  }
+
+  // Keep the legacy staff role aligned with the company role. Only the
+  // manager/supervisor/employee roles grant staff-level middleware access.
+  // HR/accountant remain company roles without accidentally becoming a
+  // global manager and bypassing supervisor-only boundaries.
+  const staffRole: "manager" | "supervisor" | "employee" =
+    role === "manager" ? "manager" :
+    role === "supervisor" ? "supervisor" :
+    "employee";
+
+  await db.update(companyMembers)
+    .set({ role, updatedAt: new Date() })
+    .where(and(eq(companyMembers.staffAccountId, staffAccountId), eq(companyMembers.companyId, actor.companyId)));
+
+  await db.update(staffAccounts)
+    .set({ role: staffRole, updatedAt: new Date() })
+    .where(eq(staffAccounts.id, staffAccountId));
+
   await writeAudit(actorId, actor.companyId, "role.updated", "staff", String(staffAccountId), { role });
   return getMembership(staffAccountId);
 }
