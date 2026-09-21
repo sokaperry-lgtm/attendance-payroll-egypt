@@ -209,6 +209,8 @@ export async function generatePayroll(staffAccountId: number, month: string) {
   const ids = new Set(members.map(x=>x.staffAccountId));
   const staff = await db.select().from(staffAccounts).where(eq(staffAccounts.active,true));
   const attendance = await db.select().from(attendanceRecords);
+  const schedules = await db.select().from(weeklySchedules).where(eq(weeklySchedules.staffAccountId, staffAccountId));
+  const shifts = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
   const approvedOvertime = await db.select().from(staffRequests).where(and(eq(staffRequests.type,"أوفر تايم"),eq(staffRequests.status,"مقبول")));
   const result=[];
   let skippedApproved=0;
@@ -219,6 +221,18 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const absences=records.filter(x=>x.status==="غياب").length;
     const lateMinutes=records.reduce((a,x)=>a+x.lateMinutes,0);
     const lateDeduction=Math.round((s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours/60)*lateMinutes);
+    const earlyMinutes=records.reduce((total, record) => {
+      if (!record.checkOut) return total;
+      const schedule = schedules.find(item => item.staffAccountId === s.id && item.scheduleDate === record.date);
+      const shift = schedule ? shifts.find(item => item.id === schedule.shiftTemplateId) : undefined;
+      const shiftEnd = shift?.endTime ?? s.shiftEnd;
+      const [eh, em] = shiftEnd.split(":").map(Number);
+      const [ah, am] = record.checkOut.split(":").map(Number);
+      const endMinutes = (eh || 0) * 60 + (em || 0);
+      const actualMinutes = (ah || 0) * 60 + (am || 0);
+      return total + Math.max(0, endMinutes - actualMinutes);
+    }, 0);
+    const earlyDeduction=Math.round((s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours/60)*earlyMinutes);
     const absenceDeduction=Math.round((s.baseSalary/PAYROLL_RULES.calendarDays)*PAYROLL_RULES.absencePenaltyDays*absences);
     const overtimeHours=approvedOvertime.filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month)).reduce((sum,r)=>sum+Number(r.hours??0),0);
     const overtimeRate=s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours;
@@ -235,7 +249,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       insuranceWage: s.baseSalary,
       monthlyOtherDeductions: 0,
     });
-    const net=Math.max(0, egypt.net-absenceDeduction-lateDeduction-extraDeductions-advanceInstallment);
+    const net=Math.max(0, egypt.net-absenceDeduction-lateDeduction-earlyDeduction-extraDeductions-advanceInstallment);
     const values={companyId:m.companyId,staffAccountId:s.id,month,baseSalary:s.baseSalary,allowances,bonuses,overtime:overtimeValue,absenceDeduction,lateDeduction,otherDeductions:extraDeductions,advances:advanceInstallment,employeeSocialInsurance:egypt.employeeSocialInsurance,employeeIncomeTax:egypt.employeeIncomeTax,grossSalary:gross,netSalary:net,status:"draft"};
     if(existing) await db.update(payrollRecords).set({...values,updatedAt:new Date()}).where(eq(payrollRecords.id,existing.id));
     else await db.insert(payrollRecords).values(values);
