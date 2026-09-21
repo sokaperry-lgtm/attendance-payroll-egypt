@@ -22,7 +22,7 @@ function shiftLabel(s: ShiftTemplate | null | undefined) {
   if (s.kind === "weekly_off") return "إجازة";
   return `${s.startTime} — ${s.endTime}`;
 }
-function tone(s: ShiftTemplate | null | undefined) {
+function tone(s: ShiftTemplate | null | undefined, paletteIndex?: number) {
   if (!s) return { bg: "#F6F8FA", accent: "#A1ACBA", text: "#667085" };
   if (s.kind === "weekly_off") return { bg: "#FFF0E1", accent: "#E05A33", text: "#A33A20" };
   if (s.crossesMidnight) return { bg: "#EEE8FF", accent: "#7655D6", text: "#5135A8" };
@@ -33,9 +33,8 @@ function tone(s: ShiftTemplate | null | undefined) {
     { bg: "#FFF3D6", accent: "#D58A00", text: "#965E00" },
     { bg: "#EDE8FF", accent: "#7655D6", text: "#5135A8" },
   ];
-  const key = String(s.id ?? s.name ?? "");
-  const index = [...key].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % palettes.length;
-  return palettes[index];
+  const index = paletteIndex ?? 0;
+  return palettes[index % palettes.length];
 }
 
 export default function ScheduleScreen() {
@@ -142,7 +141,8 @@ export default function ScheduleScreen() {
                   )}
                   {week.map(d => {
                     const entry = findSchedule(visible, person.id, d.key);
-                    const t = tone(entry?.shift);
+                    const shiftIndex = entry?.shift ? shiftTemplates.findIndex(s => String(s.id) === String(entry.shift?.id)) : -1;
+                    const t = tone(entry?.shift, shiftIndex >= 0 ? shiftIndex : 0);
                     const selected = role === "manager" && person.id === selectedEmployee && d.key === selectedDay;
                     return (
                       <Pressable key={d.key} onPress={() => { if (role === "manager") { setSelectedEmployee(person.id); setSelectedDay(d.key); } }} style={[styles.gridCell, selected && styles.gridCellSelected]}>
@@ -171,8 +171,8 @@ export default function ScheduleScreen() {
               <View><Text style={styles.sectionTitle}>تعديل الوردية</Text><Text style={styles.sectionHint}>{member.name}</Text></View>
             </View>
             <View style={styles.shiftGrid}>
-              {shiftTemplates.map(s => {
-                const t = tone(s);
+              {shiftTemplates.map((s, index) => {
+                const t = tone(s, index);
                 return (
                   <Pressable key={s.id} disabled={saving} onPress={() => assignShift(s)} style={[styles.shiftOption, { backgroundColor: t.bg, borderColor: t.accent }, saving && styles.disabled]}>
                     <View style={[styles.shiftDot, { backgroundColor: t.accent }]} />
