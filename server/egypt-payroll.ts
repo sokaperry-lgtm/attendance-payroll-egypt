@@ -89,12 +89,13 @@ export function calculateEgyptPayroll(input: EgyptPayrollInput) {
   const monthlyGross = Math.max(0, input.monthlyGross);
   const rawInsuranceWage = input.insuranceWage ?? monthlyGross;
   const insuranceWage = Math.min(Math.max(0, rawInsuranceWage), rules.insuranceWageMax);
-  const calculatedEmployeeSocial = Math.round(insuranceWage * rules.employeeSocialRate);
-  const employeeSocialInsurance = Math.round(input.employeeSocialInsurance ?? calculatedEmployeeSocial);
-  const employerSocialInsurance = Math.round(insuranceWage * rules.employerSocialRate);
+  // Taxes and social insurance are settled outside the payroll system.
+  // Employee payroll must not withhold either item.
+  const employeeSocialInsurance = 0;
+  const employerSocialInsurance = 0;
   const annualGross = monthlyGross * 12;
-  const annualSocial = employeeSocialInsurance * 12;
-  const annualFunds = Math.max(0, input.employeeInsuranceFunds ?? 0) * 12;
+  const annualSocial = 0;
+  const annualFunds = 0;
   const tax = calculateEgyptAnnualIncomeTax({ annualTaxableBeforeExemptions: annualGross, employeeSocialInsurance: annualSocial, employeeInsuranceFunds: annualFunds, rules });
   const other = Math.max(0, input.monthlyOtherDeductions ?? 0);
   // Income tax is settled separately by the employer and must not be withheld from the employee salary.
