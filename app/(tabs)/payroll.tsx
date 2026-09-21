@@ -86,7 +86,11 @@ export default function PayrollScreen() {
     return { gross, deductions, net, approved };
   }, [rows]);
 
-  if (payrollAccess.isLoading) {\n    return <ScreenContainer><View style={styles.state}><ActivityIndicator color="#163A63" /><Text style={styles.stateText}>جاري التحقق من صلاحيات الرواتب...</Text></View></ScreenContainer>;\n  }\n\n  if (query.isLoading && isAdmin) {
+  if (payrollAccess.isLoading) {
+    return <ScreenContainer><View style={styles.state}><ActivityIndicator color="#163A63" /><Text style={styles.stateText}>جاري التحقق من صلاحيات الرواتب...</Text></View></ScreenContainer>;
+  }
+
+  if (query.isLoading && isAdmin) {
     return <ScreenContainer><View style={styles.state}><ActivityIndicator color="#163A63" /><Text style={styles.stateText}>جاري تحميل مسير الرواتب...</Text></View></ScreenContainer>;
   }
 
