@@ -14,7 +14,9 @@ function monthLabel(value: string) {
 function shiftMonth(value: string, delta: number) {
   const [y, m] = value.split("-").map(Number);
   const d = new Date(y, m - 1 + delta, 1);
-  return d.toISOString().slice(0, 7);
+  const nextYear = d.getFullYear();
+  const nextMonth = String(d.getMonth() + 1).padStart(2, "0");
+  return `${nextYear}-${nextMonth}`;
 }
 
 export default function PayrollScreen() {
