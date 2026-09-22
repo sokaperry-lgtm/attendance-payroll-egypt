@@ -12,6 +12,7 @@ const statusTone: Record<string, "success" | "warning" | "danger" | "neutral"> =
   غياب: "danger",
   إجازة: "neutral",
   مأمورية: "neutral",
+  مستثنى: "neutral",
 };
 
 export default function AttendanceScreen() {
@@ -167,7 +168,7 @@ export default function AttendanceScreen() {
               <View style={styles.rowHeader}>
                 <Text style={styles.rowDate}>{formatDate(item.date)}</Text>
                 <StatusBadge
-                  label={item.status === "غياب" && !(item.note || "").includes("تم اعتماد الغياب") && !(item.note || "").includes("تم إلغاء الغياب") ? "غياب · بانتظار الاعتماد" : item.status}
+                  label={item.status === "غياب" && !(item.note || "").includes("تم اعتماد الغياب") && !(item.note || "").includes("تم إلغاء الغياب") ? "غياب · بانتظار الاعتماد" : item.status === "مستثنى" ? "مستثنى من الغياب" : item.status}
                   tone={item.status === "غياب" && !(item.note || "").includes("تم اعتماد الغياب") && !(item.note || "").includes("تم إلغاء الغياب") ? "warning" : statusTone[item.status] || "neutral"}
                 />
               </View>
