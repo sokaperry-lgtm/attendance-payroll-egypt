@@ -22,6 +22,8 @@ export default function RequestsScreen() {
   const [hours, setHours] = useState("2");
   const [reason, setReason] = useState("");
   const [selectedRequest, setSelectedRequest] = useState<(typeof requests)[number] | null>(null);
+  const [activeFilter, setActiveFilter] = useState<"الكل" | "قيد المراجعة" | "مقبول" | "مرفوض">("الكل");
+  const filteredRequests = requests.filter((request:any) => activeFilter === "الكل" || request.status === activeFilter);
   const isOvertime = type === "أوفر تايم";
 
   async function saveRequest() {
@@ -56,8 +58,8 @@ export default function RequestsScreen() {
 <View style={styles.stat}><Text style={styles.statValue}>{requests.filter(r => r.status === "مرفوض").length}</Text><Text style={styles.statLabel}>مرفوض</Text></View>
 </View>
 <View style={styles.sectionHead}><View><Text style={styles.sectionTitle}>سجل الطلبات</Text><Text style={styles.sectionHint}>اضغط على الطلب لعرض التفاصيل</Text></View></View>
-    <View style={styles.filters}>{["الكل","قيد المراجعة","مقبول","مرفوض"].map(item => <View key={item} style={styles.filterChip}><Text style={styles.filterText}>{item}</Text></View>)}</View>
-    {requests.map((request:any) => {
+    <View style={styles.filters}>{["الكل","قيد المراجعة","مقبول","مرفوض"].map(item => <Pressable key={item} onPress={() => setActiveFilter(item as typeof activeFilter)} style={[styles.filterChip, activeFilter === item && styles.filterChipActive]}><Text style={[styles.filterText, activeFilter === item && styles.filterTextActive]}>{item}</Text></Pressable>)}</View>
+    {filteredRequests.map((request:any) => {
       const palette = requestPalette[request.status] ?? requestPalette["قيد المراجعة"];
       const isManagerException = role !== "employee" && request.source && request.source !== "request";
       return <Pressable key={request.id} onPress={() => setSelectedRequest(request)} style={styles.requestCard}>
@@ -78,7 +80,7 @@ export default function RequestsScreen() {
         </View> : null}
       </Pressable>;
     })}
-    {requests.length === 0 && <Text style={styles.empty}>لم ترسل أي طلبات بعد.</Text>}
+    {filteredRequests.length === 0 && <Text style={styles.empty}>{requests.length === 0 ? "لم ترسل أي طلبات بعد." : `لا توجد طلبات بحالة ${activeFilter}.`}</Text>}
   </ScrollView>
   <Modal visible={Boolean(selectedRequest)} transparent animationType="slide" onRequestClose={() => setSelectedRequest(null)}><View style={styles.modalBackdrop}><View style={styles.detailModal}><View style={styles.detailHead}><Text style={styles.detailTitle}>تفاصيل الطلب</Text><Pressable onPress={() => setSelectedRequest(null)}><Text style={styles.closeText}>إغلاق</Text></Pressable></View>{selectedRequest && <><Text style={styles.detailType}>{selectedRequest.type}</Text><Text style={styles.detailDates}>{selectedRequest.type === "أوفر تايم" ? `${selectedRequest.from} · ${selectedRequest.hours ?? 0} ساعة` : `${selectedRequest.from} إلى ${selectedRequest.to}`}</Text><View style={styles.detailStatus}><Text style={styles.detailStatusText}>{selectedRequest.status}</Text></View><Text style={styles.detailLabel}>سبب الطلب</Text><Text style={styles.detailReason}>{selectedRequest.reason}</Text><View style={styles.timeline}><Text style={styles.timelineTitle}>حالة المعالجة</Text><Text style={styles.timelineText}>{selectedRequest.status === "قيد المراجعة" ? "الطلب في انتظار مراجعة المدير." : selectedRequest.status === "مقبول" ? "تمت مراجعة الطلب واعتماده." : "تمت مراجعة الطلب ورفضه."}</Text></View></>}</View></View></Modal>
   <Modal visible={modalOpen} transparent animationType="slide" onRequestClose={() => setModalOpen(false)}><View style={styles.modalBackdrop}><View style={styles.modal}><View style={styles.modalHeader}><Pressable onPress={() => setModalOpen(false)}><Text style={styles.close}>إلغاء</Text></Pressable><Text style={styles.modalTitle}>طلب جديد</Text></View><Text style={styles.fieldLabel}>نوع الطلب</Text><View style={styles.typeRow}>{(["إجازة", "إذن", "مأمورية", "أوفر تايم", "إجازة مرضية"] as RequestType[]).map((item) => <Pressable key={item} onPress={() => setType(item)} style={[styles.typeChip, type === item && styles.typeChipActive]}><Text style={[styles.typeChipText, type === item && styles.typeChipTextActive]}>{item}</Text></Pressable>)}</View><Text style={styles.fieldLabel}>{isOvertime ? "تاريخ اليوم" : "من"}</Text><TextInput value={from} onChangeText={setFrom} placeholder="YYYY-MM-DD" style={styles.input} />{isOvertime ? <><Text style={styles.fieldLabel}>عدد الساعات</Text><TextInput value={hours} onChangeText={setHours} placeholder="مثال: 2" keyboardType="numeric" style={styles.input} /></> : <><Text style={styles.fieldLabel}>إلى</Text><TextInput value={to} onChangeText={setTo} placeholder="YYYY-MM-DD" style={styles.input} /></>}<Text style={styles.fieldLabel}>السبب</Text><TextInput value={reason} onChangeText={setReason} placeholder="اكتب سبب الطلب" multiline style={[styles.input, styles.textArea]} /><Pressable onPress={saveRequest} style={styles.submitButton}><Text style={styles.submitText}>إرسال للمراجعة</Text></Pressable></View></View></Modal>
