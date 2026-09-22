@@ -662,9 +662,18 @@ export async function listCompanyRequests(staffAccountId:number) {
   const exceptions:any[]=[];
   for(const r of attendance.filter(a=>ids.includes(a.staffAccountId))){
     const name=staff.find(s=>s.id===r.staffAccountId)?.name ?? "موظف";
-    if(Number(r.lateMinutes||0)>0 && !(r.note||"").includes("تم إلغاء التأخير")) exceptions.push({id:-1000000-r.id,source:"attendance",exceptionKind:"late",staffAccountId:r.staffAccountId,staffName:name,type:"تأخير",fromDate:r.date,toDate:r.date,reason:"تأخير "+r.lateMinutes+" دقيقة",status:((r.note||"").includes("تم اعتماد التأخير") ? "مقبول" : "قيد المراجعة"),createdAt:r.createdAt,attendanceId:r.id,actionable:!(r.note||"").includes("تم اعتماد التأخير")});
-    if((r.note||"").includes("انصراف مبكر:") && !(r.note||"").includes("تم إلغاء الانصراف المبكر")) exceptions.push({id:-2000000-r.id,source:"attendance",exceptionKind:"early",staffAccountId:r.staffAccountId,staffName:name,type:"انصراف مبكر",fromDate:r.date,toDate:r.date,reason:((r.note||"").match(/انصراف مبكر:\s*[^·]+/)||[])[0] ?? "انصراف مبكر",status:((r.note||"").includes("تم اعتماد الانصراف المبكر") ? "مقبول" : "قيد المراجعة"),createdAt:r.createdAt,attendanceId:r.id,actionable:!(r.note||"").includes("تم اعتماد الانصراف المبكر")});
-    if(r.status==="غياب" && !(r.note||"").includes("تم إلغاء الغياب")) exceptions.push({id:-4000000-r.id,source:"attendance",exceptionKind:"absence",staffAccountId:r.staffAccountId,staffName:name,type:"غياب",fromDate:r.date,toDate:r.date,reason:"غياب — لا يوجد تسجيل حضور",status:((r.note||"").includes("تم اعتماد الغياب") ? "مقبول" : "قيد المراجعة"),createdAt:r.createdAt,attendanceId:r.id,actionable:!(r.note||"").includes("تم اعتماد الغياب")});
+    if(Number(r.lateMinutes||0)>0 || (r.note||"").includes("تم إلغاء التأخير")) {
+      const status = (r.note||"").includes("تم اعتماد التأخير") ? "مقبول" : (r.note||"").includes("تم إلغاء التأخير") ? "مرفوض" : "قيد المراجعة";
+      exceptions.push({id:-1000000-r.id,source:"attendance",exceptionKind:"late",staffAccountId:r.staffAccountId,staffName:name,type:"تأخير",fromDate:r.date,toDate:r.date,reason:"تأخير "+r.lateMinutes+" دقيقة",status,createdAt:r.createdAt,attendanceId:r.id,actionable:status==="قيد المراجعة"});
+    }
+    if((r.note||"").includes("انصراف مبكر:") || (r.note||"").includes("تم إلغاء الانصراف المبكر")) {
+      const status = (r.note||"").includes("تم اعتماد الانصراف المبكر") ? "مقبول" : (r.note||"").includes("تم إلغاء الانصراف المبكر") ? "مرفوض" : "قيد المراجعة";
+      exceptions.push({id:-2000000-r.id,source:"attendance",exceptionKind:"early",staffAccountId:r.staffAccountId,staffName:name,type:"انصراف مبكر",fromDate:r.date,toDate:r.date,reason:((r.note||"").match(/انصراف مبكر:\s*[^·]+/)||[])[0] ?? "انصراف مبكر",status,createdAt:r.createdAt,attendanceId:r.id,actionable:status==="قيد المراجعة"});
+    }
+    if(r.status==="غياب" || (r.note||"").includes("تم إلغاء الغياب") || (r.note||"").includes("تم اعتماد الغياب")) {
+      const status = (r.note||"").includes("تم اعتماد الغياب") ? "مقبول" : (r.note||"").includes("تم إلغاء الغياب") ? "مرفوض" : "قيد المراجعة";
+      exceptions.push({id:-4000000-r.id,source:"attendance",exceptionKind:"absence",staffAccountId:r.staffAccountId,staffName:name,type:"غياب",fromDate:r.date,toDate:r.date,reason:"غياب — لا يوجد تسجيل حضور",status,createdAt:r.createdAt,attendanceId:r.id,actionable:status==="قيد المراجعة"});
+    }
   }
   const penaltyRows=penalties.filter(p=>ids.includes(p.staffAccountId)).map(p=>({...p,id:-3000000-p.id,source:"penalty",adjustmentId:p.id,staffName:staff.find(s=>s.id===p.staffAccountId)?.name ?? "موظف",fromDate:p.month+"-01",toDate:p.month+"-01",type:"جزاء",reason:p.title+(p.note?" · "+p.note:"")+" · "+p.amount.toLocaleString()+" جنيه",status:"مخصوم",actionable:true}));
   return [...regular,...exceptions,...penaltyRows].sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime());
