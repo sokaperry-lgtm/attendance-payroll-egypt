@@ -39,6 +39,17 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
+  // Baseline browser security headers for the production web shell.
+  // Keep these conservative so Expo web assets and the API continue to work.
+  app.disable("x-powered-by");
+  app.use((_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(self)");
+    next();
+  });
+
   // Same-origin is the default production architecture. Only enable cross-origin
   // requests for explicitly trusted origins configured by the deployment.
   app.use((req, res, next) => {
