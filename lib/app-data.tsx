@@ -58,7 +58,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const meQuery = trpc.auth.me.useQuery(undefined, { retry: false });
   const attendanceQuery = trpc.attendance.list.useQuery(undefined, { enabled: Boolean(meQuery.data), retry: false });
   const requestsQuery = trpc.requests.list.useQuery(undefined, { enabled: Boolean(meQuery.data), retry: false });
-  const staffQuery = trpc.staff.list.useQuery(undefined, { enabled: ["owner","manager","hr","supervisor"].includes((meQuery.data?.membershipRole as Role | undefined) ?? "employee"), retry: false });
+  const staffQuery = trpc.staff.list.useQuery(undefined, { enabled: ["owner","manager","hr"].includes((meQuery.data?.membershipRole as Role | undefined) ?? "employee"), retry: false });
   const checkInMutation = trpc.attendance.checkIn.useMutation();
   const checkOutMutation = trpc.attendance.checkOut.useMutation();
   const requestMutation = trpc.requests.create.useMutation();
