@@ -15,7 +15,10 @@ const statusTone: Record<string, "success" | "warning" | "danger" | "neutral"> =
 };
 
 export default function AttendanceScreen() {
-  const { records, employee } = useAppData();
+  const { records, employee, role, refresh } = useAppData();
+  const attendanceReview = trpc.requests.reviewAttendanceException.useMutation();
+  const managerRequests = trpc.requests.list.useQuery(undefined, { enabled: role === "manager" || role === "supervisor", retry: false });
+  const pendingAbsences = (managerRequests.data ?? []).filter((item: any) => item.source === "attendance" && item.exceptionKind === "absence" && item.status === "قيد المراجعة");
   const month = "2026-09";
   const workSummary = trpc.attendance.workSummary.useQuery({ month });
   const syncAttendance = trpc.attendance.sync.useMutation({ onSuccess: () => workSummary.refetch() });
@@ -83,7 +86,52 @@ export default function AttendanceScreen() {
               </View>
             </View>
 
-            <View style={styles.insight}>
+            <View style={styles.reviewPanel}>
+  <View style={styles.reviewHeader}>
+    <View style={styles.reviewBadge}><Text style={styles.reviewBadgeText}>{pendingAbsences.length}</Text></View>
+    <View style={styles.reviewCopy}>
+      <Text style={styles.reviewTitle}>مراجعة الغياب</Text>
+      <Text style={styles.reviewText}>الغياب التلقائي لا يُخصم من الراتب إلا بعد اعتماد المدير.</Text>
+    </View>
+    <IconSymbol name="person.crop.circle.badge.exclamationmark" size={24} color="#163A63" />
+  </View>
+  {pendingAbsences.length === 0 ? (
+    <Text style={styles.reviewEmpty}>لا توجد حالات غياب بانتظار القرار.</Text>
+  ) : pendingAbsences.slice(0, 5).map((item: any) => (
+    <View key={String(item.id)} style={styles.absenceCard}>
+      <View style={styles.absenceInfo}>
+        <Text style={styles.absenceName}>{item.staffName ?? "موظف"}</Text>
+        <Text style={styles.absenceDate}>{item.fromDate} · غياب تلقائي</Text>
+      </View>
+      <View style={styles.absenceActions}>
+        <Pressable
+          disabled={attendanceReview.isPending}
+          onPress={async () => {
+            try {
+              await attendanceReview.mutateAsync({ staffAccountId: Number(item.staffAccountId), date: String(item.fromDate), kind: "absence", action: "approve" });
+              await managerRequests.refetch();
+              await refresh();
+            } catch {}
+          }}
+          style={styles.approveAbsence}
+        ><Text style={styles.approveAbsenceText}>{attendanceReview.isPending ? "..." : "اعتماد"}</Text></Pressable>
+        <Pressable
+          disabled={attendanceReview.isPending}
+          onPress={async () => {
+            try {
+              await attendanceReview.mutateAsync({ staffAccountId: Number(item.staffAccountId), date: String(item.fromDate), kind: "absence", action: "cancel" });
+              await managerRequests.refetch();
+              await refresh();
+            } catch {}
+          }}
+          style={styles.cancelAbsence}
+        ><Text style={styles.cancelAbsenceText}>إلغاء</Text></Pressable>
+      </View>
+    </View>
+  ))}
+</View>
+
+<View style={styles.insight}>
               <View style={styles.insightIcon}>
                 <IconSymbol name={late > 0 ? "clock" : "checkmark"} size={18} color="#163A63" />
               </View>
@@ -175,6 +223,23 @@ const styles = StyleSheet.create({
   },
   kpiValue: { color: "#172033", fontSize: 23, fontWeight: "900", textAlign: "right" },
   kpiLabel: { color: "#667085", fontSize: 11, fontWeight: "700", textAlign: "right", marginTop: 3 },
+  reviewPanel: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 15, borderWidth: 1, borderColor: "#D9E6F2", gap: 10 },
+  reviewHeader: { flexDirection: "row-reverse", alignItems: "center", gap: 10 },
+  reviewBadge: { minWidth: 32, height: 32, borderRadius: 10, backgroundColor: "#163A63", alignItems: "center", justifyContent: "center" },
+  reviewBadgeText: { color: "#FFFFFF", fontSize: 12, fontWeight: "900" },
+  reviewCopy: { flex: 1 },
+  reviewTitle: { color: "#172033", fontSize: 13, fontWeight: "900", textAlign: "right" },
+  reviewText: { color: "#667085", fontSize: 10, lineHeight: 16, marginTop: 2, textAlign: "right" },
+  reviewEmpty: { color: "#98A6B8", fontSize: 10, textAlign: "right", paddingVertical: 5 },
+  absenceCard: { backgroundColor: "#F7F9FC", borderRadius: 14, padding: 11, flexDirection: "row-reverse", alignItems: "center", gap: 9 },
+  absenceInfo: { flex: 1 },
+  absenceName: { color: "#172033", fontSize: 12, fontWeight: "800", textAlign: "right" },
+  absenceDate: { color: "#667085", fontSize: 10, marginTop: 3, textAlign: "right" },
+  absenceActions: { flexDirection: "row-reverse", gap: 6 },
+  approveAbsence: { backgroundColor: "#163A63", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 11 },
+  approveAbsenceText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
+  cancelAbsence: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D9E6F2", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 11 },
+  cancelAbsenceText: { color: "#31577F", fontSize: 10, fontWeight: "800" },
   insight: {
     backgroundColor: "#F2F5F8", borderRadius: 18, padding: 14,
     borderWidth: 1, borderColor: "#D9E6F2",
