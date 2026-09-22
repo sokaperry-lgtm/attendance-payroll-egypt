@@ -10,7 +10,7 @@ export default function MoreScreen() {
   const teamAccess = manager || role === "supervisor";
 
   const items = [
-    ...(teamAccess ? [["الفريق", "person.2.fill", "/manager"]] : []),
+    ...(manager ? [["لوحة القيادة", "chart.bar.xaxis", "/manager"]] : []),
     ...(manager ? [["الموظفون", "person.2.fill", "/employees"], ["الرواتب", "banknote", "/payroll"], ["HR Tools", "banknote", "/hr-tools"]] : []),
     ...(teamAccess ? [["الجدول", "calendar", "/schedule"], ["التقارير", "chart.bar.fill", "/reports"]] : []),
     ...(manager ? [["الإعدادات", "settings", "/settings"]] : []),
