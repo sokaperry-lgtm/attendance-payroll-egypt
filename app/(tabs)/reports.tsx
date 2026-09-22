@@ -29,7 +29,7 @@ export default function ReportsScreen() {
   const compact = width < 700;
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const reportQuery = trpc.reports.month.useQuery({ month });
-  const payrollQuery = trpc.payroll.list.useQuery({ month }, { enabled: role === "manager", retry: false });
+  const payrollQuery = trpc.payroll.list.useQuery({ month }, { enabled: role === "owner" || role === "manager", retry: false });
   const [exporting, setExporting] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | "all">("all");
@@ -77,7 +77,7 @@ export default function ReportsScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <PageHeader eyebrow={`EXECUTIVE DASHBOARD · ${month}`} title="لوحة الحضور والرواتب" subtitle="قراءة تشغيلية مرئية لأداء الفريق وتكلفة الشهر." icon="chart.bar.fill" />
         <View style={[styles.toolbar, compact && styles.toolbarCompact]}>
-          <View><Text style={styles.toolbarTitle}>{role === "manager" ? "لوحة الإدارة" : "لوحة الفريق"}</Text><Text style={styles.toolbarHint}>تقرير شهر {month}</Text></View>
+          <View><Text style={styles.toolbarTitle}>{role === "owner" || role === "manager" ? "لوحة الإدارة" : "لوحة الفريق"}</Text><Text style={styles.toolbarHint}>تقرير شهر {month}</Text></View>
           <View style={[styles.toolbarActions, compact && styles.toolbarActionsCompact]}><View style={styles.monthPicker}><Pressable onPress={() => setMonth(shiftMonth(month, 1))}><Text style={styles.monthArrow}>‹</Text></Pressable><Text style={styles.monthValue}>{month}</Text><Pressable onPress={() => setMonth(shiftMonth(month, -1))}><Text style={styles.monthArrow}>›</Text></Pressable></View>
             <Pressable onPress={() => setFilterOpen(true)} style={({ pressed }) => [styles.filterButton, pressed && styles.pressed]}>
               <IconSymbol name="line.3.horizontal.decrease" size={16} color={UI.primary} />
@@ -113,8 +113,8 @@ export default function ReportsScreen() {
           </SurfaceCard>
         </View>
 
-        {role === "manager" && <SectionTitle title="ملخص الرواتب" subtitle="التكلفة والاعتمادات لهذا الشهر" />}
-        {role === "manager" && <View style={styles.payrollGrid}>
+        {(role === "owner" || role === "manager") && <SectionTitle title="ملخص الرواتب" subtitle="التكلفة والاعتمادات لهذا الشهر" />}
+        {(role === "owner" || role === "manager") && <View style={styles.payrollGrid}>
           <MetricCard label="صافي الرواتب" value={`${payrollSummary.totalPayroll.toLocaleString("ar-EG")} ج.م`} tone="blue" />
           <MetricCard label="خصومات الغياب" value={`${payrollSummary.totalAbsenceDeductions.toLocaleString("ar-EG")} ج.م`} tone="red" />
           <MetricCard label="الأوفر تايم" value={`${payrollSummary.totalOvertime.toLocaleString("ar-EG")} ج.م`} tone="orange" />
