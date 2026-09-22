@@ -35,6 +35,7 @@ function ManagerScreenContent() {
   const [branchRadius, setBranchRadius] = useState("");
   const [teamSearch, setTeamSearch] = useState("");
   const [teamFilter, setTeamFilter] = useState<"all" | "active" | "inactive">("all");
+  const [approvalBusy, setApprovalBusy] = useState<string | null>(null);
   const pending = requests.filter((item) => item.status === "قيد المراجعة").length;
   const presentCount = records.filter((record) => record.status === "حاضر").length;
   const lateCount = records.filter((record) => record.status === "متأخر").length;
@@ -130,6 +131,23 @@ function ManagerScreenContent() {
       <View style={styles.alertCard}><View style={styles.commandCardHeader}><View><Text style={styles.commandCardTitle}>يحتاج انتباهك</Text><Text style={styles.commandCardHint}>إجراءات تشغيلية مفتوحة</Text></View><Text style={styles.alertCount}>{alerts.length}</Text></View>{alerts.length ? alerts.map((item,index)=><View key={item.title+index} style={styles.alertRow}><View style={[styles.alertIcon,item.tone==="danger" ? styles.alertDanger : styles.alertWarning]}><IconSymbol name={item.icon as any} size={15} color={item.tone==="danger" ? "#B42318" : "#B45309"}/></View><View style={styles.alertCopy}><Text style={styles.alertTitle}>{item.title}</Text><Text style={styles.alertHint}>افتح القسم وراجع التفاصيل</Text></View><Text style={styles.alertValue}>{item.value}</Text></View>) : <View style={styles.clearState}><IconSymbol name="checkmark" size={19} color="#15803D"/><Text style={styles.clearText}>كل شيء تحت السيطرة حاليًا.</Text></View>}</View>
       <View style={styles.quickCard}><View style={styles.commandCardHeader}><View><Text style={styles.commandCardTitle}>وصول سريع</Text><Text style={styles.commandCardHint}>المهام اليومية للمدير</Text></View></View>{quickActions.map((item)=><Pressable key={item.label} onPress={() => router.push(item.label === "الموظفون" ? "/employees" : item.label === "الجدول" ? "/schedule" : item.label === "الطلبات" ? "/requests" : "/payroll")} style={({ pressed }) => [styles.quickAction, pressed && styles.quickActionPressed]} accessibilityRole="button"><View style={styles.quickActionIcon}><IconSymbol name={item.icon as any} size={15} color="#163A63"/></View><View style={styles.quickActionCopy}><Text style={styles.quickActionTitle}>{item.label}</Text><Text style={styles.quickActionHint}>{item.hint}</Text></View><Text style={styles.quickArrow}>‹</Text></Pressable>)}</View>
     </View>
+    <View style={styles.approvalInbox}>
+      <View style={styles.approvalHeader}>
+        <View><Text style={styles.approvalTitle}>صندوق قرارات المدير</Text><Text style={styles.approvalHint}>طلبات تحتاج قرارًا الآن</Text></View>
+        <Pressable onPress={() => router.push("/requests")} style={styles.approvalViewAll}><Text style={styles.approvalViewAllText}>عرض الكل</Text></Pressable>
+      </View>
+      {requests.filter((item) => item.status === "قيد المراجعة").slice(0, 4).map((item) => (
+        <View key={item.id} style={styles.approvalItem}>
+          <View style={styles.approvalAvatar}><Text style={styles.approvalAvatarText}>{String((item as any).staffName ?? "مو").split(" ").slice(0,2).map((x:string)=>x[0] ?? "").join("")}</Text></View>
+          <View style={styles.approvalCopy}><Text style={styles.approvalName}>{(item as any).staffName ?? "موظف"}</Text><Text style={styles.approvalType}>{item.type} · {item.from}{item.to !== item.from ? " — " + item.to : ""}</Text></View>
+          <View style={styles.approvalActions}>
+            <Pressable disabled={approvalBusy === String(item.id)} onPress={async()=>{setApprovalBusy(String(item.id));try{await approveRequest(String(item.id),"مقبول");showAlert("تم الاعتماد","تم اعتماد الطلب وإبلاغ الموظف.");}catch(error){showAlert("تعذر الاعتماد",error instanceof Error?error.message:"حدث خطأ أثناء اعتماد الطلب.");}finally{setApprovalBusy(null);}}} style={styles.approveMini}><Text style={styles.approveMiniText}>اعتماد</Text></Pressable>
+            <Pressable disabled={approvalBusy === String(item.id)} onPress={async()=>{setApprovalBusy(String(item.id));try{await approveRequest(String(item.id),"مرفوض");showAlert("تم الرفض","تم رفض الطلب وإبلاغ الموظف.");}catch(error){showAlert("تعذر الرفض",error instanceof Error?error.message:"حدث خطأ أثناء رفض الطلب.");}finally{setApprovalBusy(null);}}} style={styles.rejectMini}><Text style={styles.rejectMiniText}>رفض</Text></Pressable>
+          </View>
+        </View>
+      ))}
+      {pending === 0 ? <View style={styles.approvalEmpty}><IconSymbol name="checkmark.circle.fill" size={18} color="#15803D" /><Text style={styles.approvalEmptyText}>لا توجد قرارات معلقة — كل الطلبات محدثة.</Text></View> : null}
+    </View>
     <View style={styles.managerHero}><View style={styles.heroTop}><View style={styles.heroIcon}><IconSymbol name="chart.bar" size={25} color="#FFFFFF" /></View><View style={styles.heroText}><Text style={styles.heroEyebrow}>OPERATIONS OVERVIEW</Text><Text style={styles.heroTitle}>الفريق شغال بشكل مستقر</Text><Text style={styles.heroHint}>تابع الحضور والطلبات والرواتب من لوحة واحدة.</Text></View></View><View style={styles.heroMetrics}><View><Text style={styles.heroMetricValue}>{staffMembers.length}</Text><Text style={styles.heroMetricLabel}>موظف</Text></View><View><Text style={styles.heroMetricValue}>{presentCount > 0 ? "1" : "0"}</Text><Text style={styles.heroMetricLabel}>حاضر اليوم</Text></View><View><Text style={styles.heroMetricValue}>{pending}</Text><Text style={styles.heroMetricLabel}>طلبات معلقة</Text></View></View></View>
     <View style={styles.sectionTitleRow}><View><Text style={styles.sectionTitle}>الفريق</Text><Text style={styles.sectionHint}>{staffMembers.length} حساب · إدارة الصلاحيات والبيانات</Text></View><Pressable onPress={() => { resetAdd(); setAddOpen(true); }} style={styles.addButton}><IconSymbol name="person.2.fill" size={15} color="#FFFFFF" /><Text style={styles.addButtonText}>إضافة موظف</Text></Pressable></View>
     {filteredTeam.map((member) => <Pressable key={member.id} onPress={() => router.push(("/employee/" + member.id) as never)} style={styles.employeeCard}><View style={styles.employeeAvatar}><Text style={styles.employeeAvatarText}>{member.initials}</Text></View><View style={styles.employeeMain}><Text style={styles.employeeName}>{member.name}</Text><Text style={styles.employeeRole}>{member.title} · {member.department}</Text><Text style={styles.employeePhone}>{member.phone}</Text></View><View style={styles.employeeActions}><View style={[styles.statusDot, { backgroundColor: member.active ? "#163A63" : "#667085" }]} /><Text style={styles.statusLabel}>{member.active ? "نشط" : "موقوف"}</Text><Pressable onPress={() => openEdit(member)} style={styles.editButton}><Text style={styles.editButtonText}>تعديل</Text></Pressable></View></Pressable>)}
@@ -148,6 +166,26 @@ function ManagerScreenContent() {
 }
 
 const styles = StyleSheet.create({
+  approvalInbox:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E6ECF2",borderRadius:22,padding:17,gap:11,shadowColor:"#0F2742",shadowOpacity:0.04,shadowRadius:12,elevation:1},
+  approvalHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},
+  approvalTitle:{color:"#172033",fontSize:17,fontWeight:"900",textAlign:"right"},
+  approvalHint:{color:"#98A6B8",fontSize:10,marginTop:3,textAlign:"right"},
+  approvalViewAll:{backgroundColor:"#F2F6FA",borderRadius:10,paddingHorizontal:10,paddingVertical:7},
+  approvalViewAllText:{color:"#31577F",fontSize:10,fontWeight:"800"},
+  approvalItem:{flexDirection:"row-reverse",alignItems:"center",gap:9,borderTopWidth:1,borderTopColor:"#EEF2F6",paddingTop:11},
+  approvalAvatar:{width:34,height:34,borderRadius:12,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},
+  approvalAvatarText:{color:"#163A63",fontSize:10,fontWeight:"900"},
+  approvalCopy:{flex:1},
+  approvalName:{color:"#172033",fontSize:12,fontWeight:"800",textAlign:"right"},
+  approvalType:{color:"#667085",fontSize:9,marginTop:3,textAlign:"right"},
+  approvalActions:{flexDirection:"row",gap:5},
+  approveMini:{backgroundColor:"#163A63",borderRadius:9,paddingHorizontal:9,paddingVertical:7},
+  approveMiniText:{color:"#FFFFFF",fontSize:9,fontWeight:"800"},
+  rejectMini:{backgroundColor:"#F7F9FC",borderWidth:1,borderColor:"#DDE4EC",borderRadius:9,paddingHorizontal:9,paddingVertical:7},
+  rejectMiniText:{color:"#667085",fontSize:9,fontWeight:"800"},
+  approvalEmpty:{flexDirection:"row-reverse",alignItems:"center",justifyContent:"center",gap:7,paddingVertical:8},
+  approvalEmptyText:{color:"#667085",fontSize:10},
+
   executiveHero:{backgroundColor:"#102A43",borderRadius:26,padding:20,overflow:"hidden",gap:18},
   heroGlow:{position:"absolute",width:180,height:180,borderRadius:90,backgroundColor:"#1F4E79",right:-60,top:-70,opacity:.5},
   executiveTop:{flexDirection:"row-reverse",alignItems:"center",gap:14},
