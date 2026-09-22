@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { showAlert } from "@/lib/alert";
 import { ScreenContainer } from "@/components/screen-container";
@@ -32,7 +32,24 @@ export default function ManagerScreen() {
   const [branchLongitude, setBranchLongitude] = useState("");
   const [branchRadius, setBranchRadius] = useState("");
   const pending = requests.filter((item) => item.status === "قيد المراجعة").length;
-  const presentToday = records.find((record) => record.status === "حاضر" || record.status === "متأخر");
+  const presentCount = records.filter((record) => record.status === "حاضر").length;
+  const lateCount = records.filter((record) => record.status === "متأخر").length;
+  const absentCount = records.filter((record) => record.status === "غياب").length;
+  const leaveCount = records.filter((record) => record.status === "إجازة").length;
+  const attendanceTotal = records.length || 1;
+  const attendanceRate = Math.min(100, Math.round(((presentCount + lateCount) / attendanceTotal) * 100));
+  const payrollReady = staffMembers.length > 0 && payroll.net >= 0;
+  const alerts = [
+    ...(pending > 0 ? [{ icon: "doc.text.fill", title: "طلبات تحتاج مراجعة", value: String(pending), tone: "warning" }] : []),
+    ...(absentCount > 0 ? [{ icon: "person.fill.xmark", title: "غياب مسجل", value: String(absentCount), tone: "danger" }] : []),
+    ...(lateCount > 0 ? [{ icon: "clock", title: "موظفون متأخرون", value: String(lateCount), tone: "warning" }] : []),
+  ];
+  const quickActions = [
+    { icon: "person.2.fill", label: "الموظفون", hint: "إدارة الفريق" },
+    { icon: "calendar", label: "الجدول", hint: "تخطيط الورديات" },
+    { icon: "doc.text.fill", label: "الطلبات", hint: "المراجعة والاعتماد" },
+    { icon: "banknote", label: "الرواتب", hint: "حالة المسير" },
+  ];
 
   function resetAdd() { setName(""); setPhone(""); setPassword(""); setTitle(""); setDepartment(""); setBaseSalary(""); setNewRole("employee"); }
   async function saveEmployee() {
@@ -64,6 +81,23 @@ export default function ManagerScreen() {
 
   return <ScreenContainer><ScrollView contentContainerStyle={styles.content}>
     <View style={styles.header}><View style={styles.headerCopy}><Text style={styles.eyebrow}>COMMAND CENTER · سبتمبر 2026</Text><Text style={styles.title}>نظرة المدير</Text><Text style={styles.subtitle}>{branch.name} · متابعة التشغيل في مكان واحد</Text></View><View style={styles.managerBadge}><IconSymbol name="person.2.fill" size={22} color="#FFFFFF" /></View></View>
+    <View style={styles.commandHeader}><View><Text style={styles.commandEyebrow}>MANAGER COMMAND CENTER</Text><Text style={styles.commandTitle}>مركز قيادة التشغيل</Text><Text style={styles.commandSub}>كل ما يحتاج قرارك اليوم في شاشة واحدة.</Text></View><View style={styles.liveBadge}><View style={styles.liveDot}/><Text style={styles.liveText}>LIVE</Text></View></View>
+    <View style={styles.kpiGrid}>
+      <View style={styles.commandKpi}><View style={styles.kpiIconBlue}><IconSymbol name="person.2.fill" size={17} color="#163A63"/></View><Text style={styles.kpiNumber}>{staffMembers.length}</Text><Text style={styles.kpiLabel}>إجمالي الموظفين</Text><Text style={styles.kpiHint}>حسابات الفريق</Text></View>
+      <View style={styles.commandKpi}><View style={styles.kpiIconGreen}><IconSymbol name="checkmark" size={17} color="#15803D"/></View><Text style={styles.kpiNumber}>{presentCount}</Text><Text style={styles.kpiLabel}>حاضر اليوم</Text><Text style={styles.kpiHint}>تم تسجيل الحضور</Text></View>
+      <View style={styles.commandKpi}><View style={styles.kpiIconAmber}><IconSymbol name="clock" size={17} color="#B45309"/></View><Text style={styles.kpiNumber}>{lateCount}</Text><Text style={styles.kpiLabel}>متأخر اليوم</Text><Text style={styles.kpiHint}>يحتاج متابعة</Text></View>
+      <View style={styles.commandKpi}><View style={styles.kpiIconRed}><IconSymbol name="person.fill.xmark" size={17} color="#B42318"/></View><Text style={styles.kpiNumber}>{absentCount}</Text><Text style={styles.kpiLabel}>غياب</Text><Text style={styles.kpiHint}>خصومات قيد المتابعة</Text></View>
+      <View style={styles.commandKpi}><View style={styles.kpiIconBlue}><IconSymbol name="calendar" size={17} color="#163A63"/></View><Text style={styles.kpiNumber}>{leaveCount}</Text><Text style={styles.kpiLabel}>إجازات</Text><Text style={styles.kpiHint}>ضمن سجلات اليوم</Text></View>
+      <View style={styles.commandKpi}><View style={styles.kpiIconAmber}><IconSymbol name="doc.text.fill" size={17} color="#B45309"/></View><Text style={styles.kpiNumber}>{pending}</Text><Text style={styles.kpiLabel}>طلبات معلقة</Text><Text style={styles.kpiHint}>تحتاج قرار المدير</Text></View>
+    </View>
+    <View style={styles.commandGrid}>
+      <View style={styles.readinessCard}><View style={styles.commandCardHeader}><View><Text style={styles.commandCardTitle}>جاهزية الرواتب</Text><Text style={styles.commandCardHint}>ملخص سريع قبل اعتماد الشهر</Text></View><View style={[styles.readyBadge,{backgroundColor: payrollReady ? "#ECFDF3" : "#FFF7ED"}]}><Text style={[styles.readyBadgeText,{color: payrollReady ? "#15803D" : "#B45309"}]}>{payrollReady ? "جاهز" : "قيد التجهيز"}</Text></View></View><View style={styles.progressTrack}><View style={[styles.progressFill,{width: payrollReady ? "100%" : "35%"}]}/></View><View style={styles.readinessRow}><Text style={styles.readinessPercent}>{payrollReady ? "100%" : "35%"}</Text><Text style={styles.readinessLabel}>حالة البيانات الحالية</Text></View></View>
+      <View style={styles.todayCard}><View style={styles.commandCardHeader}><View><Text style={styles.commandCardTitle}>مؤشر الحضور</Text><Text style={styles.commandCardHint}>اليوم</Text></View><Text style={styles.attendanceRate}>{attendanceRate}%</Text></View><View style={styles.progressTrack}><View style={[styles.progressFill,{width: attendanceRate + "%"}]}/></View><View style={styles.readinessRow}><Text style={styles.readinessPercent}>{presentCount + lateCount}</Text><Text style={styles.readinessLabel}>سجلات حضور</Text></View></View>
+    </View>
+    <View style={styles.commandGrid}>
+      <View style={styles.alertCard}><View style={styles.commandCardHeader}><View><Text style={styles.commandCardTitle}>يحتاج انتباهك</Text><Text style={styles.commandCardHint}>إجراءات تشغيلية مفتوحة</Text></View><Text style={styles.alertCount}>{alerts.length}</Text></View>{alerts.length ? alerts.map((item,index)=><View key={item.title+index} style={styles.alertRow}><View style={[styles.alertIcon,item.tone==="danger" ? styles.alertDanger : styles.alertWarning]}><IconSymbol name={item.icon as any} size={15} color={item.tone==="danger" ? "#B42318" : "#B45309"}/></View><View style={styles.alertCopy}><Text style={styles.alertTitle}>{item.title}</Text><Text style={styles.alertHint}>افتح القسم وراجع التفاصيل</Text></View><Text style={styles.alertValue}>{item.value}</Text></View>) : <View style={styles.clearState}><IconSymbol name="checkmark" size={19} color="#15803D"/><Text style={styles.clearText}>كل شيء تحت السيطرة حاليًا.</Text></View>}</View>
+      <View style={styles.quickCard}><View style={styles.commandCardHeader}><View><Text style={styles.commandCardTitle}>وصول سريع</Text><Text style={styles.commandCardHint}>المهام اليومية للمدير</Text></View></View>{quickActions.map((item)=><View key={item.label} style={styles.quickAction}><View style={styles.quickActionIcon}><IconSymbol name={item.icon as any} size={15} color="#163A63"/></View><View style={styles.quickActionCopy}><Text style={styles.quickActionTitle}>{item.label}</Text><Text style={styles.quickActionHint}>{item.hint}</Text></View><Text style={styles.quickArrow}>‹</Text></View>)}</View>
+    </View>
     <View style={styles.managerHero}><View style={styles.heroTop}><View style={styles.heroIcon}><IconSymbol name="chart.bar" size={25} color="#FFFFFF" /></View><View style={styles.heroText}><Text style={styles.heroEyebrow}>OPERATIONS OVERVIEW</Text><Text style={styles.heroTitle}>الفريق شغال بشكل مستقر</Text><Text style={styles.heroHint}>تابع الحضور والطلبات والرواتب من لوحة واحدة.</Text></View></View><View style={styles.heroMetrics}><View><Text style={styles.heroMetricValue}>{staffMembers.length}</Text><Text style={styles.heroMetricLabel}>موظف</Text></View><View><Text style={styles.heroMetricValue}>{presentToday ? "1" : "0"}</Text><Text style={styles.heroMetricLabel}>حاضر اليوم</Text></View><View><Text style={styles.heroMetricValue}>{pending}</Text><Text style={styles.heroMetricLabel}>طلبات معلقة</Text></View></View></View>
     <View style={styles.sectionTitleRow}><View><Text style={styles.sectionTitle}>الفريق</Text><Text style={styles.sectionHint}>{staffMembers.length} حساب · إدارة الصلاحيات والبيانات</Text></View><Pressable onPress={() => { resetAdd(); setAddOpen(true); }} style={styles.addButton}><IconSymbol name="person.2.fill" size={15} color="#FFFFFF" /><Text style={styles.addButtonText}>إضافة موظف</Text></Pressable></View>
     {staffMembers.map((member) => <View key={member.id} style={styles.employeeCard}><View style={styles.employeeAvatar}><Text style={styles.employeeAvatarText}>{member.initials}</Text></View><View style={styles.employeeMain}><Text style={styles.employeeName}>{member.name}</Text><Text style={styles.employeeRole}>{member.title} · {member.department}</Text><Text style={styles.employeePhone}>{member.phone}</Text></View><View style={styles.employeeActions}><View style={[styles.statusDot, { backgroundColor: member.active ? "#163A63" : "#667085" }]} /><Text style={styles.statusLabel}>{member.active ? "نشط" : "موقوف"}</Text><Pressable onPress={() => openEdit(member)} style={styles.editButton}><Text style={styles.editButtonText}>تعديل</Text></Pressable></View></View>)}
