@@ -66,6 +66,9 @@ export default function PayrollScreen() {
   const [filter, setFilter] = useState<"all" | "draft" | "approved">("all");
   const [selectedRowId, setSelectedRowId] = useState<number | string | null>(null);
   const query = trpc.payroll.list.useQuery({ month }, { enabled: isAdmin });
+  // Payroll must load the company staff list independently of AppData role caching.
+  // Otherwise an admin with stale/missing legacy role data can see an empty payroll table.
+  const payrollStaffQuery = trpc.staff.list.useQuery(undefined, { enabled: isAdmin, retry: false });
   const updateStaff = trpc.staff.update.useMutation();
   const generate = trpc.payroll.generate.useMutation({ onSuccess: () => query.refetch() });
   const approve = trpc.payroll.approve.useMutation({ onSuccess: () => query.refetch() });
@@ -76,7 +79,8 @@ export default function PayrollScreen() {
   const printQuery = trpc.payroll.payslip.useQuery({ id: printPayrollId ?? 0 }, { enabled: printPayrollId !== null });
 
   const rows = query.data ?? [];
-  const salaryRows = [employee, ...staffMembers.filter(s => s.id !== employee.id)].filter(s => s.active !== false);
+  const payrollStaffMembers = (payrollStaffQuery.data ?? []).map((s) => ({ id: String(s.id), name: s.name, title: s.title ?? "موظف", department: s.department ?? "عام", baseSalary: Number(s.baseSalary ?? 0), initials: String(s.name).split(" ").slice(0, 2).map((part) => part[0] ?? "").join(""), active: s.active }));
+  const salaryRows = [employee, ...payrollStaffMembers.filter(s => s.id !== employee.id)].filter(s => s.active !== false);
   const printData = printQuery.data;
   useEffect(() => { if (printData) { const timer = setTimeout(() => { printPayslip(printData, month); setPrintPayrollId(null); }, 100); return () => clearTimeout(timer); } }, [printData, month]);
   const filteredRows = useMemo(
@@ -95,7 +99,7 @@ export default function PayrollScreen() {
     return <ScreenContainer><View style={styles.state}><ActivityIndicator color="#163A63" /><Text style={styles.stateText}>جاري التحقق من صلاحيات الرواتب...</Text></View></ScreenContainer>;
   }
 
-  if (query.isLoading && isAdmin) {
+  if ((query.isLoading || payrollStaffQuery.isLoading) && isAdmin) {
     return <ScreenContainer><View style={styles.state}><ActivityIndicator color="#163A63" /><Text style={styles.stateText}>جاري تحميل مسير الرواتب...</Text></View></ScreenContainer>;
   }
 
@@ -219,7 +223,7 @@ export default function PayrollScreen() {
               <View key={r.id} style={[styles.employeeRow, isSelected && styles.employeeRowSelected]}>
                 <View style={styles.avatar}><Text style={styles.avatarText}>{String(r.staffAccountId).slice(-2)}</Text></View>
                 <Pressable onPress={() => setSelectedRowId(r.id)} style={styles.employeeCopy}>
-                  <Text style={styles.employeeName}>{staffMembers.find(s => String(s.id) === String(r.staffAccountId))?.name ?? (String(employee.id) === String(r.staffAccountId) ? employee.name : `موظف #${r.staffAccountId}`)}</Text>
+                  <Text style={styles.employeeName}>{payrollStaffMembers.find(s => String(s.id) === String(r.staffAccountId))?.name ?? (String(employee.id) === String(r.staffAccountId) ? employee.name : `موظف #${r.staffAccountId}`)}</Text>
                   <Text style={styles.employeeMeta}>{staffMembers.find(s => String(s.id) === String(r.staffAccountId))?.title ?? (String(employee.id) === String(r.staffAccountId) ? employee.title : "موظف")} · إجمالي {formatMoney(gross)} · خصومات {formatMoney(deductions)}</Text>
                 </Pressable>
                 <Pressable onPress={() => setSelectedRowId(r.id)} style={styles.netBox}><Text style={styles.netLabel}>الصافي</Text><Text style={styles.netValue}>{formatMoney(r.netSalary)}</Text><StatusBadge label={r.status === "approved" ? "معتمد" : "مسودة"} tone={r.status === "approved" ? "success" : "warning"} /><Text style={styles.viewSalary}>عرض الراتب</Text></Pressable>
