@@ -39,24 +39,34 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
-  // Enable CORS for all routes - reflect the request origin to support credentials
+  // Same-origin is the default production architecture. Only enable cross-origin
+  // requests for explicitly trusted origins configured by the deployment.
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (origin) {
-      res.header("Access-Control-Allow-Origin", origin);
-    }
-    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    res.header(
-      "Access-Control-Allow-Headers",
-      "Origin, X-Requested-With, Content-Type, Accept, Authorization",
-    );
-    res.header("Access-Control-Allow-Credentials", "true");
+    const configuredOrigins = (process.env.CORS_ORIGINS ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
 
-    // Handle preflight requests
-    if (req.method === "OPTIONS") {
-      res.sendStatus(200);
+    if (origin && configuredOrigins.includes(origin)) {
+      res.header("Access-Control-Allow-Origin", origin);
+      res.header("Vary", "Origin");
+      res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+      res.header(
+        "Access-Control-Allow-Headers",
+        "Origin, X-Requested-With, Content-Type, Accept, Authorization",
+      );
+      res.header("Access-Control-Allow-Credentials", "true");
+
+      if (req.method === "OPTIONS") {
+        res.sendStatus(200);
+        return;
+      }
+    } else if (req.method === "OPTIONS") {
+      res.sendStatus(204);
       return;
     }
+
     next();
   });
 
