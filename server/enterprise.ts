@@ -815,7 +815,24 @@ export async function reviewAttendanceException(actorId:number,input:{staffAccou
 export async function listAuditLogs(staffAccountId:number, limit=100) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
-  return db.select().from(auditLogs).where(eq(auditLogs.companyId,m.companyId)).orderBy(desc(auditLogs.createdAt)).limit(Math.min(Math.max(limit,1),250));
+  // Return the actor name with each event so the audit center is useful to
+  // managers without exposing unrelated company records.
+  return db.select({
+    id: auditLogs.id,
+    companyId: auditLogs.companyId,
+    staffAccountId: auditLogs.staffAccountId,
+    staffName: staffAccounts.name,
+    action: auditLogs.action,
+    entity: auditLogs.entity,
+    entityId: auditLogs.entityId,
+    metadata: auditLogs.metadata,
+    createdAt: auditLogs.createdAt,
+  })
+    .from(auditLogs)
+    .leftJoin(staffAccounts, eq(auditLogs.staffAccountId, staffAccounts.id))
+    .where(eq(auditLogs.companyId,m.companyId))
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(Math.min(Math.max(limit,1),250));
 }
 
 export async function getEmployeeSelfService(staffAccountId:number, month:string) {
