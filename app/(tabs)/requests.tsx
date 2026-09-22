@@ -25,6 +25,10 @@ export default function RequestsScreen() {
   const [selectedRequest, setSelectedRequest] = useState<(typeof requests)[number] | null>(null);
   const [activeFilter, setActiveFilter] = useState<"الكل" | "قيد المراجعة" | "مقبول" | "مرفوض">("الكل");
   const filteredRequests = requests.filter((request:any) => activeFilter === "الكل" || request.status === activeFilter);
+  const managerAttendanceReview = trpc.requests.list.useQuery(undefined, { enabled: role !== "employee", retry: false });
+  const pendingAbsenceReviews = (managerAttendanceReview.data ?? []).filter((item: any) =>
+    item.source === "attendance" && item.exceptionKind === "absence" && item.status === "قيد المراجعة"
+  );
   const isLeaveType = type === "إجازة" || type === "إجازة مرضية" || type === "إجازة طارئة";
 
   async function saveRequest() {
@@ -41,6 +45,57 @@ export default function RequestsScreen() {
 
   return <ScreenContainer><ScrollView contentContainerStyle={styles.content}>
     <View style={styles.header}><View><Text style={styles.eyebrow}>طلباتك وموافقاتك</Text><Text style={styles.title}>الطلبات</Text><Text style={styles.subtitle}>إجازات، أذونات ومأموريات</Text></View><Pressable onPress={() => setModalOpen(true)} style={styles.addButton}><Text style={styles.addButtonText}>+ طلب جديد</Text></Pressable></View>
+    {role !== "employee" ? <View style={styles.absenceReviewPanel}>
+      <View style={styles.absenceReviewHeader}>
+        <View style={styles.absenceReviewBadge}><Text style={styles.absenceReviewBadgeText}>{pendingAbsenceReviews.length}</Text></View>
+        <View style={styles.absenceReviewCopy}>
+          <Text style={styles.absenceReviewTitle}>غياب يحتاج اعتمادك</Text>
+          <Text style={styles.absenceReviewText}>الغياب التلقائي لا يُخصم من راتب الموظف إلا بعد اعتمادك.</Text>
+        </View>
+        <IconSymbol name="person.crop.circle.badge.exclamationmark" size={25} color="#163A63" />
+      </View>
+      {pendingAbsenceReviews.length === 0 ? (
+        <Text style={styles.absenceReviewEmpty}>لا توجد حالات غياب معلقة حاليًا.</Text>
+      ) : pendingAbsenceReviews.slice(0, 6).map((item: any) => (
+        <View key={String(item.id)} style={styles.absenceReviewCard}>
+          <View style={styles.absenceReviewInfo}>
+            <Text style={styles.absenceReviewName}>{item.staffName ?? "موظف"}</Text>
+            <Text style={styles.absenceReviewDate}>{item.fromDate} · غياب تلقائي</Text>
+            <Text style={styles.absenceReviewHint}>القرار مطلوب قبل احتساب الخصم.</Text>
+          </View>
+          <View style={styles.absenceReviewActions}>
+            <Pressable
+              disabled={reviewAttendanceException.isPending}
+              onPress={async () => {
+                try {
+                  await reviewAttendanceException.mutateAsync({ staffAccountId: Number(item.staffAccountId), date: String(item.fromDate), kind: "absence", action: "approve" });
+                  await managerAttendanceReview.refetch();
+                  await refresh();
+                  showAlert("تم اعتماد الغياب", "سيتم احتساب خصم الغياب في المرتب.");
+                } catch (error) {
+                  showAlert("تعذر اعتماد الغياب", error instanceof Error ? error.message : "حدث خطأ أثناء اعتماد الغياب.");
+                }
+              }}
+              style={styles.absenceApproveButton}
+            ><Text style={styles.absenceApproveText}>{reviewAttendanceException.isPending ? "..." : "اعتماد الغياب"}</Text></Pressable>
+            <Pressable
+              disabled={reviewAttendanceException.isPending}
+              onPress={async () => {
+                try {
+                  await reviewAttendanceException.mutateAsync({ staffAccountId: Number(item.staffAccountId), date: String(item.fromDate), kind: "absence", action: "cancel" });
+                  await managerAttendanceReview.refetch();
+                  await refresh();
+                  showAlert("تم إلغاء الغياب", "لن يتم احتساب خصم الغياب لهذا اليوم.");
+                } catch (error) {
+                  showAlert("تعذر إلغاء الغياب", error instanceof Error ? error.message : "حدث خطأ أثناء إلغاء الغياب.");
+                }
+              }}
+              style={styles.absenceCancelButton}
+            ><Text style={styles.absenceCancelText}>{reviewAttendanceException.isPending ? "..." : "إلغاء الغياب"}</Text></Pressable>
+          </View>
+        </View>
+      ))}
+    </View> : null}
     <View style={styles.requestsHero}>
       <View style={styles.requestsHeroIcon}><IconSymbol name="doc.text" size={22} color="#FFFFFF" /></View>
       <View style={styles.requestsHeroCopy}><Text style={styles.requestsHeroTitle}>مركز الطلبات</Text><Text style={styles.requestsHeroText}>قدّم طلبك وتابع حالته من مكان واحد.</Text></View>
@@ -88,6 +143,25 @@ export default function RequestsScreen() {
 }
 
 const styles = StyleSheet.create({
+  absenceReviewPanel: { backgroundColor: "#FFFFFF", borderRadius: 22, padding: 16, borderWidth: 1, borderColor: "#D9E6F2", gap: 11, marginBottom: 2 },
+  absenceReviewHeader: { flexDirection: "row-reverse", alignItems: "center", gap: 11 },
+  absenceReviewBadge: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#163A63", alignItems: "center", justifyContent: "center" },
+  absenceReviewBadgeText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
+  absenceReviewCopy: { flex: 1 },
+  absenceReviewTitle: { color: "#172033", fontSize: 14, fontWeight: "900", textAlign: "right" },
+  absenceReviewText: { color: "#667085", fontSize: 10, lineHeight: 16, marginTop: 2, textAlign: "right" },
+  absenceReviewEmpty: { color: "#98A6B8", fontSize: 11, textAlign: "right", paddingVertical: 5 },
+  absenceReviewCard: { backgroundColor: "#F7F9FC", borderRadius: 16, padding: 12, flexDirection: "row-reverse", alignItems: "center", gap: 10 },
+  absenceReviewInfo: { flex: 1 },
+  absenceReviewName: { color: "#172033", fontSize: 12, fontWeight: "900", textAlign: "right" },
+  absenceReviewDate: { color: "#31577F", fontSize: 10, fontWeight: "800", marginTop: 3, textAlign: "right" },
+  absenceReviewHint: { color: "#98A6B8", fontSize: 9, marginTop: 3, textAlign: "right" },
+  absenceReviewActions: { gap: 6, minWidth: 104 },
+  absenceApproveButton: { backgroundColor: "#163A63", borderRadius: 10, paddingVertical: 9, paddingHorizontal: 10, alignItems: "center" },
+  absenceApproveText: { color: "#FFFFFF", fontSize: 10, fontWeight: "900" },
+  absenceCancelButton: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D9E6F2", borderRadius: 10, paddingVertical: 9, paddingHorizontal: 10, alignItems: "center" },
+  absenceCancelText: { color: "#31577F", fontSize: 10, fontWeight: "900" },
+
   detailModal:{backgroundColor:"#FFFFFF",borderTopLeftRadius:26,borderTopRightRadius:26,padding:20,gap:10},detailHead:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},detailTitle:{color:"#172033",fontSize:20,fontWeight:"900"},closeText:{color:"#163A63",fontSize:11},detailType:{color:"#163A63",fontSize:18,fontWeight:"800",textAlign:"right"},detailDates:{color:"#667085",fontSize:12,textAlign:"right"},detailStatus:{alignSelf:"flex-end",backgroundColor:"#EEF4FB",borderRadius:99,paddingHorizontal:12,paddingVertical:6},detailStatusText:{color:"#31577F",fontSize:10,fontWeight:"800"},detailLabel:{color:"#667085",fontSize:10,fontWeight:"700",textAlign:"right",marginTop:10},detailReason:{color:"#172033",fontSize:13,lineHeight:20,textAlign:"right"},timeline:{backgroundColor:"#172033",borderRadius:14,padding:13,marginTop:8},timelineTitle:{color:"#FFFFFF",fontSize:12,fontWeight:"800",textAlign:"right"},timelineText:{color:"#D9E6F2",fontSize:11,lineHeight:18,textAlign:"right",marginTop:4},
   requestsHero: { backgroundColor: "#163A63", borderRadius: 23, padding: 18, flexDirection: "row-reverse", alignItems: "center", gap: 12 },
   requestsHeroIcon: { width: 45, height: 45, borderRadius: 14, backgroundColor: "#163A63", alignItems: "center", justifyContent: "center" },
