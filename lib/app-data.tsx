@@ -89,7 +89,9 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const approvedOvertimeHours = requests.filter((request) => request.type === "أوفر تايم" && request.status === "مقبول" && request.from.startsWith(currentMonth)).reduce((sum, request) => sum + (request.hours ?? 0), 0);
   const payrollInputs: PayrollInputs = useMemo(() => ({ baseSalary: employee.baseSalary, allowances: 0, bonuses: 0, overtimeHours: approvedOvertimeHours, absences: records.filter((record) => record.status === "غياب").length, lateMinutes: records.reduce((sum, record) => sum + record.lateMinutes, 0), deductions: 0, advances: 0 }), [employee.baseSalary, records, approvedOvertimeHours]);
   const payroll = useMemo(() => calculatePayroll(payrollInputs), [payrollInputs]);
-  const role: Role = (meQuery.data?.membershipRole as Role | undefined) ?? (meQuery.data?.role === "manager" ? "manager" : meQuery.data?.role === "supervisor" ? "supervisor" : "employee");
+  const role: Role = meQuery.data?.role === "manager" && meQuery.data?.membershipRole !== "owner"
+    ? "manager"
+    : (meQuery.data?.membershipRole as Role | undefined) ?? (meQuery.data?.role === "supervisor" ? "supervisor" : "employee");
 
   const invalidateAll = () => queryClient.invalidateQueries();
   const value = useMemo<AppDataContext>(() => ({
