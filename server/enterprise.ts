@@ -595,62 +595,43 @@ export async function listCompanyRequests(staffAccountId:number) {
   const rows=await db.select().from(staffRequests).orderBy(desc(staffRequests.createdAt));
   const penalties=await db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.companyId,m.companyId),eq(salaryAdjustments.type,"penalty"))).orderBy(desc(salaryAdjustments.createdAt));
   const attendance=await db.select().from(attendanceRecords).orderBy(desc(attendanceRecords.date));
-  const regular=rows.filter(r=>ids.includes(r.staffAccountId)).map(r=>({
-    ...r,
-    source:"request",
-    staffName:staff.find(s=>s.id===r.staffAccountId)?.name ?? "موظف",
-    actionable:r.status==="قيد المراجعة"
-  }));
+  const regular=rows.filter(r=>ids.includes(r.staffAccountId)).map(r=>({...r,source:"request",staffName:staff.find(s=>s.id===r.staffAccountId)?.name ?? "موظف",actionable:r.status==="قيد المراجعة"}));
   const exceptions:any[]=[];
   for(const r of attendance.filter(a=>ids.includes(a.staffAccountId))){
     const name=staff.find(s=>s.id===r.staffAccountId)?.name ?? "موظف";
-    if(Number(r.lateMinutes||0)>0) exceptions.push({
-      id:-1000000-r.id,
-      source:"attendance",
-      exceptionKind:"late",
-      staffAccountId:r.staffAccountId,
-      staffName:name,
-      type:"تأخير",
-      fromDate:r.date,
-      toDate:r.date,
-      reason:"تأخير "+r.lateMinutes+" دقيقة",
-      hours:null,
-      status:"يحتاج مراجعة",
-      createdAt:r.createdAt,
-      attendanceId:r.id,
-      actionable:true
-    });
-    if((r.note||"").includes("انصراف مبكر:")) exceptions.push({
-      id:-2000000-r.id,
-      source:"attendance",
-      exceptionKind:"early",
-      staffAccountId:r.staffAccountId,
-      staffName:name,
-      type:"انصراف مبكر",
-      fromDate:r.date,
-      toDate:r.date,
-      reason:(r.note||"").match(/انصراف مبكر:\\s*[^·]+/)?.[0] ?? "انصراف مبكر",
-      hours:null,
-      status:"يحتاج مراجعة",
-      createdAt:r.createdAt,
-      attendanceId:r.id,
-      actionable:true
-    });
+    if(Number(r.lateMinutes||0)>0) exceptions.push({id:-1000000-r.id,source:"attendance",exceptionKind:"late",staffAccountId:r.staffAccountId,staffName:name,type:"تأخير",fromDate:r.date,toDate:r.date,reason:"تأخير "+r.lateMinutes+" دقيقة",status:"يحتاج مراجعة",createdAt:r.createdAt,attendanceId:r.id,actionable:true});
+    if((r.note||"").includes("انصراف مبكر:")) exceptions.push({id:-2000000-r.id,source:"attendance",exceptionKind:"early",staffAccountId:r.staffAccountId,staffName:name,type:"انصراف مبكر",fromDate:r.date,toDate:r.date,reason:((r.note||"").match(/انصراف مبكر:\s*[^·]+/)||[])[0] ?? "انصراف مبكر",status:"يحتاج مراجعة",createdAt:r.createdAt,attendanceId:r.id,actionable:true});
+    if(r.status==="غياب") exceptions.push({id:-4000000-r.id,source:"attendance",exceptionKind:"absence",staffAccountId:r.staffAccountId,staffName:name,type:"غياب",fromDate:r.date,toDate:r.date,reason:"غياب — لا يوجد تسجيل حضور",status:"يحتاج مراجعة",createdAt:r.createdAt,attendanceId:r.id,actionable:true});
   }
-  const penaltyRows=penalties.filter(p=>ids.includes(p.staffAccountId)).map(p=>({
-    ...p,
-    id:-3000000-p.id,
-    source:"penalty",
-    adjustmentId:p.id,
-    staffName:staff.find(s=>s.id===p.staffAccountId)?.name ?? "موظف",
-    fromDate:p.month+"-01",
-    toDate:p.month+"-01",
-    type:"جزاء",
-    reason:p.title+(p.note?" · "+p.note:"")+" · "+p.amount.toLocaleString()+" جنيه",
-    status:"مخصوم",
-    actionable:true
-  }));
+  const penaltyRows=penalties.filter(p=>ids.includes(p.staffAccountId)).map(p=>({...p,id:-3000000-p.id,source:"penalty",adjustmentId:p.id,staffName:staff.find(s=>s.id===p.staffAccountId)?.name ?? "موظف",fromDate:p.month+"-01",toDate:p.month+"-01",type:"جزاء",reason:p.title+(p.note?" · "+p.note:"")+" · "+p.amount.toLocaleString()+" جنيه",status:"مخصوم",actionable:true}));
   return [...regular,...exceptions,...penaltyRows].sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime());
+}
+
+export async function reviewAttendanceException(actorId:number,input:{staffAccountId:number;date:string;kind:"late"|"early"|"absence";action:"approve"|"cancel"}) {
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const m=await getCompanyForStaff(actorId);
+  if(!m || !["owner","hr","accountant","manager","supervisor"].includes(m.role)) throw new Error("غير مصرح");
+  await assertStaffInCompany(actorId,input.staffAccountId);
+  await assertPayrollEditable(actorId,input.date.slice(0,7));
+  const row=(await db.select().from(attendanceRecords).where(and(eq(attendanceRecords.staffAccountId,input.staffAccountId),eq(attendanceRecords.date,input.date))).limit(1))[0];
+  if(!row) throw new Error("سجل الحضور غير موجود.");
+  if(input.kind==="late" && Number(row.lateMinutes||0)<=0) throw new Error("لا يوجد تأخير على هذا اليوم.");
+  if(input.kind==="early" && !(row.note||"").includes("انصراف مبكر:")) throw new Error("لا يوجد انصراف مبكر مسجل على هذا اليوم.");
+  if(input.kind==="absence" && row.status!=="غياب") throw new Error("لا يوجد غياب على هذا اليوم.");
+  let nextNote=(row.note||"").replace(/\s*·\s*(?:تم إلغاء )?(?:التأخير|الانصراف المبكر|الغياب)/g,"").trim();
+  if(input.action==="cancel"){
+    if(input.kind==="late") row.lateMinutes=0;
+    if(input.kind==="absence") row.status="حاضر";
+    if(input.kind==="early") nextNote=nextNote.replace(/انصراف مبكر:\s*\d+\s*دقيقة/g,"").trim();
+    nextNote=(nextNote?nextNote+" · ":"")+"تم إلغاء "+(input.kind==="late"?"التأخير":input.kind==="early"?"الانصراف المبكر":"الغياب");
+  }
+  if(input.action==="approve"){
+    nextNote=(nextNote?nextNote+" · ":"")+"تم اعتماد "+(input.kind==="late"?"التأخير":input.kind==="early"?"الانصراف المبكر":"الغياب");
+  }
+  await db.update(attendanceRecords).set({lateMinutes:row.lateMinutes,status:row.status,note:nextNote,updatedAt:new Date()}).where(eq(attendanceRecords.id,row.id));
+  await writeAudit(actorId,m.companyId,"attendance.exception."+input.action,"attendance",String(row.id),input);
+  await createNotification(input.staffAccountId,"attendance",input.action==="approve"?"تم اعتماد مخالفة الحضور":"تم إلغاء مخالفة الحضور","تم "+(input.action==="approve"?"اعتماد":"إلغاء")+" "+(input.kind==="late"?"التأخير":input.kind==="early"?"الانصراف المبكر":"الغياب")+" ليوم "+input.date+".");
+  return (await db.select().from(attendanceRecords).where(eq(attendanceRecords.id,row.id)).limit(1))[0];
 }
 
 export async function listAuditLogs(staffAccountId:number, limit=100) {
