@@ -179,6 +179,38 @@ export default function AttendanceScreen() {
               {item.lateMinutes > 0 && (
                 <Text style={styles.lateText}>تأخير {item.lateMinutes} دقيقة</Text>
               )}
+              {(role === "manager" || role === "supervisor") &&
+                item.status === "غياب" &&
+                !(item.note || "").includes("تم اعتماد الغياب") &&
+                !(item.note || "").includes("تم إلغاء الغياب") ? (
+                <View style={styles.inlineAbsenceReview}>
+                  <Text style={styles.inlineAbsenceHint}>هذا غياب تلقائي — القرار مطلوب قبل خصم الراتب</Text>
+                  <View style={styles.inlineAbsenceActions}>
+                    <Pressable
+                      disabled={attendanceReview.isPending}
+                      onPress={async () => {
+                        try {
+                          await attendanceReview.mutateAsync({ staffAccountId: Number((item as any).staffAccountId ?? employee.id), date: String(item.date), kind: "absence", action: "approve" });
+                          await managerRequests.refetch();
+                          await refresh();
+                        } catch {}
+                      }}
+                      style={styles.inlineApprove}
+                    ><Text style={styles.inlineApproveText}>{attendanceReview.isPending ? "..." : "اعتماد الغياب"}</Text></Pressable>
+                    <Pressable
+                      disabled={attendanceReview.isPending}
+                      onPress={async () => {
+                        try {
+                          await attendanceReview.mutateAsync({ staffAccountId: Number((item as any).staffAccountId ?? employee.id), date: String(item.date), kind: "absence", action: "cancel" });
+                          await managerRequests.refetch();
+                          await refresh();
+                        } catch {}
+                      }}
+                      style={styles.inlineCancel}
+                    ><Text style={styles.inlineCancelText}>استثناء من الغياب</Text></Pressable>
+                  </View>
+                </View>
+              ) : null}
             </View>
           </View>
         )}
@@ -195,6 +227,13 @@ export default function AttendanceScreen() {
 }
 
 const styles = StyleSheet.create({
+  inlineAbsenceReview: { marginTop: 10, padding: 10, borderRadius: 12, backgroundColor: "#FFF8ED", borderWidth: 1, borderColor: "#F4D7A1", gap: 8 },
+  inlineAbsenceHint: { color: "#8A5A00", fontSize: 9, fontWeight: "800", textAlign: "right" },
+  inlineAbsenceActions: { flexDirection: "row-reverse", gap: 7 },
+  inlineApprove: { flex: 1, backgroundColor: "#163A63", borderRadius: 9, paddingVertical: 8, alignItems: "center" },
+  inlineApproveText: { color: "#FFFFFF", fontSize: 9, fontWeight: "900" },
+  inlineCancel: { flex: 1, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D9E6F2", borderRadius: 9, paddingVertical: 8, alignItems: "center" },
+  inlineCancelText: { color: "#31577F", fontSize: 9, fontWeight: "900" },
   content: { padding: 20, paddingBottom: 40, gap: 14 },
   hero: {
     backgroundColor: "#163A63",
