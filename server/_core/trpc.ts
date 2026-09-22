@@ -29,7 +29,7 @@ const requireManager = t.middleware(async (opts) => {
 const requireSupervisor = t.middleware(async (opts) => {
   if (!opts.ctx.staffUser) throw new TRPCError({ code: "UNAUTHORIZED", message: "يجب تسجيل الدخول بحساب الشركة." });
   const membership = await getMembership(opts.ctx.staffUser.id);
-  if (!membership || !["owner", "manager", "supervisor"].includes(membership.role)) throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+  if (!membership || !["owner", "manager", "hr", "supervisor"].includes(membership.role)) throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
   return opts.next({ ctx: { ...opts.ctx, staffUser: opts.ctx.staffUser, membership } });
 });
 
