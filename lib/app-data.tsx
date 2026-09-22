@@ -5,7 +5,7 @@ import { calculatePayroll, type PayrollInputs, todayKey } from "@/lib/payroll";
 
 export type Role = "employee" | "supervisor" | "manager";
 export type AttendanceState = "حاضر" | "متأخر" | "إجازة" | "غياب" | "مأمورية";
-export type RequestType = "إجازة" | "إذن" | "مأمورية" | "أوفر تايم" | "إجازة مرضية";
+export type RequestType = "إجازة" | "إذن" | "مأمورية" | "أوفر تايم" | "إجازة مرضية" | "إجازة طارئة";
 export type RequestStatus = "قيد المراجعة" | "مقبول" | "مرفوض";
 
 export type Branch = { name: string; address: string; latitude: number; longitude: number; radiusMeters: number };
