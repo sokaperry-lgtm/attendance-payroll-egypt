@@ -8,12 +8,12 @@ import { trpc } from "@/lib/trpc";
 
 export default function HrToolsScreen(){
  const {role,staffMembers}=useAppData(); const month=new Date().toISOString().slice(0,7);
- const adjustments=trpc.hrTools.adjustments.useQuery({month},{enabled:role==="manager"});
- const advances=trpc.hrTools.advances.useQuery(undefined,{enabled:role==="manager"});
+ const adjustments=trpc.hrTools.adjustments.useQuery({month},{enabled:role==="owner" || role==="manager"});
+ const advances=trpc.hrTools.advances.useQuery(undefined,{enabled:role==="owner" || role==="manager"});
  const addAdjustment=trpc.hrTools.addAdjustment.useMutation({onSuccess:()=>adjustments.refetch()});
  const addAdvance=trpc.hrTools.addAdvance.useMutation({onSuccess:()=>advances.refetch()});
  const [staffId,setStaffId]=useState(""); const [amount,setAmount]=useState(""); const [title,setTitle]=useState(""); const [type,setType]=useState<"bonus"|"incentive"|"penalty"|"deduction">("incentive"); const [advance,setAdvance]=useState({amount:"",installment:"",staffId:""});
- if(role!=="manager") return <ScreenContainer><View style={styles.denied}><IconSymbol name="lock" size={34} color="#668C7F"/><Text style={styles.deniedTitle}>إدارة الرواتب للمدير فقط</Text></View></ScreenContainer>;
+ if(role!=="owner" && role!=="manager") return <ScreenContainer><View style={styles.denied}><IconSymbol name="lock" size={34} color="#668C7F"/><Text style={styles.deniedTitle}>إدارة الرواتب للمدير فقط</Text></View></ScreenContainer>;
  const submitAdjustment=async()=>{if(!staffId||!amount||!title)return Alert.alert("بيانات ناقصة","اختار موظف واكتب المبلغ والوصف.");try{await addAdjustment.mutateAsync({staffAccountId:Number(staffId),month,type,title,amount:Number(amount)});setAmount("");setTitle("");Alert.alert("تم","تم تسجيل التعديل وربطه بالمسير.");}catch(e){Alert.alert("خطأ",e instanceof Error?e.message:"تعذر الحفظ.")}};
  const submitAdvance=async()=>{if(!advance.staffId||!advance.amount||!advance.installment)return Alert.alert("بيانات ناقصة","اكمل بيانات السلفة.");try{await addAdvance.mutateAsync({staffAccountId:Number(advance.staffId),amount:Number(advance.amount),installmentAmount:Number(advance.installment),startMonth:month});setAdvance({amount:"",installment:"",staffId:""});Alert.alert("تم","تم تسجيل السلفة.");}catch(e){Alert.alert("خطأ",e instanceof Error?e.message:"تعذر الحفظ.")}};
  return <ScreenContainer><ScrollView contentContainerStyle={styles.content}>
