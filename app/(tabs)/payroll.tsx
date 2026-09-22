@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useEffect, useMemo, useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -57,6 +57,8 @@ function shiftMonth(value: string, delta: number) {
 }
 
 export default function PayrollScreen() {
+  const { width } = useWindowDimensions();
+  const compact = width < 700;
   const { role, employee, payroll, staffMembers } = useAppData();
   const payrollAccess = trpc.companyAdmin.payrollAccess.useQuery();
   // Fallback to the authenticated app role so a stale/missing company-membership row
@@ -117,12 +119,12 @@ export default function PayrollScreen() {
             <View style={styles.heroCopy}><Text style={styles.heroKicker}>NET SALARY</Text><Text style={styles.heroValue}>{formatMoney(net)}</Text><Text style={styles.heroMeta}>{monthLabel(month)} · {p?.status === "approved" ? "راتب معتمد" : "قيد المراجعة"}</Text></View>
             <View style={styles.heroIcon}><IconSymbol name="banknote" size={25} color="#FFFFFF" /></View>
           </View>
-          <View style={styles.monthBar}>
+          <View style={[styles.monthBar, compact && styles.monthBarCompact]}>
             <Pressable onPress={() => setMonth(shiftMonth(month, -1))} style={styles.monthButton}><Text style={styles.monthArrow}>‹</Text><Text style={styles.monthButtonLabel}>السابق</Text></Pressable>
             <View style={styles.monthCenter}><Text style={styles.monthKicker}>PAYSLIP PERIOD</Text><Text style={styles.monthTitle}>{monthLabel(month)}</Text></View>
             <Pressable onPress={() => setMonth(shiftMonth(month, 1))} style={styles.monthButton}><Text style={styles.monthButtonLabel}>التالي</Text><IconSymbol name="arrow.right" size={16} color="#163A63" /></Pressable>
           </View>
-          <View style={styles.kpiGrid}><Kpi label="إجمالي المستحقات" value={formatMoney(gross)} /><Kpi label="إجمالي الخصومات" value={formatMoney(deductions)} /><Kpi label="الأوفر تايم" value={formatMoney(p?.overtime ?? payroll.overtimeValue)} /></View>
+          <View style={[styles.kpiGrid, compact && styles.kpiGridCompact]}><Kpi label="إجمالي المستحقات" value={formatMoney(gross)} /><Kpi label="إجمالي الخصومات" value={formatMoney(deductions)} /><Kpi label="الأوفر تايم" value={formatMoney(p?.overtime ?? payroll.overtimeValue)} /></View>
           <Section title="قسيمة الراتب" subtitle="تفصيل كامل للمستحقات والخصومات والتأمين والضريبة" />
           <View style={styles.detailCard}>
             <Row label="الراتب الأساسي" value={formatMoney(p?.baseSalary ?? employee.baseSalary)} />
@@ -162,20 +164,20 @@ export default function PayrollScreen() {
           <View style={styles.heroIcon}><IconSymbol name="banknote" size={25} color="#FFFFFF" /></View>
         </View>
 
-        <View style={styles.monthBar}>
+        <View style={[styles.monthBar, compact && styles.monthBarCompact]}>
           <Pressable onPress={() => setMonth(shiftMonth(month, -1))} style={styles.monthButton}><Text style={styles.monthArrow}>‹</Text><Text style={styles.monthButtonLabel}>السابق</Text></Pressable>
           <View style={styles.monthCenter}><Text style={styles.monthKicker}>PAYROLL PERIOD</Text><Text style={styles.monthTitle}>{monthLabel(month)}</Text><Text style={styles.monthHint}>السابق ←  الشهر الحالي  → التالي</Text></View>
           <Pressable onPress={() => setMonth(shiftMonth(month, 1))} style={styles.monthButton}><Text style={styles.monthButtonLabel}>التالي</Text><IconSymbol name="arrow.right" size={16} color="#163A63" /></Pressable>
         </View>
 
-        <View style={styles.kpiGrid}>
+        <View style={[styles.kpiGrid, compact && styles.kpiGridCompact]}>
           <Kpi label="إجمالي قبل الخصم" value={formatMoney(stats.gross)} />
           <Kpi label="الخصومات" value={formatMoney(stats.deductions)} />
           <Kpi label="صافي المسير" value={formatMoney(stats.net)} />
           <Kpi label="تم اعتمادهم" value={String(stats.approved)} />
         </View>
 
-        <View style={styles.approvalCard}><View style={styles.approvalTop}><View><Text style={styles.approvalTitle}>جاهزية المسير</Text><Text style={styles.approvalText}>{stats.approved} من {rows.length} موظف تم اعتمادهم</Text></View><Text style={styles.approvalPercent}>{rows.length ? Math.round((stats.approved / rows.length) * 100) : 0}%</Text></View><View style={styles.progressTrack}><View style={[styles.progressFill,{width:`${rows.length ? Math.round((stats.approved / rows.length) * 100) : 0}%`}]} /></View></View><View style={styles.actionCard}>
+        <View style={styles.approvalCard}><View style={styles.approvalTop}><View><Text style={styles.approvalTitle}>جاهزية المسير</Text><Text style={styles.approvalText}>{stats.approved} من {rows.length} موظف تم اعتمادهم</Text></View><Text style={styles.approvalPercent}>{rows.length ? Math.round((stats.approved / rows.length) * 100) : 0}%</Text></View><View style={styles.progressTrack}><View style={[styles.progressFill,{width:`${rows.length ? Math.round((stats.approved / rows.length) * 100) : 0}%`}]} /></View></View><View style={[styles.actionCard, compact && styles.actionCardCompact]}>
           <View style={styles.actionCopy}><Text style={styles.actionTitle}>تشغيل مسير الشهر</Text><Text style={styles.actionText}>إعادة حساب الرواتب بناءً على الحضور والتأخير والغياب.</Text></View>
           <Pressable
             disabled={generate.isPending || updateStaff.isPending}
@@ -193,7 +195,7 @@ export default function PayrollScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.insightGrid}>
+        <View style={[styles.insightGrid, compact && styles.insightGridCompact]}>
           <Insight title="تعديلات الشهر" value={String(adjustments.data?.length ?? 0)} meta="حوافز / خصومات" />
           <Insight title="السلف النشطة" value={String((advances.data ?? []).filter(a => a.status === "active").length)} meta="حسابات مفتوحة" />
           <Insight title="المتبقي من السلف" value={formatMoney((advances.data ?? []).filter(a => a.status === "active").reduce((s, a) => s + a.remainingAmount, 0))} meta="إجمالي المتبقي" />
@@ -208,7 +210,7 @@ export default function PayrollScreen() {
           <Section title="موظفو المسير" subtitle={filteredRows.length + " موظف ظاهر في العرض"} />
         </View>
 
-        <View style={styles.table}><View style={styles.tableHeader}><Text style={styles.tableHeaderText}>الحالة</Text><Text style={styles.tableHeaderText}>صافي الراتب</Text><Text style={[styles.tableHeaderText,{flex:1}]}>الموظف</Text></View>
+        <View style={styles.table}><View style={[styles.tableHeader, compact && styles.tableHeaderCompact]}><Text style={styles.tableHeaderText}>الحالة</Text><Text style={styles.tableHeaderText}>صافي الراتب</Text><Text style={[styles.tableHeaderText,{flex:1}]}>الموظف</Text></View>
           {filteredRows.length === 0 && salaryRows.length === 0 ? (
             <View style={styles.empty}><IconSymbol name="banknote" size={25} color="#A1ACBA" /><Text style={styles.emptyTitle}>لا توجد بيانات موظفين</Text><Text style={styles.emptyText}>لم تصل بيانات الاستاف. افتح إدارة الموظفين وتأكد من وجود الموظفين.</Text></View>
           ) : (
@@ -221,17 +223,17 @@ export default function PayrollScreen() {
             const gross = r.grossSalary;
             const isSelected = String(selectedRowId) === String(r.id);
             return (
-              <View key={r.id} style={[styles.employeeRow, isSelected && styles.employeeRowSelected]}>
+              <View key={r.id} style={[styles.employeeRow, compact && styles.employeeRowCompact, isSelected && styles.employeeRowSelected]}>
                 <View style={styles.avatar}><Text style={styles.avatarText}>{String(r.staffAccountId).slice(-2)}</Text></View>
-                <Pressable onPress={() => setSelectedRowId(r.id)} style={styles.employeeCopy}>
+                <Pressable onPress={() => setSelectedRowId(r.id)} style={[styles.employeeCopy, compact && styles.employeeCopyCompact]}>
                   <Text style={styles.employeeName}>{payrollStaffMembers.find(s => String(s.id) === String(r.staffAccountId))?.name ?? (String(employee.id) === String(r.staffAccountId) ? employee.name : `موظف #${r.staffAccountId}`)}</Text>
                   <Text style={styles.employeeMeta}>{staffMembers.find(s => String(s.id) === String(r.staffAccountId))?.title ?? (String(employee.id) === String(r.staffAccountId) ? employee.title : "موظف")} · إجمالي {formatMoney(gross)} · خصومات {formatMoney(deductions)}</Text>
                 </Pressable>
-                <Pressable onPress={() => setSelectedRowId(r.id)} style={styles.netBox}><Text style={styles.netLabel}>الصافي</Text><Text style={styles.netValue}>{formatMoney(r.netSalary)}</Text><StatusBadge label={r.status === "approved" ? "معتمد" : "مسودة"} tone={r.status === "approved" ? "success" : "warning"} /><Text style={styles.viewSalary}>عرض الراتب</Text></Pressable>
+                <Pressable onPress={() => setSelectedRowId(r.id)} style={[styles.netBox, compact && styles.netBoxCompact]}><Text style={styles.netLabel}>الصافي</Text><Text style={styles.netValue}>{formatMoney(r.netSalary)}</Text><StatusBadge label={r.status === "approved" ? "معتمد" : "مسودة"} tone={r.status === "approved" ? "success" : "warning"} /><Text style={styles.viewSalary}>عرض الراتب</Text></Pressable>
                 <Pressable
                   disabled={approve.isPending || unapprove.isPending}
                   onPress={() => r.status === "approved" ? unapprove.mutate({ id: r.id }) : approve.mutate({ id: r.id })}
-                  style={[styles.approveButton, r.status === "approved" && styles.approvedButton]}
+                  style={[styles.approveButton, compact && styles.approveButtonCompact, r.status === "approved" && styles.approvedButton]}
                 >
                   <Text style={[styles.approveText, r.status === "approved" && styles.unapproveText]}>{r.status === "approved" ? "إلغاء الاعتماد" : "اعتماد"}</Text>
                 </Pressable>
@@ -239,7 +241,7 @@ export default function PayrollScreen() {
             );
           })}
               {salaryRows.filter(s => !rows.some(r => String(r.staffAccountId) === String(s.id))).map(s => (
-                <View key={`salary-${s.id}`} style={styles.employeeRow}>
+                <View key={`salary-${s.id}`} style={[styles.employeeRow, compact && styles.employeeRowCompact]}>
                   <View style={styles.avatar}><Text style={styles.avatarText}>{s.initials || String(s.id).slice(-2)}</Text></View>
                   <View style={styles.employeeCopy}>
                     <Text style={styles.employeeName}>{s.name}</Text>
@@ -258,12 +260,12 @@ export default function PayrollScreen() {
           const deductions = selected.employeeSocialInsurance + selected.employeeIncomeTax + selected.absenceDeduction + selected.lateDeduction + selected.otherDeductions + selected.advances;
           return (
             <View style={styles.selectedCard}>
-              <View style={styles.selectedHeader}>
+              <View style={[styles.selectedHeader, compact && styles.selectedHeaderCompact]}>
                 <View style={styles.profileIdentity}><View style={styles.profileAvatar}><Text style={styles.profileAvatarText}>{String(selected.staffAccountId).slice(-2)}</Text></View><View><Text style={styles.selectedKicker}>EMPLOYEE PAYSLIP · {monthLabel(month)}</Text><Text style={styles.selectedTitle}>{payrollStaffMembers.find(s => String(s.id) === String(selected.staffAccountId))?.name ?? `موظف #${selected.staffAccountId}`}</Text><Text style={styles.profileMeta}>{payrollStaffMembers.find(s => String(s.id) === String(selected.staffAccountId))?.title ?? "موظف"} · رقم الموظف #{selected.staffAccountId}</Text></View></View>
                 <Pressable onPress={() => setSelectedRowId(null)} style={styles.closeSelected}><Text style={styles.closeSelectedText}>×</Text></Pressable>
               </View>
               <View style={styles.netHero}><View><Text style={styles.netHeroLabel}>صافي الراتب</Text><Text style={styles.netHeroValue}>{formatMoney(selected.netSalary)}</Text></View><StatusBadge label={selected.status === "approved" ? "معتمد" : "مسودة"} tone={selected.status === "approved" ? "success" : "warning"} /></View>
-              <View style={styles.selectedGrid}>
+              <View style={[styles.selectedGrid, compact && styles.selectedGridCompact]}>
                 <Kpi label="الأساسي" value={formatMoney(selected.baseSalary)} />
                 <Kpi label="البدلات" value={formatMoney(selected.allowances)} />
                 <Kpi label="المكافآت" value={formatMoney(selected.bonuses)} />
@@ -276,7 +278,7 @@ export default function PayrollScreen() {
                 <Kpi label="السلف" value={formatMoney(selected.advances)} />
                 <Kpi label="الصافي" value={formatMoney(selected.netSalary)} />
               </View>
-              <View style={styles.payslipActions}>
+              <View style={[styles.payslipActions, compact && styles.payslipActionsCompact]}>
                 <Pressable onPress={() => setPrintPayrollId(selected.id)} style={styles.printButton}><IconSymbol name="banknote" size={16} color="#FFFFFF" /><Text style={styles.printText}>طباعة / حفظ PDF</Text></Pressable>
                 <StatusBadge label={selected.status === "approved" ? "معتمد" : "مسودة"} tone={selected.status === "approved" ? "success" : "warning"} />
               </View>
@@ -315,4 +317,11 @@ const styles = StyleSheet.create({
   sectionHeader:{gap:10},section:{},sectionTitle:{color:"#172033",fontSize:16,fontWeight:"900",textAlign:"right"},sectionSubtitle:{color:"#98A6B8",fontSize:9,textAlign:"right",marginTop:3},filters:{flexDirection:"row-reverse",gap:7},filter:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E1E7ED",borderRadius:10,paddingHorizontal:12,paddingVertical:8},filterActive:{backgroundColor:"#163A63",borderColor:"#163A63"},filterText:{color:"#667085",fontSize:9,fontWeight:"800"},filterTextActive:{color:"#FFFFFF"},
   tableHeader:{display:"flex",flexDirection:"row-reverse",alignItems:"center",gap:10,paddingHorizontal:12,paddingVertical:10,backgroundColor:"#F8FAFC",borderBottomWidth:1,borderBottomColor:"#E5EAF0"},tableHeaderText:{color:"#98A6B8",fontSize:8,fontWeight:"900",textAlign:"right",minWidth:80},table:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,overflow:"hidden"},salaryNotice:{backgroundColor:"#F3F8FD",borderBottomWidth:1,borderBottomColor:"#D9E9F7",padding:14},salaryNoticeTitle:{color:"#163A63",fontSize:12,fontWeight:"900",textAlign:"right"},salaryNoticeText:{color:"#667085",fontSize:9,lineHeight:16,textAlign:"right",marginTop:4},employeeRow:{minHeight:88,padding:12,flexDirection:"row-reverse",alignItems:"center",gap:10,borderBottomWidth:1,borderBottomColor:"#EEF1F4"},employeeRowSelected:{backgroundColor:"#F1F7FD",borderColor:"#BFD8EE"},avatar:{width:38,height:38,borderRadius:12,backgroundColor:"#EAF1F8",alignItems:"center",justifyContent:"center"},avatarText:{color:"#31577F",fontSize:10,fontWeight:"900"},employeeCopy:{flex:1,paddingVertical:4},employeeName:{color:"#172033",fontSize:11,fontWeight:"900",textAlign:"right"},employeeMeta:{color:"#98A6B8",fontSize:8,textAlign:"right",marginTop:4},netBox:{minWidth:110,alignItems:"flex-end"},netLabel:{color:"#98A6B8",fontSize:8},netValue:{color:"#163A63",fontSize:12,fontWeight:"900",marginTop:2},approveButton:{backgroundColor:"#163A63",borderRadius:10,paddingHorizontal:12,paddingVertical:9},approvedButton:{backgroundColor:"#EAF8F1"},approveText:{color:"#FFFFFF",fontSize:9,fontWeight:"900"},viewSalary:{color:"#1677D2",fontSize:7,fontWeight:"900",marginTop:3},selectedCard:{backgroundColor:"#FFFFFF",borderWidth:2,borderColor:"#163A63",borderRadius:20,padding:16,gap:10},selectedHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},profileIdentity:{flexDirection:"row-reverse",alignItems:"center",gap:10,flex:1},profileAvatar:{width:46,height:46,borderRadius:15,backgroundColor:"#EAF1F8",alignItems:"center",justifyContent:"center"},profileAvatarText:{color:"#163A63",fontSize:12,fontWeight:"900"},profileMeta:{color:"#98A6B8",fontSize:8,textAlign:"right",marginTop:3},netHero:{backgroundColor:"#102A47",borderRadius:16,padding:16,flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",marginTop:2},netHeroLabel:{color:"#9EB3C7",fontSize:9,fontWeight:"800",textAlign:"right"},netHeroValue:{color:"#FFFFFF",fontSize:25,fontWeight:"900",textAlign:"right",marginTop:4},selectedKicker:{color:"#7B8798",fontSize:8,fontWeight:"900",textAlign:"right"},selectedTitle:{color:"#172033",fontSize:15,fontWeight:"900",textAlign:"right",marginTop:3},closeSelected:{width:32,height:32,borderRadius:10,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},closeSelectedText:{color:"#667085",fontSize:22,lineHeight:24},selectedGrid:{flexDirection:"row-reverse",gap:8,flexWrap:"wrap"},empty:{padding:35,alignItems:"center"},emptyTitle:{color:"#172033",fontSize:13,fontWeight:"900",marginTop:9},emptyText:{color:"#98A6B8",fontSize:9,marginTop:4},
   detailCard:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,padding:16},row:{flexDirection:"row-reverse",justifyContent:"space-between",paddingVertical:12,borderBottomWidth:1,borderBottomColor:"#F1F4F7"},rowLabel:{color:"#667085",fontSize:10},rowValue:{color:"#172033",fontSize:11,fontWeight:"800"},rowStrong:{color:"#163A63",fontSize:14},statusCard:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,padding:15,flexDirection:"row-reverse",alignItems:"center",gap:10},statusIcon:{width:40,height:40,borderRadius:12,backgroundColor:"#EEF6FF",alignItems:"center",justifyContent:"center"},statusCopy:{flex:1},statusTitle:{color:"#172033",fontSize:11,fontWeight:"900",textAlign:"right"},statusText:{color:"#667085",fontSize:9,lineHeight:16,textAlign:"right",marginTop:3},state:{flex:1,alignItems:"center",justifyContent:"center",gap:12},stateText:{color:"#667085",fontSize:11}
+  monthBarCompact:{flexDirection:"column",gap:8},\
+  kpiGridCompact:{flexDirection:"column"},\
+  actionCardCompact:{flexDirection:"column",alignItems:"stretch"},\
+  insightGridCompact:{flexDirection:"column"},\
+  tableHeaderCompact:{display:"none"},\
+  employeeRowCompact:{flexDirection:"column",alignItems:"stretch",gap:9},employeeCopyCompact:{width:"100%"},netBoxCompact:{width:"100%",alignItems:"flex-end"},approveButtonCompact:{alignSelf:"stretch",alignItems:"center"},\
+  selectedHeaderCompact:{alignItems:"flex-start"},selectedGridCompact:{flexDirection:"column"},payslipActionsCompact:{flexDirection:"column",alignItems:"stretch"},
 });
