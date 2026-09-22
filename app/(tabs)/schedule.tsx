@@ -9,9 +9,21 @@ const dayNames = ["الأحد","الاثنين","الثلاثاء","الأربع
 
 function dateKey(date: Date) { return date.toISOString().slice(0, 10); }
 function makeWeek() {
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const saturdayOffset = (today.getDay() + 1) % 7;
+  const saturday = new Date(today);
+  saturday.setDate(today.getDate() - saturdayOffset);
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + i);
-    return { key: dateKey(d), label: i === 0 ? "اليوم" : dayNames[d.getDay()], date: new Intl.DateTimeFormat("ar-EG", { day: "numeric", month: "short" }).format(d), day: d.getDate() };
+    const d = new Date(saturday);
+    d.setDate(saturday.getDate() + i);
+    return {
+      key: dateKey(d),
+      label: dayNames[d.getDay()],
+      date: new Intl.DateTimeFormat("ar-EG", { day: "numeric", month: "short" }).format(d),
+      day: d.getDate(),
+      isToday: dateKey(d) === dateKey(today),
+    };
   });
 }
 function findSchedule(entries: ScheduleEntry[], staffId: string, day: string) {
@@ -79,8 +91,8 @@ export default function ScheduleScreen() {
 
         <View style={styles.hero}>
           <View style={styles.heroTop}>
-            <View style={styles.weekPill}><Text style={styles.weekPillText}>هذا الأسبوع</Text></View>
-            <View><Text style={styles.heroKicker}>WEEKLY ROSTER</Text><Text style={styles.heroTitle}>{role === "manager" ? "خطة تشغيل الفريق" : "خطة عملك"}</Text></View>
+            <View style={styles.weekPill}><Text style={styles.weekPillText}>السبت → الجمعة</Text></View>
+            <View><Text style={styles.heroKicker}>WEEKLY ROSTER · SAT → FRI</Text><Text style={styles.heroTitle}>{role === "manager" ? "خطة تشغيل الفريق" : "خطة عملك"}</Text></View>
           </View>
           <View style={styles.heroStats}>
             <View><Text style={styles.heroStatValue}>{stats.total}</Text><Text style={styles.heroStatLabel}>مجدول</Text></View>
@@ -124,7 +136,7 @@ export default function ScheduleScreen() {
               <View style={styles.gridRow}>
                 {role === "manager" && <View style={[styles.nameHeader, styles.corner]}><Text style={styles.nameHeaderText}>الموظف</Text></View>}
                 {week.map(d => (
-                  <Pressable key={d.key} onPress={() => role === "manager" && setSelectedDay(d.key)} style={[styles.dayHeader, d.key === week[0].key && styles.dayHeaderToday, d.key === selectedDay && role === "manager" && styles.dayHeaderSelected]}>
+                  <Pressable key={d.key} onPress={() => role === "manager" && setSelectedDay(d.key)} style={[styles.dayHeader, d.isToday && styles.dayHeaderToday, d.key === selectedDay && role === "manager" && styles.dayHeaderSelected]}>
                     <Text style={styles.dayHeaderLabel}>{d.label}</Text>
                     <Text style={styles.dayHeaderDate}>{d.day}</Text>
                   </Pressable>
