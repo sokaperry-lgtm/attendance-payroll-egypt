@@ -58,6 +58,11 @@ export default function ScheduleScreen() {
   const [saving, setSaving] = useState(false);
   const weekRange = `${week[0]?.date ?? ""} — ${week[6]?.date ?? ""}`;
   const visible = role === "manager" ? teamSchedules : schedules;
+  const weekDayStats = useMemo(() => week.map((day) => ({
+    ...day,
+    scheduled: visible.filter((entry) => entry.scheduleDate === day.key).length,
+    off: visible.filter((entry) => entry.scheduleDate === day.key && entry.shift?.kind === "weekly_off").length,
+  })), [week, visible]);
   const member = staffMembers.find(m => m.id === selectedEmployee);
 
   const stats = useMemo(() => {
@@ -104,6 +109,16 @@ export default function ScheduleScreen() {
             <Text style={styles.weekNavText}>السابق</Text>
             <IconSymbol name="chevron.right" size={17} color="#163A63" />
           </Pressable>
+        </View>
+
+        <View style={styles.dayStrip}>
+          {weekDayStats.map((day) => (
+            <Pressable key={day.key} onPress={() => role === "manager" && setSelectedDay(day.key)} style={[styles.dayMini, day.isToday && styles.dayMiniToday, day.key === selectedDay && role === "manager" && styles.dayMiniSelected]}>
+              <Text style={styles.dayMiniLabel}>{day.label.slice(0, 2)}</Text>
+              <Text style={styles.dayMiniDate}>{day.day}</Text>
+              <Text style={styles.dayMiniCount}>{day.scheduled} {day.scheduled === 1 ? "وردية" : "ورديات"}</Text>
+            </Pressable>
+          ))}
         </View>
 
         <View style={styles.hero}>
@@ -229,7 +244,7 @@ const styles = StyleSheet.create({
   weekCurrentButton:{flex:1.35,minHeight:52,backgroundColor:"#EEF5FB",borderWidth:1,borderColor:"#C9DCEC",borderRadius:15,alignItems:"center",justifyContent:"center",paddingHorizontal:8},
   weekCurrentText:{color:"#163A63",fontSize:11,fontWeight:"900"},
   weekRangeText:{color:"#667085",fontSize:9,marginTop:2,fontWeight:"700"},
-  header:{flexDirection:"row-reverse",alignItems:"center",gap:12},
+  dayStrip:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,padding:8,flexDirection:"row-reverse",gap:6},dayMini:{flex:1,minWidth:42,minHeight:68,borderRadius:12,backgroundColor:"#F7F9FC",alignItems:"center",justifyContent:"center",paddingVertical:7},dayMiniToday:{backgroundColor:"#EEF6FF",borderWidth:1,borderColor:"#C7DFF5"},dayMiniSelected:{backgroundColor:"#DDEEFF",borderWidth:1,borderColor:"#76A9D8"},dayMiniLabel:{color:"#7B8798",fontSize:8,fontWeight:"800"},dayMiniDate:{color:"#172033",fontSize:15,fontWeight:"900",marginTop:2},dayMiniCount:{color:"#667085",fontSize:7,fontWeight:"700",marginTop:4},header:{flexDirection:"row-reverse",alignItems:"center",gap:12},
   headerIcon:{width:52,height:52,borderRadius:17,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},
   headerCopy:{flex:1},eyebrow:{color:"#7B8798",fontSize:9,fontWeight:"900",textAlign:"right",letterSpacing:1},title:{color:"#172033",fontSize:29,fontWeight:"900",textAlign:"right",marginTop:3},subtitle:{color:"#667085",fontSize:11,lineHeight:18,textAlign:"right",marginTop:4},
   hero:{backgroundColor:"#102A47",borderRadius:22,padding:18,gap:18},heroTop:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"flex-start"},weekPill:{backgroundColor:"#1D4268",borderRadius:10,paddingHorizontal:10,paddingVertical:6},weekPillText:{color:"#B9D9F5",fontSize:9,fontWeight:"900"},heroKicker:{color:"#8EA7BE",fontSize:8,fontWeight:"900",textAlign:"right",letterSpacing:1},heroTitle:{color:"#FFF",fontSize:19,fontWeight:"900",textAlign:"right",marginTop:4},heroStats:{flexDirection:"row-reverse",alignItems:"center",justifyContent:"space-between"},heroStatValue:{color:"#72B5EF",fontSize:21,fontWeight:"900",textAlign:"center"},heroStatLabel:{color:"#B8C9D8",fontSize:8,textAlign:"center",marginTop:3},heroDivider:{width:1,height:28,backgroundColor:"#2A4B69"},
