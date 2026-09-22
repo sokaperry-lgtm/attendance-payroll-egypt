@@ -574,8 +574,66 @@ export async function listCompanyRequests(staffAccountId:number) {
   const members=await db.select({staffAccountId:companyMembers.staffAccountId}).from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
   const ids=members.map(x=>x.staffAccountId);
   if(!ids.length) return [];
+  const staff=await db.select({id:staffAccounts.id,name:staffAccounts.name}).from(staffAccounts);
   const rows=await db.select().from(staffRequests).orderBy(desc(staffRequests.createdAt));
-  return rows.filter(r=>ids.includes(r.staffAccountId));
+  const penalties=await db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.companyId,m.companyId),eq(salaryAdjustments.type,"penalty"))).orderBy(desc(salaryAdjustments.createdAt));
+  const attendance=await db.select().from(attendanceRecords).orderBy(desc(attendanceRecords.date));
+  const regular=rows.filter(r=>ids.includes(r.staffAccountId)).map(r=>({
+    ...r,
+    source:"request",
+    staffName:staff.find(s=>s.id===r.staffAccountId)?.name ?? "موظف",
+    actionable:r.status==="قيد المراجعة"
+  }));
+  const exceptions:any[]=[];
+  for(const r of attendance.filter(a=>ids.includes(a.staffAccountId))){
+    const name=staff.find(s=>s.id===r.staffAccountId)?.name ?? "موظف";
+    if(Number(r.lateMinutes||0)>0) exceptions.push({
+      id:-1000000-r.id,
+      source:"attendance",
+      exceptionKind:"late",
+      staffAccountId:r.staffAccountId,
+      staffName:name,
+      type:"تأخير",
+      fromDate:r.date,
+      toDate:r.date,
+      reason:"تأخير "+r.lateMinutes+" دقيقة",
+      hours:null,
+      status:"يحتاج مراجعة",
+      createdAt:r.createdAt,
+      attendanceId:r.id,
+      actionable:true
+    });
+    if((r.note||"").includes("انصراف مبكر:")) exceptions.push({
+      id:-2000000-r.id,
+      source:"attendance",
+      exceptionKind:"early",
+      staffAccountId:r.staffAccountId,
+      staffName:name,
+      type:"انصراف مبكر",
+      fromDate:r.date,
+      toDate:r.date,
+      reason:(r.note||"").match(/انصراف مبكر:\\s*[^·]+/)?.[0] ?? "انصراف مبكر",
+      hours:null,
+      status:"يحتاج مراجعة",
+      createdAt:r.createdAt,
+      attendanceId:r.id,
+      actionable:true
+    });
+  }
+  const penaltyRows=penalties.filter(p=>ids.includes(p.staffAccountId)).map(p=>({
+    ...p,
+    id:-3000000-p.id,
+    source:"penalty",
+    adjustmentId:p.id,
+    staffName:staff.find(s=>s.id===p.staffAccountId)?.name ?? "موظف",
+    fromDate:p.month+"-01",
+    toDate:p.month+"-01",
+    type:"جزاء",
+    reason:p.title+(p.note?" · "+p.note:"")+" · "+p.amount.toLocaleString()+" جنيه",
+    status:"مخصوم",
+    actionable:true
+  }));
+  return [...regular,...exceptions,...penaltyRows].sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime());
 }
 
 export async function listAuditLogs(staffAccountId:number, limit=100) {
