@@ -446,6 +446,54 @@ export async function getPayrollPayslip(staffAccountId:number, payrollId:number)
   return { payroll, staff, company, branch, employeeId: staff.id, issuedAt: payroll.approvedAt ?? payroll.updatedAt ?? payroll.createdAt };
 }
 
+
+export async function unapprovePayroll(staffAccountId:number, id:number) {
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const m=await getCompanyForStaff(staffAccountId);
+  if(!m || !["owner","hr","accountant"].includes(m.role)) throw new Error("غير مصرح");
+  const current=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
+  if(!current) throw new Error("مسير الرواتب غير موجود.");
+  if(current.status!=="approved") return current;
+  await db.update(payrollRecords).set({status:"draft",approvedAt:null,updatedAt:new Date()}).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId)));
+  await writeAudit(staffAccountId,m.companyId,"payroll.unapproved","payroll",String(id),{month:current.month});
+  await createNotification(current.staffAccountId,"payroll","تم إلغاء اعتماد راتبك","تم فتح مسير راتب شهر "+current.month+" للمراجعة والتعديل.");
+  return (await db.select().from(payrollRecords).where(eq(payrollRecords.id,id)).limit(1))[0];
+}
+
+export async function waiveAttendanceException(actorId:number,input:{staffAccountId:number;date:string;kind:"late"|"early"}) {
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const m=await getCompanyForStaff(actorId);
+  if(!m || !["owner","hr","accountant","manager","supervisor"].includes(m.role)) throw new Error("غير مصرح");
+  await assertStaffInCompany(actorId,input.staffAccountId);
+  await assertPayrollEditable(actorId,input.date.slice(0,7));
+  const row=(await db.select().from(attendanceRecords).where(and(eq(attendanceRecords.staffAccountId,input.staffAccountId),eq(attendanceRecords.date,input.date))).limit(1))[0];
+  if(!row) throw new Error("سجل الحضور غير موجود.");
+  if(input.kind==="late" && Number(row.lateMinutes||0)<=0) throw new Error("لا يوجد تأخير على هذا اليوم.");
+  if(input.kind==="early" && !(row.note||"").includes("انصراف مبكر")) throw new Error("لا يوجد انصراف مبكر مسجل على هذا اليوم.");
+  const cleanedNote=(row.note||"").replace(/\\s*·\\s*انصراف مبكر:\\s*\\d+\\s*دقيقة/g,"").replace(/\\s*انصراف مبكر:\\s*\\d+\\s*دقيقة/g,"").trim();
+  await db.update(attendanceRecords).set({
+    lateMinutes: input.kind==="late" ? 0 : row.lateMinutes,
+    note: cleanedNote ? cleanedNote+" · تم إلغاء "+(input.kind==="late"?"التأخير":"الانصراف المبكر") : "تم إلغاء "+(input.kind==="late"?"التأخير":"الانصراف المبكر"),
+    updatedAt:new Date()
+  }).where(eq(attendanceRecords.id,row.id));
+  await writeAudit(actorId,m.companyId,"attendance.exception.waived","attendance",String(row.id),input);
+  await createNotification(input.staffAccountId,"attendance","تم إلغاء الخصم","تم إلغاء احتساب "+(input.kind==="late"?"التأخير":"الانصراف المبكر")+" ليوم "+input.date+".");
+  return (await db.select().from(attendanceRecords).where(eq(attendanceRecords.id,row.id)).limit(1))[0];
+}
+
+export async function cancelSalaryAdjustment(actorId:number,id:number) {
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const m=await getCompanyForStaff(actorId);
+  if(!m || !["owner","hr","accountant","manager"].includes(m.role)) throw new Error("غير مصرح");
+  const row=(await db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.id,id),eq(salaryAdjustments.companyId,m.companyId))).limit(1))[0];
+  if(!row) throw new Error("الجزاء غير موجود.");
+  await assertPayrollEditable(actorId,row.month);
+  await db.delete(salaryAdjustments).where(and(eq(salaryAdjustments.id,id),eq(salaryAdjustments.companyId,m.companyId)));
+  await writeAudit(actorId,m.companyId,"salary_adjustment.cancelled","salary_adjustment",String(id),{staffAccountId:row.staffAccountId,month:row.month,title:row.title,amount:row.amount});
+  await createNotification(row.staffAccountId,"payroll","تم إلغاء الجزاء","تم إلغاء الجزاء \""+row.title+"\" بقيمة "+row.amount.toLocaleString()+" جنيه.");
+  return {success:true};
+}
+
 export async function getPayroll(staffAccountId:number, month:string) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
