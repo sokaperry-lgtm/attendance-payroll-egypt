@@ -50,7 +50,7 @@ export default function RequestsScreen() {
         <View style={styles.absenceReviewBadge}><Text style={styles.absenceReviewBadgeText}>{pendingAbsenceReviews.length}</Text></View>
         <View style={styles.absenceReviewCopy}>
           <Text style={styles.absenceReviewTitle}>غياب يحتاج اعتمادك</Text>
-          <Text style={styles.absenceReviewText}>الغياب التلقائي لا يُخصم من راتب الموظف إلا بعد اعتمادك.</Text>
+          <Text style={styles.absenceReviewText}>الغياب التلقائي يدخل للمراجعة أولًا — أنت تقرر: يُعتمد كغياب أو يُستثنى من الغياب.</Text>
         </View>
         <IconSymbol name="person.crop.circle.badge.exclamationmark" size={25} color="#163A63" />
       </View>
@@ -61,7 +61,7 @@ export default function RequestsScreen() {
           <View style={styles.absenceReviewInfo}>
             <Text style={styles.absenceReviewName}>{item.staffName ?? "موظف"}</Text>
             <Text style={styles.absenceReviewDate}>{item.fromDate} · غياب تلقائي</Text>
-            <Text style={styles.absenceReviewHint}>القرار مطلوب قبل احتساب الخصم.</Text>
+            <Text style={styles.absenceReviewHint}>قرار المدير مطلوب قبل احتساب أي خصم من الراتب.</Text>
           </View>
           <View style={styles.absenceReviewActions}>
             <Pressable
@@ -71,7 +71,7 @@ export default function RequestsScreen() {
                   await reviewAttendanceException.mutateAsync({ staffAccountId: Number(item.staffAccountId), date: String(item.fromDate), kind: "absence", action: "approve" });
                   await managerAttendanceReview.refetch();
                   await refresh();
-                  showAlert("تم اعتماد الغياب", "سيتم احتساب خصم الغياب في المرتب.");
+                  showAlert("تم اعتماد كغياب", "سيتم احتساب خصم الغياب في المرتب.");
                 } catch (error) {
                   showAlert("تعذر اعتماد الغياب", error instanceof Error ? error.message : "حدث خطأ أثناء اعتماد الغياب.");
                 }
@@ -85,7 +85,7 @@ export default function RequestsScreen() {
                   await reviewAttendanceException.mutateAsync({ staffAccountId: Number(item.staffAccountId), date: String(item.fromDate), kind: "absence", action: "cancel" });
                   await managerAttendanceReview.refetch();
                   await refresh();
-                  showAlert("تم إلغاء الغياب", "لن يتم احتساب خصم الغياب لهذا اليوم.");
+                  showAlert("تم استثناء من الغياب", "لن يتم احتساب خصم الغياب لهذا اليوم.");
                 } catch (error) {
                   showAlert("تعذر إلغاء الغياب", error instanceof Error ? error.message : "حدث خطأ أثناء إلغاء الغياب.");
                 }
