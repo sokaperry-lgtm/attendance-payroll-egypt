@@ -37,7 +37,27 @@ function ManagerScreenContent() {
   const [teamSearch, setTeamSearch] = useState("");
   const [teamFilter, setTeamFilter] = useState<"all" | "active" | "inactive">("all");
   const [approvalBusy, setApprovalBusy] = useState<string | null>(null);
-  const payrollQuery = trpc.payroll.list.useQuery({ month: new Date().toISOString().slice(0, 7) }, { enabled: role === "manager", retry: false });
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const previousMonthDate = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+  const previousMonth = `${previousMonthDate.getFullYear()}-${String(previousMonthDate.getMonth() + 1).padStart(2, "0")}`;
+  const payrollQuery = trpc.payroll.list.useQuery({ month: currentMonth }, { enabled: role === "manager", retry: false });
+  const previousPayrollQuery = trpc.payroll.list.useQuery({ month: previousMonth }, { enabled: role === "manager", retry: false });
+  const currentPayrollNet = (payrollQuery.data ?? []).reduce((s,r)=>s+Number(r.netSalary||0),0);
+  const previousPayrollNet = (previousPayrollQuery.data ?? []).reduce((s,r)=>s+Number(r.netSalary||0),0);
+  const payrollChange = previousPayrollNet > 0 ? Math.round(((currentPayrollNet - previousPayrollNet) / previousPayrollNet) * 100) : null;
+  const overtimeCost = (payrollQuery.data ?? []).reduce((s,r)=>s+Number(r.overtime||0),0);
+  const overtimeShare = currentPayrollNet > 0 ? Math.min(100, Math.round((overtimeCost / currentPayrollNet) * 100)) : 0;
+  const attendanceTrend = useMemo(() => {
+    const grouped = new Map<string, { total:number; present:number }>();
+    records.forEach((r) => {
+      const key = String(r.date).slice(0,10);
+      const item = grouped.get(key) ?? { total:0, present:0 };
+      item.total += 1;
+      if (r.status === "حاضر" || r.status === "متأخر") item.present += 1;
+      grouped.set(key,item);
+    });
+    return Array.from(grouped.entries()).sort(([a],[b])=>a.localeCompare(b)).slice(-7).map(([date,v])=>({date,rate:v.total?Math.round(v.present/v.total*100):0}));
+  }, [records]);
   const pending = requests.filter((item) => item.status === "قيد المراجعة").length;
   const presentCount = records.filter((record) => record.status === "حاضر").length;
   const lateCount = records.filter((record) => record.status === "متأخر").length;
@@ -143,6 +163,22 @@ function ManagerScreenContent() {
         <View style={styles.departmentBars}>{Array.from(new Set(staffMembers.map(m=>m.department||"عام"))).slice(0,5).map(dept=>{const count=staffMembers.filter(m=>(m.department||"عام")===dept).length; const pct=Math.round((count/Math.max(staffMembers.length,1))*100); return <View key={dept} style={styles.departmentBarRow}><View style={styles.departmentBarTop}><Text style={styles.departmentBarName}>{dept}</Text><Text style={styles.departmentBarValue}>{count}</Text></View><View style={styles.departmentBarTrack}><View style={[styles.departmentBarFill,{width:pct+"%"}]}/></View></View>})}</View>
       </View>
     </View>
+    <View style={styles.executiveDeepGrid}>
+      <View style={styles.deepAnalyticsCard}>
+        <View style={styles.analyticsCardHead}><View><Text style={styles.analyticsCardTitle}>Month-over-Month</Text><Text style={styles.analyticsCardHint}>صافي الرواتب مقابل الشهر السابق</Text></View><Text style={styles.deepValue}>{payrollChange === null ? "—" : `${payrollChange > 0 ? "+" : ""}${payrollChange}%`}</Text></View>
+        <View style={styles.comparisonRow}><View><Text style={styles.comparisonValue}>{formatMoney(currentPayrollNet)}</Text><Text style={styles.comparisonLabel}>الشهر الحالي</Text></View><View style={styles.comparisonDivider}/><View><Text style={styles.comparisonValueMuted}>{formatMoney(previousPayrollNet)}</Text><Text style={styles.comparisonLabel}>الشهر السابق</Text></View></View>
+        <Text style={styles.comparisonHint}>{payrollChange === null ? "لا توجد بيانات شهر سابق للمقارنة." : payrollChange > 0 ? "ارتفاع في تكلفة صافي الرواتب مقارنة بالشهر السابق." : payrollChange < 0 ? "انخفاض في تكلفة صافي الرواتب مقارنة بالشهر السابق." : "التكلفة مستقرة مقارنة بالشهر السابق."}</Text>
+      </View>
+      <View style={styles.deepAnalyticsCard}>
+        <View style={styles.analyticsCardHead}><View><Text style={styles.analyticsCardTitle}>Payroll vs Overtime</Text><Text style={styles.analyticsCardHint}>نسبة تكلفة الأوفر تايم من صافي الرواتب</Text></View><Text style={styles.deepValue}>{overtimeShare}%</Text></View>
+        <View style={styles.analyticsBigTrack}><View style={[styles.analyticsBigFill,{width:overtimeShare+"%"}]}/></View>
+        <View style={styles.comparisonRow}><View><Text style={styles.comparisonValue}>{formatMoney(overtimeCost)}</Text><Text style={styles.comparisonLabel}>Overtime</Text></View><View><Text style={styles.comparisonValue}>{formatMoney(currentPayrollNet)}</Text><Text style={styles.comparisonLabel}>صافي الرواتب</Text></View></View>
+      </View>
+      <View style={styles.deepAnalyticsCard}>
+        <View style={styles.analyticsCardHead}><View><Text style={styles.analyticsCardTitle}>Attendance Trend</Text><Text style={styles.analyticsCardHint}>آخر 7 أيام متاحة</Text></View><Text style={styles.deepValue}>{attendanceTrend.length ? attendanceTrend[attendanceTrend.length-1].rate+"%" : "—"}</Text></View>
+        <View style={styles.trendBars}>{attendanceTrend.length ? attendanceTrend.map((item)=><View key={item.date} style={styles.trendColumn}><Text style={styles.trendValue}>{item.rate}%</Text><View style={styles.trendTrack}><View style={[styles.trendFill,{height:Math.max(8,item.rate)+"%"}]}/></View><Text style={styles.trendLabel}>{item.date.slice(8,10)}</Text></View>) : <Text style={styles.analyticsCardHint}>لا توجد بيانات كافية.</Text>}</View>
+      </View>
+    </View>
     <View style={styles.insightStrip}>
       <View style={styles.insightStripIcon}><IconSymbol name={absentCount>0?"person.fill.xmark":"checkmark"} size={17} color={absentCount>0?"#B42318":"#15803D"}/></View>
       <View style={styles.insightStripCopy}><Text style={styles.insightStripTitle}>{absentCount>0 ? "يوجد غياب يحتاج متابعة" : "الحضور مستقر اليوم"}</Text><Text style={styles.insightStripText}>{absentCount>0 ? absentCount+" موظف مسجل كغائب حاليًا. راجع السجلات قبل إغلاق اليوم." : "لا توجد حالات غياب مسجلة في البيانات الحالية."}</Text></View>
@@ -210,6 +246,21 @@ const styles = StyleSheet.create({
   analyticsMetricLabel:{color:"#667085",fontSize:10,fontWeight:"800",textAlign:"right"},
   analyticsMetricValue:{color:"#163A63",fontSize:20,fontWeight:"900",textAlign:"right",marginTop:7},
   analyticsMetricHint:{color:"#98A6B8",fontSize:9,textAlign:"right",marginTop:4},
+  executiveDeepGrid:{flexDirection:"row-reverse",gap:12,flexWrap:"wrap"},
+  deepAnalyticsCard:{flex:1,minWidth:260,backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E4E7EC",borderRadius:20,padding:16},
+  deepValue:{color:"#163A63",fontSize:22,fontWeight:"900"},
+  comparisonRow:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",gap:12,marginTop:18},
+  comparisonValue:{color:"#172033",fontSize:15,fontWeight:"900",textAlign:"right"},
+  comparisonValueMuted:{color:"#667085",fontSize:13,fontWeight:"800",textAlign:"right"},
+  comparisonLabel:{color:"#98A2B3",fontSize:9,marginTop:3,textAlign:"right"},
+  comparisonDivider:{width:1,height:34,backgroundColor:"#E4E7EC"},
+  comparisonHint:{color:"#667085",fontSize:10,lineHeight:16,textAlign:"right",marginTop:14},
+  trendBars:{height:120,flexDirection:"row-reverse",alignItems:"flex-end",justifyContent:"space-around",gap:6,marginTop:14},
+  trendColumn:{flex:1,height:"100%",alignItems:"center",justifyContent:"flex-end",gap:4},
+  trendValue:{color:"#667085",fontSize:8,fontWeight:"800"},
+  trendTrack:{height:82,width:18,backgroundColor:"#EEF4FB",borderRadius:8,justifyContent:"flex-end",overflow:"hidden"},
+  trendFill:{width:"100%",backgroundColor:"#1677D2",borderRadius:8},
+  trendLabel:{color:"#98A2B3",fontSize:8},
   analyticsGrid:{flexDirection:"row-reverse",gap:12,flexWrap:"wrap"},
   analyticsCard:{flex:1,minWidth:320,backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E4E7EC",borderRadius:19,padding:18},
   analyticsCardHead:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"flex-start"},
