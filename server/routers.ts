@@ -32,7 +32,8 @@ export const appRouter = router({
     login: publicProcedure.input(loginInput).mutation(async ({ ctx, input }) => {
       const staff = await db.authenticateStaff(input.phone, input.password);
       if (!staff) throw new Error("رقم الهاتف أو كلمة المرور غير صحيحة.");
-      await enterprise.ensureCompanyForStaff(staff.id);
+      const membership = await enterprise.ensureCompanyForStaff(staff.id);
+      await enterprise.writeAudit(staff.id, membership.companyId, "auth.login", "staff", String(staff.id), { role: staff.role });
       const token = await db.createStaffSession(staff.id);
       ctx.res.cookie(INTERNAL_SESSION_COOKIE, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
       return { token, staff: staffView(staff) };
@@ -41,6 +42,8 @@ export const appRouter = router({
       const authHeader = ctx.req.headers.authorization || ctx.req.headers.Authorization;
       const bearer = typeof authHeader === "string" && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
       const cookieToken = parseCookieHeader(ctx.req.headers.cookie ?? "")[INTERNAL_SESSION_COOKIE] ?? null;
+      const membership = await enterprise.getCompanyForStaff(ctx.staffUser.id);
+      if (membership) await enterprise.writeAudit(ctx.staffUser.id, membership.companyId, "auth.logout", "staff", String(ctx.staffUser.id));
       await db.deleteStaffSession(bearer || cookieToken);
       ctx.res.clearCookie(INTERNAL_SESSION_COOKIE, getSessionCookieOptions(ctx.req));
       return { success: true };
