@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Platform, useWindowDimensions } from "react-native";
+import { Platform, useWindowDimensions, View, Pressable } from "react-native";
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
@@ -19,6 +19,7 @@ function RoleAwareTabs() {
     const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { role } = useAppData();
+  const router = useRouter();
   const isDesktopWeb = Platform.OS === "web" && width >= 900;
 
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
@@ -39,6 +40,7 @@ function RoleAwareTabs() {
   const mobilePrimary = new Set(["index", "attendance", "requests", "notifications"]);
 
   return (
+      <View style={{ flex: 1 }}>
       <Tabs
         screenOptions={{
           tabBarPosition: isDesktopWeb ? "right" : "bottom",
@@ -104,5 +106,32 @@ function RoleAwareTabs() {
         <Tabs.Screen name="settings" options={{ title: "الإعدادات", href: mobile ? null : (manager ? "/settings" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="settings" color={color} /> }} />
         <Tabs.Screen name="logout" options={{ title: "تسجيل الخروج", href: mobile ? null : "/logout", tabBarIcon: ({ color }) => <IconSymbol size={23} name="logout" color={color} /> }} />
       </Tabs>
+      <Pressable
+        onPress={() => router.replace("/")}
+        accessibilityLabel="العودة للرئيسية"
+        style={({ pressed }) => ({
+          position: "absolute",
+          top: 14,
+          left: 14,
+          zIndex: 100,
+          width: 42,
+          height: 42,
+          borderRadius: 14,
+          backgroundColor: "#FFFFFF",
+          borderWidth: 1,
+          borderColor: "#E4E7EC",
+          alignItems: "center",
+          justifyContent: "center",
+          shadowColor: "#172033",
+          shadowOpacity: 0.08,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 4,
+          opacity: pressed ? 0.7 : 1,
+        })}
+      >
+        <IconSymbol name="arrow.left" size={19} color="#163A63" />
+      </Pressable>
+      </View>
   );
 }
