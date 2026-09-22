@@ -15,7 +15,7 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { summarizeAttendance, summarizeRequests } from "../lib/report-utils";
-import { companyMembers, salaryAdjustments, salaryAdvances, employeeDocuments, payrollRecords } from "../drizzle/schema";
+import { companyMembers, salaryAdjustments, salaryAdvances, employeeDocuments, payrollRecords, leaveBalances, notifications, subscriptions, auditLogs } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -74,6 +74,38 @@ export function verifyPassword(password: string, stored: string) {
 
 function hashSessionToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
+}
+
+export async function resetStaffAccountsAndCreateManager(input: { phone: string; password: string; name: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Destructive reset: remove all staff-owned data, memberships and sessions,
+  // while keeping the company/branch configuration intact.
+  await db.delete(auditLogs);
+  await db.delete(notifications);
+  await db.delete(payrollRecords);
+  await db.delete(leaveBalances);
+  await db.delete(salaryAdjustments);
+  await db.delete(salaryAdvances);
+  await db.delete(employeeDocuments);
+  await db.delete(weeklySchedules);
+  await db.delete(staffRequests);
+  await db.delete(attendanceRecords);
+  await db.delete(staffSessions);
+  await db.delete(companyMembers);
+  await db.delete(staffAccounts);
+
+  const staff = await createStaffAccount({
+    phone: input.phone,
+    password: input.password,
+    name: input.name,
+    role: "manager",
+    title: "مدير الشركة",
+  });
+  if (!staff) throw new Error("تعذر إنشاء حساب المدير الجديد.");
+
+  return staff;
 }
 
 export async function countStaffAccounts() {
