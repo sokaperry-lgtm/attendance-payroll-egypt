@@ -72,6 +72,7 @@ export default function PayrollScreen() {
   const updateStaff = trpc.staff.update.useMutation();
   const generate = trpc.payroll.generate.useMutation({ onSuccess: () => query.refetch() });
   const approve = trpc.payroll.approve.useMutation({ onSuccess: () => query.refetch() });
+  const unapprove = trpc.payroll.unapprove.useMutation({ onSuccess: () => query.refetch() });
   const adjustments = trpc.hrTools.adjustments.useQuery({ month }, { enabled: isAdmin });
   const advances = trpc.hrTools.advances.useQuery(undefined, { enabled: isAdmin });
   const selfService = trpc.selfService.me.useQuery({ month }, { enabled: !isAdmin });
@@ -227,7 +228,13 @@ export default function PayrollScreen() {
                   <Text style={styles.employeeMeta}>{staffMembers.find(s => String(s.id) === String(r.staffAccountId))?.title ?? (String(employee.id) === String(r.staffAccountId) ? employee.title : "موظف")} · إجمالي {formatMoney(gross)} · خصومات {formatMoney(deductions)}</Text>
                 </Pressable>
                 <Pressable onPress={() => setSelectedRowId(r.id)} style={styles.netBox}><Text style={styles.netLabel}>الصافي</Text><Text style={styles.netValue}>{formatMoney(r.netSalary)}</Text><StatusBadge label={r.status === "approved" ? "معتمد" : "مسودة"} tone={r.status === "approved" ? "success" : "warning"} /><Text style={styles.viewSalary}>عرض الراتب</Text></Pressable>
-                <Pressable disabled={r.status === "approved" || approve.isPending} onPress={() => approve.mutate({ id: r.id })} style={[styles.approveButton, r.status === "approved" && styles.approvedButton]}><Text style={styles.approveText}>{r.status === "approved" ? "✓" : "اعتماد"}</Text></Pressable>
+                <Pressable
+                  disabled={approve.isPending || unapprove.isPending}
+                  onPress={() => r.status === "approved" ? unapprove.mutate({ id: r.id }) : approve.mutate({ id: r.id })}
+                  style={[styles.approveButton, r.status === "approved" && styles.approvedButton]}
+                >
+                  <Text style={[styles.approveText, r.status === "approved" && styles.unapproveText]}>{r.status === "approved" ? "إلغاء الاعتماد" : "اعتماد"}</Text>
+                </Pressable>
               </View>
             );
           })}
