@@ -91,6 +91,7 @@ function RoleAwareTabs() {
         }}
       >
         <Tabs.Screen name="index" options={{ title: "الرئيسية", href: mobile && !mobilePrimary.has("index") ? null : "/", tabBarIcon: ({ color }) => <IconSymbol size={23} name="house.fill" color={color} /> }} />
+        <Tabs.Screen name="self-service" options={{ title: "ملفي", href: role === "employee" ? "/self-service" : null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="person.fill" color={color} /> }} />
         <Tabs.Screen name="notifications" options={{ title: "الإشعارات", href: mobile && !mobilePrimary.has("notifications") ? null : "/notifications", tabBarIcon: ({ color }) => <IconSymbol size={23} name="notifications" color={color} /> }} />
         <Tabs.Screen name="hr-tools" options={{ title: "HR Tools", href: mobile ? null : (manager ? "/hr-tools" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="banknote" color={color} /> }} />
         <Tabs.Screen name="attendance" options={{ title: "الحضور", href: mobile && !mobilePrimary.has("attendance") ? null : "/attendance", tabBarIcon: ({ color }) => <IconSymbol size={23} name="calendar" color={color} /> }} />
