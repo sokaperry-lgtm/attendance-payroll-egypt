@@ -56,6 +56,7 @@ export default function ScheduleScreen() {
   const [selectedEmployee, setSelectedEmployee] = useState(staffMembers[0]?.id ?? employee.id);
   const [selectedDay, setSelectedDay] = useState(week[0].key);
   const [saving, setSaving] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | "حاضر" | "متأخر" | "غياب" | "إجازة" | "فارغ">("all");
   const weekRange = `${week[0]?.date ?? ""} — ${week[6]?.date ?? ""}`;
   const visible = role === "manager" ? teamSchedules : schedules;
   const attendanceVisible = role === "manager" ? teamAttendance : records;
@@ -65,6 +66,26 @@ export default function ScheduleScreen() {
     off: visible.filter((entry) => entry.scheduleDate === day.key && entry.shift?.kind === "weekly_off").length,
   })), [week, visible]);
   const member = staffMembers.find(m => m.id === selectedEmployee);
+  const todayKeyValue = dateKey(new Date());
+  const workforceStats = useMemo(() => {
+    const people = role === "manager" ? staffMembers : [employee];
+    const cells = people.flatMap(person => week.map(day => ({ person, day, entry: findSchedule(visible, person.id, day.key), attendance: attendanceFor(person.id, day.key) })));
+    return {
+      scheduled: cells.filter(x => x.entry?.shift && x.entry.shift.kind !== "weekly_off").length,
+      present: cells.filter(x => x.attendance?.status === "حاضر").length,
+      late: cells.filter(x => x.attendance?.status === "متأخر").length,
+      absent: cells.filter(x => x.attendance?.status === "غياب").length,
+      leave: cells.filter(x => x.attendance?.status === "إجازة" || x.entry?.shift?.kind === "weekly_off").length,
+    };
+  }, [role, staffMembers, employee, week, visible, attendanceVisible]);
+  const statusCounts = { all: staffMembers.length * 7, حاضر: workforceStats.present, متأخر: workforceStats.late, غياب: workforceStats.absent, إجازة: workforceStats.leave, فارغ: Math.max(0, stats.open) };
+  const cellMatchesFilter = (personId: string, day: string, entry: ScheduleEntry | undefined) => {
+    if (statusFilter === "all") return true;
+    const attendance = attendanceFor(personId, day);
+    if (statusFilter === "فارغ") return !entry?.shift;
+    if (statusFilter === "إجازة") return attendance?.status === "إجازة" || entry?.shift?.kind === "weekly_off";
+    return attendance?.status === statusFilter;
+  };
 
   function attendanceFor(personId: string, day: string) {
     return attendanceVisible.find((record: any) => String(record.staffAccountId ?? (role === "employee" ? employee.id : "")) === personId && record.date === day);
@@ -134,6 +155,20 @@ export default function ScheduleScreen() {
           ))}
         </View>
 
+        {role === "manager" && <View style={styles.workforceSummary}>
+          <View style={styles.summaryTitleRow}><View><Text style={styles.sectionTitle}>ملخص التشغيل</Text><Text style={styles.sectionHint}>حالة الفريق خلال الأسبوع المحدد</Text></View><View style={styles.liveBadge}><View style={styles.liveDot} /><Text style={styles.liveText}>LIVE</Text></View></View>
+          <View style={styles.summaryGrid}>
+            {[{key:"scheduled",label:"أيام عمل",value:workforceStats.scheduled,bg:"#EEF6FF",color:"#1677D2"},{key:"present",label:"حاضر",value:workforceStats.present,bg:"#E7F7EF",color:"#08704A"},{key:"late",label:"متأخر",value:workforceStats.late,bg:"#FFF4DB",color:"#9A6400"},{key:"absent",label:"غياب",value:workforceStats.absent,bg:"#FFF0F0",color:"#9F2638"},{key:"leave",label:"إجازة",value:workforceStats.leave,bg:"#EAF3FF",color:"#2F6DB3"}].map(item => <View key={item.key} style={[styles.summaryCard,{backgroundColor:item.bg}]}><Text style={[styles.summaryValue,{color:item.color}]}>{item.value}</Text><Text style={[styles.summaryLabel,{color:item.color}]}>{item.label}</Text></View>)}
+          </View>
+        </View>}
+
+        {role === "manager" && <View style={styles.filterBar}>
+          <Text style={styles.filterTitle}>تصفية الجدول</Text>
+          <ScrollView horizontal inverted showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+            {(["all","حاضر","متأخر","غياب","إجازة","فارغ"] as const).map(filter => <Pressable key={filter} onPress={() => setStatusFilter(filter)} style={[styles.filterChip,statusFilter===filter&&styles.filterChipActive]}><Text style={[styles.filterChipText,statusFilter===filter&&styles.filterChipTextActive]}>{filter === "all" ? "الكل" : filter} · {statusCounts[filter]}</Text></Pressable>)}
+          </ScrollView>
+        </View>}
+
         <View style={styles.hero}>
           <View style={styles.heroTop}>
             <View style={styles.weekPill}><Text style={styles.weekPillText}>السبت → الجمعة</Text></View>
@@ -167,7 +202,7 @@ export default function ScheduleScreen() {
         )}
 
         <View style={styles.rosterCard}>
-          <View style={styles.rosterHeader}>
+          <View style={styles.rosterHeader}><View style={styles.attendanceLegend}><Text style={styles.legendTitle}>الحضور</Text>{[["#149A67","حاضر"],["#D58A00","متأخر"],["#D94A5B","غياب"],["#1677D2","إجازة"]].map(([color,label]) => <View key={label} style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:color}]} /><Text>{label}</Text></View>)}</View>
             <View style={styles.legend}>
               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#1677D2" }]} /><Text>وردية</Text></View>
               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#B7791F" }]} /><Text>إجازة</Text></View>
@@ -188,7 +223,7 @@ export default function ScheduleScreen() {
                 ))}
               </View>
 
-              {(role === "manager" ? staffMembers : [employee]).map(person => (
+              {(role === "manager" ? staffMembers : [employee]).filter(person => role !== "manager" || week.some(d => cellMatchesFilter(person.id, d.key, findSchedule(visible, person.id, d.key)))).map(person => (
                 <View key={person.id} style={styles.gridRow}>
                   {role === "manager" && (
                     <Pressable onPress={() => setSelectedEmployee(person.id)} style={[styles.nameCell, person.id === selectedEmployee && styles.nameCellSelected]}>
