@@ -929,6 +929,19 @@ export async function listEmployee360(actorId:number,targetId:number) {
     []
   );
 
+  const schedules = await safe(
+    db.select().from(weeklySchedules).where(eq(weeklySchedules.staffAccountId,targetId)).orderBy(desc(weeklySchedules.scheduleDate)),
+    []
+  );
+  const shifts = await safe(
+    db.select().from(shiftTemplates).where(eq(shiftTemplates.active,true)),
+    []
+  );
+  const employeeSchedules = schedules.map(row => ({
+    ...row,
+    shift: shifts.find(item => item.id === row.shiftTemplateId) ?? null,
+  }));
+
   const m=await getCompanyForStaff(actorId);
   const payroll = m ? await safe(
     db.select().from(payrollRecords)
@@ -937,5 +950,19 @@ export async function listEmployee360(actorId:number,targetId:number) {
     []
   ) : [];
 
-  return {staff,attendance,requests,adjustments,advances,documents,payroll};
+  const companyAudit = m ? await safe(
+    db.select().from(auditLogs)
+      .where(eq(auditLogs.companyId,m.companyId))
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(250),
+    []
+  ) : [];
+
+  const employeeAudit = companyAudit.filter((log:any) => {
+    if (String(log.entityId ?? "") === String(targetId)) return true;
+    const metadata = String(log.metadata ?? "");
+    return metadata.includes(`"staffAccountId":${targetId}`) || metadata.includes(`"staffAccountId": ${targetId}`);
+  });
+
+  return {staff,attendance,requests,adjustments,advances,documents,payroll,schedules:employeeSchedules,audit:employeeAudit};
 }
