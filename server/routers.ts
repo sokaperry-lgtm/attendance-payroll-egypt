@@ -147,6 +147,7 @@ export const appRouter = router({
       if (existing.status !== "قيد المراجعة") throw new Error("هذا الطلب تمت معالجته بالفعل.");
       if (input.status === "مقبول" && existing.type === "إجازة") await enterprise.consumeLeaveBalance(existing.staffAccountId, existing.fromDate, existing.toDate, "annual");
       if (input.status === "مقبول" && existing.type === "إجازة مرضية") await enterprise.consumeLeaveBalance(existing.staffAccountId, existing.fromDate, existing.toDate, "sick");
+      if (input.status === "مقبول" && existing.type === "إجازة طارئة") await enterprise.consumeLeaveBalance(existing.staffAccountId, existing.fromDate, existing.toDate, "emergency");
       const row = await db.approveRequest(input.id, ctx.staffUser.id, input.status);
       if (row) {
         await enterprise.createNotification(row.staffAccountId, "request", "تم تحديث طلبك", `حالة الطلب أصبحت: ${input.status}`);
