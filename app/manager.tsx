@@ -38,6 +38,7 @@ function ManagerScreenContent() {
   const [teamFilter, setTeamFilter] = useState<"all" | "active" | "inactive">("all");
   const [approvalBusy, setApprovalBusy] = useState<string | null>(null);
   const reviewAttendanceException = trpc.requests.reviewAttendanceException.useMutation();
+  const managerReviewQuery = trpc.requests.list.useQuery(undefined, { enabled: role === "manager", retry: false });
   const currentMonth = new Date().toISOString().slice(0, 7);
   const previousMonthDate = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
   const previousMonth = `${previousMonthDate.getFullYear()}-${String(previousMonthDate.getMonth() + 1).padStart(2, "0")}`;
@@ -59,8 +60,9 @@ function ManagerScreenContent() {
     });
     return Array.from(grouped.entries()).sort(([a],[b])=>a.localeCompare(b)).slice(-7).map(([date,v])=>({date,rate:v.total?Math.round(v.present/v.total*100):0}));
   }, [records]);
-  const pending = requests.filter((item) => item.status === "قيد المراجعة").length;
-  const pendingAbsences = requests.filter((item:any) => item.status === "قيد المراجعة" && item.source === "attendance" && item.exceptionKind === "absence");
+  const managerRequests = managerReviewQuery.data ?? [];
+  const pendingAbsences = managerRequests.filter((item:any) => item.status === "قيد المراجعة" && item.source === "attendance" && item.exceptionKind === "absence");
+  const pending = requests.filter((item) => item.status === "قيد المراجعة").length + pendingAbsences.length;
   const presentCount = records.filter((record) => record.status === "حاضر").length;
   const lateCount = records.filter((record) => record.status === "متأخر").length;
   const absentCount = records.filter((record) => record.status === "غياب").length;
@@ -215,8 +217,8 @@ function ManagerScreenContent() {
           <View style={styles.approvalCopy}><Text style={styles.approvalName}>{item.staffName ?? "موظف"}</Text><Text style={styles.approvalType}>{isAbsence ? "غياب يحتاج مراجعة" : item.type} · {item.from}{item.to !== item.from ? " — " + item.to : ""}</Text></View>
           <View style={styles.approvalActions}>
             {isAbsence ? <>
-              <Pressable disabled={approvalBusy === String(item.id)} onPress={async()=>{setApprovalBusy(String(item.id));try{await reviewAttendanceException.mutateAsync({staffAccountId:Number(item.staffAccountId),date:String(item.fromDate),kind:"absence",action:"approve"});await refresh();showAlert("تم اعتماد الغياب","تم تثبيت الغياب وسيُحتسب في مسير الراتب.");}catch(error){showAlert("تعذر اعتماد الغياب",error instanceof Error?error.message:"حدث خطأ.");}finally{setApprovalBusy(null);}}} style={styles.approveMini}><Text style={styles.approveMiniText}>اعتماد الغياب</Text></Pressable>
-              <Pressable disabled={approvalBusy === String(item.id)} onPress={async()=>{setApprovalBusy(String(item.id));try{await reviewAttendanceException.mutateAsync({staffAccountId:Number(item.staffAccountId),date:String(item.fromDate),kind:"absence",action:"cancel"});await refresh();showAlert("تم إلغاء الغياب","لن يتم احتساب خصم الغياب على الموظف.");}catch(error){showAlert("تعذر إلغاء الغياب",error instanceof Error?error.message:"حدث خطأ.");}finally{setApprovalBusy(null);}}} style={styles.rejectMini}><Text style={styles.rejectMiniText}>إلغاء الغياب</Text></Pressable>
+              <Pressable disabled={approvalBusy === String(item.id)} onPress={async()=>{setApprovalBusy(String(item.id));try{await reviewAttendanceException.mutateAsync({staffAccountId:Number(item.staffAccountId),date:String(item.fromDate),kind:"absence",action:"approve"});await managerReviewQuery.refetch();await refresh();showAlert("تم اعتماد الغياب","تم تثبيت الغياب وسيُحتسب في مسير الراتب.");}catch(error){showAlert("تعذر اعتماد الغياب",error instanceof Error?error.message:"حدث خطأ.");}finally{setApprovalBusy(null);}}} style={styles.approveMini}><Text style={styles.approveMiniText}>اعتماد الغياب</Text></Pressable>
+              <Pressable disabled={approvalBusy === String(item.id)} onPress={async()=>{setApprovalBusy(String(item.id));try{await reviewAttendanceException.mutateAsync({staffAccountId:Number(item.staffAccountId),date:String(item.fromDate),kind:"absence",action:"cancel"});await managerReviewQuery.refetch();await refresh();showAlert("تم إلغاء الغياب","لن يتم احتساب خصم الغياب على الموظف.");}catch(error){showAlert("تعذر إلغاء الغياب",error instanceof Error?error.message:"حدث خطأ.");}finally{setApprovalBusy(null);}}} style={styles.rejectMini}><Text style={styles.rejectMiniText}>إلغاء الغياب</Text></Pressable>
             </> : <>
               <Pressable disabled={approvalBusy === String(item.id)} onPress={async()=>{setApprovalBusy(String(item.id));try{await approveRequest(String(item.id),"مقبول");showAlert("تم الاعتماد","تم اعتماد الطلب وإبلاغ الموظف.");}catch(error){showAlert("تعذر الاعتماد",error instanceof Error?error.message:"حدث خطأ أثناء اعتماد الطلب.");}finally{setApprovalBusy(null);}}} style={styles.approveMini}><Text style={styles.approveMiniText}>اعتماد</Text></Pressable>
               <Pressable disabled={approvalBusy === String(item.id)} onPress={async()=>{setApprovalBusy(String(item.id));try{await approveRequest(String(item.id),"مرفوض");showAlert("تم الرفض","تم رفض الطلب وإبلاغ الموظف.");}catch(error){showAlert("تعذر الرفض",error instanceof Error?error.message:"حدث خطأ أثناء رفض الطلب.");}finally{setApprovalBusy(null);}}} style={styles.rejectMini}><Text style={styles.rejectMiniText}>رفض</Text></Pressable>
