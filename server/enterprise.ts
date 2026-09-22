@@ -225,7 +225,7 @@ export async function listCompanySchedules(staffAccountId: number) {
 export async function setMemberRole(actorId: number, staffAccountId: number, role: CompanyRole) {
   const db = await getDb(); if (!db) throw new Error("Database not available");
   const actor = await getCompanyForStaff(actorId);
-  if (!actor || actor.role !== "owner") throw new Error("غير مصرح");
+  if (!actor || !["owner","manager"].includes(actor.role)) throw new Error("غير مصرح");
 
   // Never allow privilege escalation through the membership role picker.
   // "owner" is reserved for the original tenant owner and cannot be assigned
