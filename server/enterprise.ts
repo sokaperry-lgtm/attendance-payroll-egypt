@@ -454,6 +454,23 @@ export async function unapprovePayroll(staffAccountId:number, id:number) {
   const current=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
   if(!current) throw new Error("مسير الرواتب غير موجود.");
   if(current.status!=="approved") return current;
+  if(Number(current.advances||0)>0){
+    const advances=await db.select().from(salaryAdvances).where(and(
+      eq(salaryAdvances.staffAccountId,current.staffAccountId),
+      eq(salaryAdvances.companyId,m.companyId)
+    )).orderBy(desc(salaryAdvances.createdAt));
+    let restore=Number(current.advances||0);
+    for(const advance of advances){
+      if(restore<=0) break;
+      const amount=Math.min(Number(current.advances||0),restore);
+      await db.update(salaryAdvances).set({
+        remainingAmount:Number(advance.remainingAmount)+amount,
+        status:"active",
+        updatedAt:new Date()
+      }).where(eq(salaryAdvances.id,advance.id));
+      restore-=amount;
+    }
+  }
   await db.update(payrollRecords).set({status:"draft",approvedAt:null,updatedAt:new Date()}).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId)));
   await writeAudit(staffAccountId,m.companyId,"payroll.unapproved","payroll",String(id),{month:current.month});
   await createNotification(current.staffAccountId,"payroll","تم إلغاء اعتماد راتبك","تم فتح مسير راتب شهر "+current.month+" للمراجعة والتعديل.");
