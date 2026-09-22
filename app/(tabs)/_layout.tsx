@@ -36,7 +36,7 @@ function RoleAwareTabs() {
   const manager = role === "manager";
   const teamAccess = role === "manager" || role === "supervisor";
   const mobile = Platform.OS !== "web" || width < 900;
-  const mobilePrimary = new Set(["index", "attendance", "requests", "notifications", ...(manager ? ["manager"] : [])]);
+  const mobilePrimary = new Set(["index", "attendance", "requests", "notifications"]);
 
   return (
       <Tabs
