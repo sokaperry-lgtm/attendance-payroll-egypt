@@ -24,20 +24,18 @@ export default function RequestsScreen() {
   const [selectedRequest, setSelectedRequest] = useState<(typeof requests)[number] | null>(null);
   const [activeFilter, setActiveFilter] = useState<"الكل" | "قيد المراجعة" | "مقبول" | "مرفوض">("الكل");
   const filteredRequests = requests.filter((request:any) => activeFilter === "الكل" || request.status === activeFilter);
-  const isOvertime = type === "أوفر تايم";\n  const isLeaveType = type === "إجازة" || type === "إجازة مرضية" || type === "إجازة طارئة";
+  const isLeaveType = type === "إجازة" || type === "إجازة مرضية" || type === "إجازة طارئة";
 
   async function saveRequest() {
     if (!reason.trim()) { showAlert("بيانات ناقصة", "اكتب سبب الطلب أولًا."); return; }
-    const hoursValue = Number(hours);
-    if (isOvertime && (!Number.isFinite(hoursValue) || hoursValue <= 0)) { showAlert("بيانات ناقصة", "اكتب عدد ساعات الأوفر تايم."); return; }
     try {
-      await submitRequest({ type, from, to: isOvertime ? from : to, reason, hours: isOvertime ? hoursValue : undefined });
+      await submitRequest({ type, from, to, reason });
     } catch (error) {
       showAlert("تعذر إرسال الطلب", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
       return;
     }
     setReason(""); setModalOpen(false);
-    showAlert("تم إرسال الطلب", isOvertime ? "سيظهر للمدير للموافقة قبل احتسابه في المرتب." : "سيظهر للمدير للمراجعة والاعتماد.");
+    showAlert("تم إرسال الطلب", "سيظهر للمدير للمراجعة والاعتماد.");
   }
 
   return <ScreenContainer><ScrollView contentContainerStyle={styles.content}>
@@ -84,7 +82,7 @@ export default function RequestsScreen() {
     {filteredRequests.length === 0 && <Text style={styles.empty}>{requests.length === 0 ? "لم ترسل أي طلبات بعد." : `لا توجد طلبات بحالة ${activeFilter}.`}</Text>}
   </ScrollView>
   <Modal visible={Boolean(selectedRequest)} transparent animationType="slide" onRequestClose={() => setSelectedRequest(null)}><View style={styles.modalBackdrop}><View style={styles.detailModal}><View style={styles.detailHead}><Text style={styles.detailTitle}>تفاصيل الطلب</Text><Pressable onPress={() => setSelectedRequest(null)}><Text style={styles.closeText}>إغلاق</Text></Pressable></View>{selectedRequest && <><Text style={styles.detailType}>{selectedRequest.type}</Text><Text style={styles.detailDates}>{selectedRequest.type === "أوفر تايم" ? `${selectedRequest.from} · ${selectedRequest.hours ?? 0} ساعة` : `${selectedRequest.from} إلى ${selectedRequest.to}`}</Text><View style={styles.detailStatus}><Text style={styles.detailStatusText}>{selectedRequest.status}</Text></View><Text style={styles.detailLabel}>سبب الطلب</Text><Text style={styles.detailReason}>{selectedRequest.reason}</Text><View style={styles.timeline}><Text style={styles.timelineTitle}>حالة المعالجة</Text><Text style={styles.timelineText}>{selectedRequest.status === "قيد المراجعة" ? "الطلب في انتظار مراجعة المدير." : selectedRequest.status === "مقبول" ? "تمت مراجعة الطلب واعتماده." : "تمت مراجعة الطلب ورفضه."}</Text></View></>}</View></View></Modal>
-  <Modal visible={modalOpen} transparent animationType="slide" onRequestClose={() => setModalOpen(false)}><View style={styles.modalBackdrop}><View style={styles.modal}><View style={styles.modalHeader}><Pressable onPress={() => setModalOpen(false)}><Text style={styles.close}>إلغاء</Text></Pressable><Text style={styles.modalTitle}>طلب جديد</Text></View><Text style={styles.fieldLabel}>نوع الطلب</Text><View style={styles.typeRow}>{(["إجازة", "إجازة مرضية", "إجازة طارئة", "إذن", "مأمورية", "أوفر تايم"] as RequestType[]).map((item) => <Pressable key={item} onPress={() => setType(item)} style={[styles.typeChip, type === item && styles.typeChipActive]}><Text style={[styles.typeChipText, type === item && styles.typeChipTextActive]}>{item}</Text></Pressable>)}</View><Text style={styles.fieldLabel}>{isOvertime ? "تاريخ اليوم" : "من"}</Text><TextInput value={from} onChangeText={setFrom} placeholder="YYYY-MM-DD" style={styles.input} />{isOvertime ? <><Text style={styles.fieldLabel}>عدد الساعات</Text><TextInput value={hours} onChangeText={setHours} placeholder="مثال: 2" keyboardType="numeric" style={styles.input} /></> : <><Text style={styles.fieldLabel}>إلى</Text><TextInput value={to} onChangeText={setTo} placeholder="YYYY-MM-DD" style={styles.input} /></>}<Text style={styles.fieldLabel}>السبب</Text><TextInput value={reason} onChangeText={setReason} placeholder="اكتب سبب الطلب" multiline style={[styles.input, styles.textArea]} /><Pressable onPress={saveRequest} style={styles.submitButton}><Text style={styles.submitText}>إرسال للمراجعة</Text></Pressable></View></View></Modal>
+  <Modal visible={modalOpen} transparent animationType="slide" onRequestClose={() => setModalOpen(false)}><View style={styles.modalBackdrop}><View style={styles.modal}><View style={styles.modalHeader}><Pressable onPress={() => setModalOpen(false)}><Text style={styles.close}>إلغاء</Text></Pressable><Text style={styles.modalTitle}>طلب جديد</Text></View><Text style={styles.fieldLabel}>نوع الطلب</Text><View style={styles.typeRow}>{(["إجازة", "إجازة مرضية", "إجازة طارئة", "إذن", "مأمورية"] as RequestType[]).map((item) => <Pressable key={item} onPress={() => setType(item)} style={[styles.typeChip, type === item && styles.typeChipActive]}><Text style={[styles.typeChipText, type === item && styles.typeChipTextActive]}>{item}</Text></Pressable>)}</View><Text style={styles.fieldLabel}>من</Text><TextInput value={from} onChangeText={setFrom} placeholder="YYYY-MM-DD" style={styles.input} /><Text style={styles.fieldLabel}>إلى</Text><TextInput value={to} onChangeText={setTo} placeholder="YYYY-MM-DD" style={styles.input} /><Text style={styles.fieldLabel}>السبب</Text><TextInput value={reason} onChangeText={setReason} placeholder="اكتب سبب الطلب" multiline style={[styles.input, styles.textArea]} /><Pressable onPress={saveRequest} style={styles.submitButton}><Text style={styles.submitText}>إرسال للمراجعة</Text></Pressable></View></View></Modal>
   </ScreenContainer>;
 }
 
