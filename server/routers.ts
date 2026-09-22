@@ -48,7 +48,15 @@ export const appRouter = router({
     }),
   }),
   auth: router({
-    me: publicProcedure.query(async ({ ctx }) => await staffView(ctx.staffUser)),
+    me: publicProcedure.query(async ({ ctx }) => {
+      if (!ctx.staffUser) return null;
+      // Self-heal the tenant membership before the client decides which
+      // admin tools to render. This also repairs older accounts created
+      // before company membership was introduced.
+      await enterprise.ensureCompanyForStaff(ctx.staffUser.id);
+      const freshStaff = await db.getStaffAccountById(ctx.staffUser.id);
+      return await staffView(freshStaff);
+    }),
     login: publicProcedure.input(loginInput).mutation(async ({ ctx, input }) => {
       const staff = await db.authenticateStaff(input.phone, input.password);
       if (!staff) throw new Error("رقم الهاتف أو كلمة المرور غير صحيحة.");
