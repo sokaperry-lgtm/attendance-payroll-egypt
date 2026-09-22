@@ -139,7 +139,7 @@ export default function SettingsScreen() {
         <View style={[styles.hero, compact && styles.heroCompact]}>
           <View style={styles.heroIcon}><IconSymbol name="building.2.fill" size={23} color="#FFFFFF"/></View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.heroTitle}>{overview.data?.company?.name ?? companyName || "الشركة"}</Text>
+            <Text style={styles.heroTitle}>{(overview.data?.company?.name ?? companyName) || "الشركة"}</Text>
             <Text style={styles.heroText}>لوحة تحكم متعددة الفروع · Egypt / EGP / Africa-Cairo</Text>
           </View>
           <View style={styles.heroStats}>
