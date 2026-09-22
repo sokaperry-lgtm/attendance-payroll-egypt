@@ -96,17 +96,120 @@ export async function getBranchForStaff(staffAccountId: number) {
   return (await db.select().from(branches).where(eq(branches.id, m.branchId)).limit(1))[0];
 }
 
+export async function getCompanyAdminOverview(staffAccountId: number) {
+  const db = await getDb(); if (!db) return null;
+  const m = await getCompanyForStaff(staffAccountId); if (!m) return null;
+  const company = (await db.select().from(companies).where(eq(companies.id, m.companyId)).limit(1))[0];
+  if (!company) return null;
+  const branchRows = await db.select().from(branches).where(eq(branches.companyId, m.companyId)).orderBy(desc(branches.createdAt));
+  const members = await db.select().from(companyMembers).where(and(eq(companyMembers.companyId, m.companyId), eq(companyMembers.active, true)));
+  return {
+    company,
+    branchCount: branchRows.length,
+    activeBranchCount: branchRows.filter(b => b.active).length,
+    employeeCount: members.length,
+  };
+}
+
 export async function listCompanyBranches(staffAccountId: number) {
   const db = await getDb(); if (!db) return [];
   const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
-  return db.select().from(branches).where(eq(branches.companyId, m.companyId)).orderBy(desc(branches.createdAt));
+  const rows = await db.select().from(branches).where(eq(branches.companyId, m.companyId)).orderBy(desc(branches.createdAt));
+  const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
+  const staff = await db.select({ id: staffAccounts.id, name: staffAccounts.name }).from(staffAccounts);
+  return rows.map(branch => {
+    const branchMembers = members.filter(member => member.branchId === branch.id && member.active);
+    const manager = branchMembers.find(member => member.role === "manager" || member.role === "owner");
+    return {
+      ...branch,
+      employeeCount: branchMembers.length,
+      managerName: manager ? (staff.find(s => s.id === manager.staffAccountId)?.name ?? null) : null,
+    };
+  });
+}
+
+export async function listCompanyMembers(staffAccountId: number) {
+  const db = await getDb(); if (!db) return [];
+  const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
+  const members = await db.select().from(companyMembers).where(and(eq(companyMembers.companyId, m.companyId), eq(companyMembers.active, true)));
+  const staff = await db.select({
+    id: staffAccounts.id, name: staffAccounts.name, phone: staffAccounts.phone,
+    title: staffAccounts.title, department: staffAccounts.department, role: staffAccounts.role, active: staffAccounts.active,
+  }).from(staffAccounts);
+  const branchRows = await db.select({ id: branches.id, name: branches.name, active: branches.active })
+    .from(branches).where(eq(branches.companyId, m.companyId));
+  return members.map(member => {
+    const person = staff.find(s => s.id === member.staffAccountId);
+    const branch = branchRows.find(b => b.id === member.branchId);
+    return person ? { ...person, membershipRole: member.role, branchId: member.branchId, branchName: branch?.name ?? null } : null;
+  }).filter(Boolean);
 }
 
 export async function createBranch(staffAccountId: number, input: { name: string; address: string; latitude: string; longitude: string; radiusMeters: number }) {
   const db = await getDb(); if (!db) throw new Error("Database not available");
-  const m = await getCompanyForStaff(staffAccountId); if (!m) throw new Error("Company not found");
-  const result = await db.insert(branches).values({ ...input, companyId: m.companyId });
-  return (await db.select().from(branches).where(eq(branches.id, Number(result[0].insertId))).limit(1))[0];
+  const m = await getCompanyForStaff(staffAccountId); if (!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
+  const name = input.name.trim();
+  const address = input.address.trim();
+  if (!name || !address) throw new Error("اسم الفرع والعنوان مطلوبان");
+  const result = await db.insert(branches).values({ ...input, name, address, companyId: m.companyId });
+  const branch = (await db.select().from(branches).where(eq(branches.id, Number(result[0].insertId))).limit(1))[0];
+  await writeAudit(staffAccountId, m.companyId, "branch.created", "branch", String(branch?.id ?? result[0].insertId), input);
+  return branch;
+}
+
+export async function updateBranch(staffAccountId: number, branchId: number, input: { name: string; address: string; latitude: string; longitude: string; radiusMeters: number }) {
+  const db = await getDb(); if (!db) throw new Error("Database not available");
+  const m = await getCompanyForStaff(staffAccountId); if (!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
+  const branch = (await db.select().from(branches).where(and(eq(branches.id, branchId), eq(branches.companyId, m.companyId))).limit(1))[0];
+  if (!branch) throw new Error("الفرع غير موجود");
+  await db.update(branches).set({ ...input, name: input.name.trim(), address: input.address.trim(), updatedAt: new Date() }).where(eq(branches.id, branchId));
+  await writeAudit(staffAccountId, m.companyId, "branch.updated", "branch", String(branchId), input);
+  return (await db.select().from(branches).where(eq(branches.id, branchId)).limit(1))[0];
+}
+
+export async function toggleBranch(staffAccountId: number, branchId: number, active: boolean) {
+  const db = await getDb(); if (!db) throw new Error("Database not available");
+  const m = await getCompanyForStaff(staffAccountId); if (!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
+  const branch = (await db.select().from(branches).where(and(eq(branches.id, branchId), eq(branches.companyId, m.companyId))).limit(1))[0];
+  if (!branch) throw new Error("الفرع غير موجود");
+  if (!active) {
+    const activeBranches = await db.select({ id: branches.id }).from(branches).where(and(eq(branches.companyId, m.companyId), eq(branches.active, true)));
+    if (activeBranches.length <= 1) throw new Error("لا يمكن إيقاف الفرع الوحيد النشط.");
+  }
+  await db.update(branches).set({ active, updatedAt: new Date() }).where(eq(branches.id, branchId));
+  await writeAudit(staffAccountId, m.companyId, active ? "branch.activated" : "branch.deactivated", "branch", String(branchId));
+  return (await db.select().from(branches).where(eq(branches.id, branchId)).limit(1))[0];
+}
+
+export async function assignMemberToBranch(actorId: number, staffAccountId: number, branchId: number | null) {
+  const db = await getDb(); if (!db) throw new Error("Database not available");
+  const m = await getCompanyForStaff(actorId); if (!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
+  const target = await getMembership(staffAccountId);
+  if (!target || target.companyId !== m.companyId || !target.active) throw new Error("الموظف غير موجود في الشركة");
+  if (branchId !== null) {
+    const branch = (await db.select().from(branches).where(and(eq(branches.id, branchId), eq(branches.companyId, m.companyId), eq(branches.active, true))).limit(1))[0];
+    if (!branch) throw new Error("الفرع غير موجود أو موقوف");
+  }
+  await db.update(companyMembers).set({ branchId, updatedAt: new Date() })
+    .where(and(eq(companyMembers.id, target.id), eq(companyMembers.companyId, m.companyId)));
+  await writeAudit(actorId, m.companyId, "member.branch_updated", "staff", String(staffAccountId), { branchId });
+  return getMembership(staffAccountId);
+}
+
+export async function updateCompanyProfile(staffAccountId: number, input: { name: string; legalName?: string; email?: string; phone?: string }) {
+  const db = await getDb(); if (!db) throw new Error("Database not available");
+  const m = await getCompanyForStaff(staffAccountId); if (!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
+  const name = input.name.trim();
+  if (!name) throw new Error("اسم الشركة مطلوب");
+  await db.update(companies).set({
+    name,
+    legalName: input.legalName?.trim() || null,
+    email: input.email?.trim() || null,
+    phone: input.phone?.trim() || null,
+    updatedAt: new Date(),
+  }).where(eq(companies.id, m.companyId));
+  await writeAudit(staffAccountId, m.companyId, "company.updated", "company", String(m.companyId), input);
+  return (await db.select().from(companies).where(eq(companies.id, m.companyId)).limit(1))[0];
 }
 
 export async function listCompanySchedules(staffAccountId: number) {
