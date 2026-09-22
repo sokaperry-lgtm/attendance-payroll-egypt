@@ -118,7 +118,7 @@ export default function AuditScreen() {
                 <View style={[styles.dot, { backgroundColor: actionTone(log.action) }]} />
                 <View style={styles.copy}>
                   <Text style={styles.action}>{actionLabel(log.action)}</Text>
-                  <Text style={styles.meta}>المستخدم #{log.staffAccountId}{log.entityId ? " · " + (log.entity ?? "عنصر") + " #" + log.entityId : ""}</Text>
+                  <Text style={styles.meta}>{log.staffName ? log.staffName : "المستخدم #" + log.staffAccountId}{log.entityId ? " · " + (log.entity ?? "عنصر") + " #" + log.entityId : ""}</Text>
                   <Text style={styles.time}>{new Date(log.createdAt).toLocaleString("ar-EG")}</Text>
                 </View>
               </View>
