@@ -652,9 +652,12 @@ export async function reviewAttendanceException(actorId:number,input:{staffAccou
   if(input.kind==="absence" && row.status!=="غياب") throw new Error("لا يوجد غياب على هذا اليوم.");
   const approvedMarker = "تم اعتماد "+(input.kind==="late"?"التأخير":input.kind==="early"?"الانصراف المبكر":"الغياب");
   const cancelledMarker = "تم إلغاء "+(input.kind==="late"?"التأخير":input.kind==="early"?"الانصراف المبكر":"الغياب");
-  if(input.action==="approve" && (row.note||"").includes(approvedMarker)) throw new Error("تم اعتماد هذه المخالفة بالفعل.");
-  if(input.action==="cancel" && (row.note||"").includes(cancelledMarker)) throw new Error("تم إلغاء هذه المخالفة بالفعل.");
-  let nextNote=(row.note||"").replace(/\s*·\s*(?:تم إلغاء )?(?:التأخير|الانصراف المبكر|الغياب)/g,"").trim();
+  const noteText = row.note || "";
+  if(input.action==="approve" && noteText.includes(approvedMarker)) throw new Error("تم اعتماد هذه المخالفة بالفعل.");
+  if(input.action==="cancel" && noteText.includes(cancelledMarker)) throw new Error("تم إلغاء هذه المخالفة بالفعل.");
+  if(input.action==="approve" && noteText.includes(cancelledMarker)) throw new Error("تم إلغاء هذه المخالفة بالفعل ولا يمكن اعتمادها مرة أخرى.");
+  if(input.action==="cancel" && noteText.includes(approvedMarker)) throw new Error("تم اعتماد هذه المخالفة بالفعل ولا يمكن إلغاء الخصم بعد الاعتماد.");
+  let nextNote=noteText.replace(/\s*·\s*(?:تم اعتماد|تم إلغاء )?(?:التأخير|الانصراف المبكر|الغياب)/g,"").trim();
   if(input.action==="cancel"){
     if(input.kind==="late") row.lateMinutes=0;
     if(input.kind==="absence") row.status="حاضر";
