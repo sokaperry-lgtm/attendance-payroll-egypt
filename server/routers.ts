@@ -135,7 +135,45 @@ export const appRouter = router({
       const earlyMinutes = Math.max(0, timeMinutes(shiftEnd) - timeMinutes(input.time));
       const earlyNote = earlyMinutes > 0 ? `انصراف مبكر: ${earlyMinutes} دقيقة` : null;
       const note = [current.note, earlyNote].filter(Boolean).join(" · ") || null;
-      return db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: current.checkIn, checkOut: input.time, status: current.status, lateMinutes: current.lateMinutes, distanceMeters: current.distanceMeters, note });
+      const attendance = await db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: current.checkIn, checkOut: input.time, status: current.status, lateMinutes: current.lateMinutes, distanceMeters: current.distanceMeters, note });
+
+      // Detect overtime automatically from the actual checkout time.
+      // A manager must approve the generated request before it reaches payroll.
+      const scheduledMinutes = scheduled?.shift
+        ? (() => {
+            const start = timeMinutes(scheduled.shift.startTime);
+            const end = timeMinutes(scheduled.shift.endTime);
+            const raw = end - start;
+            return scheduled.shift.crossesMidnight && raw <= 0 ? raw + 24 * 60 : raw > 0 ? raw : raw + 24 * 60;
+          })()
+        : (() => {
+            const start = timeMinutes(ctx.staffUser.shiftStart);
+            const end = timeMinutes(ctx.staffUser.shiftEnd);
+            const raw = end - start;
+            return raw > 0 ? raw : raw + 24 * 60;
+          })();
+
+      const actualMinutes = (() => {
+        const start = timeMinutes(current.checkIn!);
+        const end = timeMinutes(input.time);
+        const raw = end - start;
+        return raw >= 0 ? raw : raw + 24 * 60;
+      })();
+
+      const overtimeMinutes = Math.max(0, actualMinutes - scheduledMinutes);
+      if (overtimeMinutes >= 30) {
+        const overtimeHours = Number((overtimeMinutes / 60).toFixed(2));
+        await db.createRequest({
+          staffAccountId: ctx.staffUser.id,
+          type: "أوفر تايم",
+          fromDate: input.date,
+          toDate: input.date,
+          reason: `أوفر تايم تلقائي — الحضور ${current.checkIn} والانصراف ${input.time} — وقت إضافي ${overtimeHours} ساعة`,
+          hours: overtimeHours,
+        });
+      }
+
+      return attendance;
     }),
   }),
   requests: router({
