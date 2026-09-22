@@ -106,7 +106,7 @@ function RoleAwareTabs() {
         <Tabs.Screen name="settings" options={{ title: "الإعدادات", href: mobile ? null : (manager ? "/settings" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="settings" color={color} /> }} />
         <Tabs.Screen name="logout" options={{ title: "تسجيل الخروج", href: mobile ? null : "/logout", tabBarIcon: ({ color }) => <IconSymbol size={23} name="logout" color={color} /> }} />
       </Tabs>
-      <Pressable
+      {isDesktopWeb && <Pressable
         onPress={() => router.replace("/")}
         accessibilityLabel="العودة للرئيسية"
         style={({ pressed }) => ({
@@ -138,7 +138,7 @@ function RoleAwareTabs() {
         <View>
           <Text style={{ color: "#163A63", fontSize: 10, fontWeight: "900" }}>الرئيسية</Text>
         </View>
-      </Pressable>
+      </Pressable>}
       </View>
   );
 }
