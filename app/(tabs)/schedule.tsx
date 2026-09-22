@@ -50,7 +50,7 @@ function tone(s: ShiftTemplate | null | undefined, paletteIndex?: number) {
 }
 
 export default function ScheduleScreen() {
-  const { role, employee, staffMembers, shiftTemplates, schedules, teamSchedules, saveSchedule } = useAppData();
+  const { role, employee, staffMembers, shiftTemplates, schedules, teamSchedules, teamAttendance, saveSchedule } = useAppData();
   const [weekOffset, setWeekOffset] = useState(0);
   const week = useMemo(() => makeWeek(weekOffset), [weekOffset]);
   const [selectedEmployee, setSelectedEmployee] = useState(staffMembers[0]?.id ?? employee.id);
@@ -58,12 +58,25 @@ export default function ScheduleScreen() {
   const [saving, setSaving] = useState(false);
   const weekRange = `${week[0]?.date ?? ""} — ${week[6]?.date ?? ""}`;
   const visible = role === "manager" ? teamSchedules : schedules;
+  const attendanceVisible = role === "manager" ? teamAttendance : records;
   const weekDayStats = useMemo(() => week.map((day) => ({
     ...day,
     scheduled: visible.filter((entry) => entry.scheduleDate === day.key).length,
     off: visible.filter((entry) => entry.scheduleDate === day.key && entry.shift?.kind === "weekly_off").length,
   })), [week, visible]);
   const member = staffMembers.find(m => m.id === selectedEmployee);
+
+  function attendanceFor(personId: string, day: string) {
+    return attendanceVisible.find((record: any) => String(record.staffAccountId ?? (role === "employee" ? employee.id : "")) === personId && record.date === day);
+  }
+  function attendanceTone(status?: string) {
+    if (status === "حاضر") return { bg: "#E7F7EF", text: "#08704A", dot: "#149A67" };
+    if (status === "متأخر") return { bg: "#FFF4DB", text: "#9A6400", dot: "#D58A00" };
+    if (status === "غياب") return { bg: "#FFF0F0", text: "#9F2638", dot: "#D94A5B" };
+    if (status === "إجازة") return { bg: "#EAF3FF", text: "#2F6DB3", dot: "#1677D2" };
+    if (status === "مأمورية") return { bg: "#EEE8FF", text: "#5135A8", dot: "#7655D6" };
+    return { bg: "#F5F7F9", text: "#7B8798", dot: "#A1ACBA" };
+  }
 
   const stats = useMemo(() => {
     const source = role === "manager" ? teamSchedules : schedules;
@@ -190,14 +203,28 @@ export default function ScheduleScreen() {
                     const selected = role === "manager" && person.id === selectedEmployee && d.key === selectedDay;
                     return (
                       <Pressable key={d.key} onPress={() => { if (role === "manager") { setSelectedEmployee(person.id); setSelectedDay(d.key); } }} style={[styles.gridCell, selected && styles.gridCellSelected]}>
-                        {entry?.shift ? (
-                          <View style={[styles.shiftCell, { backgroundColor: t.bg, borderLeftColor: t.accent }]}>
-                            <Text style={[styles.cellShiftName, { color: t.text }]} numberOfLines={1}>{entry.shift.name}</Text>
-                            <Text style={[styles.cellShiftTime, { color: t.text }]} numberOfLines={1}>{shiftLabel(entry.shift)}</Text>
-                          </View>
-                        ) : (
-                          <View style={styles.emptyCell}><IconSymbol name="clock" size={15} color="#A1ACBA" /><Text style={styles.emptyCellText}>فارغ</Text></View>
-                        )}
+                        {(() => {
+                          const attendance = attendanceFor(person.id, d.key);
+                          const a = attendanceTone(attendance?.status);
+                          return entry?.shift ? (
+                            <View style={[styles.shiftCell, { backgroundColor: t.bg, borderLeftColor: t.accent }]}>
+                              <Text style={[styles.cellShiftName, { color: t.text }]} numberOfLines={1}>{entry.shift.name}</Text>
+                              <Text style={[styles.cellShiftTime, { color: t.text }]} numberOfLines={1}>{shiftLabel(entry.shift)}</Text>
+                              {attendance?.status && (
+                                <View style={[styles.attendanceBadge, { backgroundColor: a.bg }]}>
+                                  <View style={[styles.attendanceDot, { backgroundColor: a.dot }]} />
+                                  <Text style={[styles.attendanceBadgeText, { color: a.text }]}>{attendance.status}</Text>
+                                </View>
+                              )}
+                            </View>
+                          ) : (
+                            <View style={styles.emptyCell}>
+                              <IconSymbol name="clock" size={15} color="#A1ACBA" />
+                              <Text style={styles.emptyCellText}>فارغ</Text>
+                              {attendance?.status && <Text style={[styles.emptyStatus, { color: a.text }]}>{attendance.status}</Text>}
+                            </View>
+                          );
+                        })()}
                       </Pressable>
                     );
                   })}
@@ -250,7 +277,7 @@ const styles = StyleSheet.create({
   hero:{backgroundColor:"#102A47",borderRadius:22,padding:18,gap:18},heroTop:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"flex-start"},weekPill:{backgroundColor:"#1D4268",borderRadius:10,paddingHorizontal:10,paddingVertical:6},weekPillText:{color:"#B9D9F5",fontSize:9,fontWeight:"900"},heroKicker:{color:"#8EA7BE",fontSize:8,fontWeight:"900",textAlign:"right",letterSpacing:1},heroTitle:{color:"#FFF",fontSize:19,fontWeight:"900",textAlign:"right",marginTop:4},heroStats:{flexDirection:"row-reverse",alignItems:"center",justifyContent:"space-between"},heroStatValue:{color:"#72B5EF",fontSize:21,fontWeight:"900",textAlign:"center"},heroStatLabel:{color:"#B8C9D8",fontSize:8,textAlign:"center",marginTop:3},heroDivider:{width:1,height:28,backgroundColor:"#2A4B69"},
   teamBar:{backgroundColor:"#FFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,padding:14},teamBarTop:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},sectionTitle:{color:"#172033",fontSize:15,fontWeight:"900",textAlign:"right"},sectionHint:{color:"#98A6B8",fontSize:9,textAlign:"right",marginTop:3},count:{minWidth:30,textAlign:"center",color:"#163A63",backgroundColor:"#EEF4FB",borderRadius:9,padding:7,fontSize:10,fontWeight:"900"},teamScroll:{gap:8,paddingTop:13},
   employeeChip:{minWidth:105,maxWidth:145,flexDirection:"row-reverse",alignItems:"center",gap:7,borderWidth:1,borderColor:"#E1E7ED",backgroundColor:"#FAFBFC",borderRadius:12,paddingHorizontal:9,paddingVertical:8},employeeChipActive:{backgroundColor:"#EEF4FB",borderColor:"#5A91C5"},avatar:{width:27,height:27,borderRadius:9,backgroundColor:"#E8EDF3",alignItems:"center",justifyContent:"center"},avatarActive:{backgroundColor:"#163A63"},avatarText:{color:"#667085",fontSize:10,fontWeight:"900"},avatarTextActive:{color:"#FFF"},employeeName:{flex:1,color:"#667085",fontSize:9,fontWeight:"700",textAlign:"right"},employeeNameActive:{color:"#163A63",fontWeight:"900"},
-  rosterCard:{backgroundColor:"#FFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:20,paddingTop:15,overflow:"hidden"},rosterHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",paddingHorizontal:15,paddingBottom:13},legend:{flexDirection:"row",gap:10,alignItems:"center"},legendItem:{flexDirection:"row-reverse",alignItems:"center",gap:4},legendItemText:{color:"#667085",fontSize:8},legendDot:{width:7,height:7,borderRadius:4},gridScroll:{paddingHorizontal:10,paddingBottom:2},gridRow:{flexDirection:"row-reverse",borderBottomWidth:1,borderBottomColor:"#EDF0F3"},corner:{backgroundColor:"#F7F9FC"},nameHeader:{width:165,height:58,justifyContent:"center",paddingHorizontal:12,borderLeftWidth:1,borderLeftColor:"#E7EBEF"},nameHeaderText:{color:"#667085",fontSize:9,fontWeight:"900",textAlign:"right"},dayHeader:{width:112,height:58,backgroundColor:"#F7F9FC",alignItems:"center",justifyContent:"center",borderLeftWidth:1,borderLeftColor:"#E7EBEF"},dayHeaderToday:{backgroundColor:"#EEF6FF"},dayHeaderSelected:{backgroundColor:"#DDEEFF"},dayHeaderLabel:{color:"#667085",fontSize:9,fontWeight:"800"},dayHeaderDate:{color:"#172033",fontSize:15,fontWeight:"900",marginTop:2},nameCell:{width:165,minHeight:78,flexDirection:"row-reverse",alignItems:"center",gap:9,paddingHorizontal:10,borderLeftWidth:1,borderLeftColor:"#E7EBEF",backgroundColor:"#FFF"},nameCellSelected:{backgroundColor:"#F3F8FD"},nameAvatar:{width:34,height:34,borderRadius:11,backgroundColor:"#EAF0F5",alignItems:"center",justifyContent:"center"},nameAvatarText:{color:"#31577F",fontSize:12,fontWeight:"900"},nameCopy:{flex:1},nameText:{color:"#172033",fontSize:10,fontWeight:"900",textAlign:"right"},nameRole:{color:"#98A6B8",fontSize:8,textAlign:"right",marginTop:3},gridCell:{width:112,minHeight:78,padding:6,borderLeftWidth:1,borderLeftColor:"#E7EBEF",justifyContent:"center",backgroundColor:"#FFF"},gridCellSelected:{backgroundColor:"#F1F7FD"},shiftCell:{minHeight:54,borderRadius:10,borderLeftWidth:3,paddingHorizontal:8,paddingVertical:7,justifyContent:"center"},cellShiftName:{fontSize:9,fontWeight:"900",textAlign:"right"},cellShiftTime:{fontSize:8,marginTop:5,textAlign:"right"},emptyCell:{minHeight:54,borderRadius:10,backgroundColor:"#F7F8FA",alignItems:"center",justifyContent:"center",gap:4},emptyCellText:{color:"#A1ACBA",fontSize:8,fontWeight:"700"},gridHint:{color:"#98A6B8",fontSize:8,textAlign:"right",paddingHorizontal:15,paddingVertical:11,backgroundColor:"#FAFBFC"},
+  rosterCard:{backgroundColor:"#FFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:20,paddingTop:15,overflow:"hidden"},rosterHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",paddingHorizontal:15,paddingBottom:13},legend:{flexDirection:"row",gap:10,alignItems:"center"},legendItem:{flexDirection:"row-reverse",alignItems:"center",gap:4},legendItemText:{color:"#667085",fontSize:8},legendDot:{width:7,height:7,borderRadius:4},gridScroll:{paddingHorizontal:10,paddingBottom:2},gridRow:{flexDirection:"row-reverse",borderBottomWidth:1,borderBottomColor:"#EDF0F3"},corner:{backgroundColor:"#F7F9FC"},nameHeader:{width:165,height:58,justifyContent:"center",paddingHorizontal:12,borderLeftWidth:1,borderLeftColor:"#E7EBEF"},nameHeaderText:{color:"#667085",fontSize:9,fontWeight:"900",textAlign:"right"},dayHeader:{width:112,height:58,backgroundColor:"#F7F9FC",alignItems:"center",justifyContent:"center",borderLeftWidth:1,borderLeftColor:"#E7EBEF"},dayHeaderToday:{backgroundColor:"#EEF6FF"},dayHeaderSelected:{backgroundColor:"#DDEEFF"},dayHeaderLabel:{color:"#667085",fontSize:9,fontWeight:"800"},dayHeaderDate:{color:"#172033",fontSize:15,fontWeight:"900",marginTop:2},nameCell:{width:165,minHeight:78,flexDirection:"row-reverse",alignItems:"center",gap:9,paddingHorizontal:10,borderLeftWidth:1,borderLeftColor:"#E7EBEF",backgroundColor:"#FFF"},nameCellSelected:{backgroundColor:"#F3F8FD"},nameAvatar:{width:34,height:34,borderRadius:11,backgroundColor:"#EAF0F5",alignItems:"center",justifyContent:"center"},nameAvatarText:{color:"#31577F",fontSize:12,fontWeight:"900"},nameCopy:{flex:1},nameText:{color:"#172033",fontSize:10,fontWeight:"900",textAlign:"right"},nameRole:{color:"#98A6B8",fontSize:8,textAlign:"right",marginTop:3},gridCell:{width:112,minHeight:78,padding:6,borderLeftWidth:1,borderLeftColor:"#E7EBEF",justifyContent:"center",backgroundColor:"#FFF"},gridCellSelected:{backgroundColor:"#F1F7FD"},shiftCell:{minHeight:64,borderRadius:10,borderLeftWidth:3,paddingHorizontal:8,paddingVertical:7,justifyContent:"center"},attendanceBadge:{marginTop:5,borderRadius:7,paddingHorizontal:5,paddingVertical:3,flexDirection:"row-reverse",alignItems:"center",alignSelf:"flex-start",gap:4},attendanceDot:{width:5,height:5,borderRadius:3},attendanceBadgeText:{fontSize:7,fontWeight:"900"},cellShiftName:{fontSize:9,fontWeight:"900",textAlign:"right"},cellShiftTime:{fontSize:8,marginTop:5,textAlign:"right"},emptyCell:{minHeight:54,borderRadius:10,backgroundColor:"#F7F8FA",alignItems:"center",justifyContent:"center",gap:4},emptyCellText:{color:"#A1ACBA",fontSize:8,fontWeight:"700"},emptyStatus:{fontSize:7,fontWeight:"900",marginTop:3},gridHint:{color:"#98A6B8",fontSize:8,textAlign:"right",paddingHorizontal:15,paddingVertical:11,backgroundColor:"#FAFBFC"},
   assignCard:{backgroundColor:"#F7F9FC",borderWidth:1,borderColor:"#E1E7EE",borderRadius:18,padding:15},assignHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},selectedDayPill:{backgroundColor:"#EAF3FF",borderRadius:9,paddingHorizontal:9,paddingVertical:6},selectedDayPillText:{color:"#2F6DB3",fontSize:8,fontWeight:"900"},shiftGrid:{flexDirection:"row-reverse",gap:8,marginTop:13},shiftOption:{flex:1,minHeight:95,borderRadius:14,borderWidth:1,padding:10},shiftDot:{width:8,height:8,borderRadius:4,marginBottom:7},shiftOptionName:{fontSize:10,fontWeight:"900",textAlign:"right"},shiftOptionTime:{fontSize:8,marginTop:5,textAlign:"right"},shiftAction:{fontSize:8,fontWeight:"900",marginTop:9,textAlign:"right"},disabled:{opacity:.55},
   note:{backgroundColor:"#F7F9FC",borderWidth:1,borderColor:"#E1E7EE",borderRadius:15,padding:13,flexDirection:"row-reverse",alignItems:"center",gap:8},noteText:{flex:1,color:"#667085",fontSize:9,lineHeight:16,textAlign:"right"}
 });
