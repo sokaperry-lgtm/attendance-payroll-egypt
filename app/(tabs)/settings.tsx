@@ -66,7 +66,7 @@ export default function SettingsScreen() {
     }
   }, [selectedBranch?.id]);
 
-  if (role !== "manager") {
+  if (role !== "owner" && role !== "manager") {
     return <ScreenContainer><View style={styles.denied}><IconSymbol name="settings" size={35} color="#163A63"/><Text style={styles.deniedTitle}>الإعدادات للمدير فقط</Text></View></ScreenContainer>;
   }
 
