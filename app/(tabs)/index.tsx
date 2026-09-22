@@ -35,7 +35,11 @@ export default function HomeScreen(){
   const { width } = useWindowDimensions();
   const isMobile = width < 700;
   const [now, setNow] = useState(() => new Date());
-  useEffect(() => {\n    if (role === "manager") {\n      router.replace("/manager" as never);\n    }\n  }, [role]);\n  useEffect(() => {
+  useEffect(() => {
+    if (role === "manager") {
+      router.replace("/manager" as never);
+    }
+  }, [role]);\n  useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(timer);
   }, []);
