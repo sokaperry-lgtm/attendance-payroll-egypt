@@ -63,7 +63,9 @@ export function getSessionCookieOptions(
     domain,
     httpOnly: true,
     path: "/",
-    sameSite: "none",
+    // The app is served from the same origin in production. Lax prevents
+    // cross-site requests from automatically carrying the staff session cookie.
+    sameSite: "lax",
     secure: isSecureRequest(req),
   };
 }
