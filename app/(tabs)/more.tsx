@@ -18,12 +18,7 @@ export default function MoreScreen() {
   ];
 
   return (
-    <View style={styles.root}>
-      <Pressable accessibilityRole="button" accessibilityLabel="العودة إلى الرئيسية" onPress={() => router.replace("/")} style={styles.homeButton}>
-        <IconSymbol name="house.fill" size={15} color="#163A63" />
-        <Text style={styles.homeText}>الرئيسية</Text>
-      </Pressable>
-      <ScrollView contentContainerStyle={styles.page}>
+    <View style={styles.root}>      <ScrollView contentContainerStyle={styles.page}>
       <View style={styles.header}>
         <Text style={styles.eyebrow}>WORKSPACE</Text>
         <Text style={styles.title}>المزيد</Text>
