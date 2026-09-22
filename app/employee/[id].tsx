@@ -86,7 +86,7 @@ export default function EmployeeProfileScreen() {
               <Text style={[styles.tabText, tab === key && styles.tabTextActive]}>{label}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
 
         {tab === "overview" && (
           <>
