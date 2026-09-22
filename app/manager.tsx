@@ -6,6 +6,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { AppDataProvider, useAppData, type Employee } from "@/lib/app-data";
 import { formatMoney } from "@/lib/payroll";
+import { trpc } from "@/lib/trpc";
 
 type FormFieldProps = { label: string; value: string; onChangeText: (value: string) => void; placeholder?: string; numeric?: boolean; secure?: boolean };
 function FormField({ label, value, onChangeText, placeholder, numeric, secure }: FormFieldProps) {
@@ -36,6 +37,7 @@ function ManagerScreenContent() {
   const [teamSearch, setTeamSearch] = useState("");
   const [teamFilter, setTeamFilter] = useState<"all" | "active" | "inactive">("all");
   const [approvalBusy, setApprovalBusy] = useState<string | null>(null);
+  const payrollQuery = trpc.payroll.list.useQuery({ month: new Date().toISOString().slice(0, 7) }, { enabled: role === "manager", retry: false });
   const pending = requests.filter((item) => item.status === "قيد المراجعة").length;
   const presentCount = records.filter((record) => record.status === "حاضر").length;
   const lateCount = records.filter((record) => record.status === "متأخر").length;
@@ -115,6 +117,37 @@ function ManagerScreenContent() {
         <Pressable onPress={() => router.push("/requests")} style={styles.operationRow}><View style={[styles.operationIcon,{backgroundColor:"#FEF2F2"}]}><IconSymbol name="doc.text.fill" size={16} color="#B42318"/></View><View style={styles.operationCopy}><Text style={styles.operationTitle}>قرارات معلقة</Text><Text style={styles.operationHint}>طلبات بانتظار اعتمادك</Text></View><Text style={[styles.operationValue,{color:"#B42318"}]}>{pending}</Text></Pressable>
       </View>
     </View>
+    <View style={styles.analyticsHeader}>
+      <View><Text style={styles.analyticsEyebrow}>EXECUTIVE ANALYTICS</Text><Text style={styles.analyticsTitle}>لوحة التحليل التنفيذي</Text><Text style={styles.analyticsSub}>قراءة سريعة للحضور والتأخير وتكلفة الرواتب والفرق عن الشهر الحالي.</Text></View>
+      <Pressable onPress={() => router.push("/reports")} style={styles.analyticsButton}><IconSymbol name="chart.bar.fill" size={15} color="#FFFFFF"/><Text style={styles.analyticsButtonText}>التقارير الكاملة</Text></Pressable>
+    </View>
+    <View style={styles.analyticsKpis}>
+      <View style={styles.analyticsMetric}><Text style={styles.analyticsMetricLabel}>تكلفة صافي الرواتب</Text><Text style={styles.analyticsMetricValue}>{formatMoney((payrollQuery.data ?? []).reduce((s,r)=>s+Number(r.netSalary||0),0))}</Text><Text style={styles.analyticsMetricHint}>{payrollQuery.data?.length ?? 0} مسير هذا الشهر</Text></View>
+      <View style={styles.analyticsMetric}><Text style={styles.analyticsMetricLabel}>الأوفر تايم</Text><Text style={styles.analyticsMetricValue}>{formatMoney((payrollQuery.data ?? []).reduce((s,r)=>s+Number(r.overtime||0),0))}</Text><Text style={styles.analyticsMetricHint}>تكلفة إضافية</Text></View>
+      <View style={styles.analyticsMetric}><Text style={styles.analyticsMetricLabel}>نسبة الحضور</Text><Text style={styles.analyticsMetricValue}>{attendanceRate}%</Text><Text style={styles.analyticsMetricHint}>{presentCount + lateCount} سجل حضور فعلي</Text></View>
+      <View style={styles.analyticsMetric}><Text style={styles.analyticsMetricLabel}>دقائق التأخير</Text><Text style={styles.analyticsMetricValue}>{records.reduce((s,r)=>s+Number(r.lateMinutes||0),0)}</Text><Text style={styles.analyticsMetricHint}>{lateCount} حالة متأخرة</Text></View>
+    </View>
+    <View style={styles.analyticsGrid}>
+      <View style={styles.analyticsCard}>
+        <View style={styles.analyticsCardHead}><View><Text style={styles.analyticsCardTitle}>نبض الحضور</Text><Text style={styles.analyticsCardHint}>توزيع سجلات الفريق الحالية</Text></View><Text style={styles.analyticsCardValue}>{attendanceRate}%</Text></View>
+        <View style={styles.analyticsBigTrack}><View style={[styles.analyticsBigFill,{width: attendanceRate+"%"}]}/></View>
+        <View style={styles.analyticsLegend}>
+          <View><Text style={styles.analyticsLegendValue}>{presentCount}</Text><Text style={styles.analyticsLegendLabel}>حاضر</Text></View>
+          <View><Text style={[styles.analyticsLegendValue,{color:"#B45309"}]}>{lateCount}</Text><Text style={styles.analyticsLegendLabel}>متأخر</Text></View>
+          <View><Text style={[styles.analyticsLegendValue,{color:"#B42318"}]}>{absentCount}</Text><Text style={styles.analyticsLegendLabel}>غائب</Text></View>
+          <View><Text style={[styles.analyticsLegendValue,{color:"#163A63"}]}>{leaveCount}</Text><Text style={styles.analyticsLegendLabel}>إجازة</Text></View>
+        </View>
+      </View>
+      <View style={styles.analyticsCard}>
+        <View style={styles.analyticsCardHead}><View><Text style={styles.analyticsCardTitle}>الأقسام</Text><Text style={styles.analyticsCardHint}>حجم الفريق وتوزيع الموظفين</Text></View><Text style={styles.analyticsCardValue}>{staffMembers.length}</Text></View>
+        <View style={styles.departmentBars}>{Array.from(new Set(staffMembers.map(m=>m.department||"عام"))).slice(0,5).map(dept=>{const count=staffMembers.filter(m=>(m.department||"عام")===dept).length; const pct=Math.round((count/Math.max(staffMembers.length,1))*100); return <View key={dept} style={styles.departmentBarRow}><View style={styles.departmentBarTop}><Text style={styles.departmentBarName}>{dept}</Text><Text style={styles.departmentBarValue}>{count}</Text></View><View style={styles.departmentBarTrack}><View style={[styles.departmentBarFill,{width:pct+"%"}]}/></View></View>})}</View>
+      </View>
+    </View>
+    <View style={styles.insightStrip}>
+      <View style={styles.insightStripIcon}><IconSymbol name={absentCount>0?"person.fill.xmark":"checkmark"} size={17} color={absentCount>0?"#B42318":"#15803D"}/></View>
+      <View style={styles.insightStripCopy}><Text style={styles.insightStripTitle}>{absentCount>0 ? "يوجد غياب يحتاج متابعة" : "الحضور مستقر اليوم"}</Text><Text style={styles.insightStripText}>{absentCount>0 ? absentCount+" موظف مسجل كغائب حاليًا. راجع السجلات قبل إغلاق اليوم." : "لا توجد حالات غياب مسجلة في البيانات الحالية."}</Text></View>
+      <Pressable onPress={() => router.push("/reports")} style={styles.insightStripAction}><Text style={styles.insightStripActionText}>تحليل أعمق ←</Text></Pressable>
+    </View>
     <View style={styles.kpiGrid}>
       <View style={styles.commandKpi}><View style={styles.kpiIconBlue}><IconSymbol name="person.2.fill" size={17} color="#163A63"/></View><Text style={styles.kpiNumber}>{staffMembers.length}</Text><Text style={styles.kpiLabel}>إجمالي الموظفين</Text><Text style={styles.kpiHint}>حسابات الفريق</Text></View>
       <View style={styles.commandKpi}><View style={styles.kpiIconGreen}><IconSymbol name="checkmark" size={17} color="#15803D"/></View><Text style={styles.kpiNumber}>{presentCount}</Text><Text style={styles.kpiLabel}>حاضر اليوم</Text><Text style={styles.kpiHint}>تم تسجيل الحضور</Text></View>
@@ -166,6 +199,42 @@ function ManagerScreenContent() {
 }
 
 const styles = StyleSheet.create({
+  analyticsHeader:{backgroundColor:"#163A63",borderRadius:22,padding:20,flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",gap:14,marginTop:4},
+  analyticsEyebrow:{color:"#A9C7E3",fontSize:9,fontWeight:"900",letterSpacing:1,textAlign:"right"},
+  analyticsTitle:{color:"#FFFFFF",fontSize:21,fontWeight:"900",textAlign:"right",marginTop:4},
+  analyticsSub:{color:"#D9E6F2",fontSize:10,lineHeight:18,textAlign:"right",marginTop:5,maxWidth:650},
+  analyticsButton:{backgroundColor:"#1677D2",borderRadius:11,paddingHorizontal:13,paddingVertical:10,flexDirection:"row-reverse",alignItems:"center",gap:6},
+  analyticsButtonText:{color:"#FFFFFF",fontSize:10,fontWeight:"900"},
+  analyticsKpis:{flexDirection:"row-reverse",gap:10,flexWrap:"wrap"},
+  analyticsMetric:{flex:1,minWidth:190,backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E4E7EC",borderRadius:17,padding:15},
+  analyticsMetricLabel:{color:"#667085",fontSize:10,fontWeight:"800",textAlign:"right"},
+  analyticsMetricValue:{color:"#163A63",fontSize:20,fontWeight:"900",textAlign:"right",marginTop:7},
+  analyticsMetricHint:{color:"#98A6B8",fontSize:9,textAlign:"right",marginTop:4},
+  analyticsGrid:{flexDirection:"row-reverse",gap:12,flexWrap:"wrap"},
+  analyticsCard:{flex:1,minWidth:320,backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E4E7EC",borderRadius:19,padding:18},
+  analyticsCardHead:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"flex-start"},
+  analyticsCardTitle:{color:"#172033",fontSize:15,fontWeight:"900",textAlign:"right"},
+  analyticsCardHint:{color:"#667085",fontSize:9,textAlign:"right",marginTop:3},
+  analyticsCardValue:{color:"#163A63",fontSize:22,fontWeight:"900"},
+  analyticsBigTrack:{height:13,borderRadius:8,backgroundColor:"#EEF2F6",overflow:"hidden",marginTop:22},
+  analyticsBigFill:{height:"100%",backgroundColor:"#1677D2",borderRadius:8},
+  analyticsLegend:{flexDirection:"row-reverse",justifyContent:"space-between",marginTop:18},
+  analyticsLegendValue:{color:"#15803D",fontSize:17,fontWeight:"900",textAlign:"right"},
+  analyticsLegendLabel:{color:"#667085",fontSize:9,textAlign:"right",marginTop:2},
+  departmentBars:{gap:12,marginTop:17},
+  departmentBarRow:{gap:5},
+  departmentBarTop:{flexDirection:"row-reverse",justifyContent:"space-between"},
+  departmentBarName:{color:"#344054",fontSize:10,fontWeight:"800"},
+  departmentBarValue:{color:"#163A63",fontSize:10,fontWeight:"900"},
+  departmentBarTrack:{height:7,borderRadius:7,backgroundColor:"#EEF2F6",overflow:"hidden"},
+  departmentBarFill:{height:"100%",backgroundColor:"#163A63",borderRadius:7},
+  insightStrip:{backgroundColor:"#F7F9FC",borderWidth:1,borderColor:"#E4E7EC",borderRadius:17,padding:14,flexDirection:"row-reverse",alignItems:"center",gap:11},
+  insightStripIcon:{width:36,height:36,borderRadius:12,backgroundColor:"#FFFFFF",alignItems:"center",justifyContent:"center"},
+  insightStripCopy:{flex:1},
+  insightStripTitle:{color:"#172033",fontSize:12,fontWeight:"900",textAlign:"right"},
+  insightStripText:{color:"#667085",fontSize:9,lineHeight:16,textAlign:"right",marginTop:3},
+  insightStripAction:{paddingHorizontal:9,paddingVertical:7},
+  insightStripActionText:{color:"#163A63",fontSize:10,fontWeight:"900"},
   approvalInbox:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E6ECF2",borderRadius:22,padding:17,gap:11,shadowColor:"#0F2742",shadowOpacity:0.04,shadowRadius:12,elevation:1},
   approvalHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},
   approvalTitle:{color:"#172033",fontSize:17,fontWeight:"900",textAlign:"right"},
