@@ -36,7 +36,7 @@ function RoleAwareTabs() {
   const manager = role === "manager";
   const teamAccess = role === "manager" || role === "supervisor";
   const mobile = Platform.OS !== "web" || width < 900;
-  const mobilePrimary = new Set(["index", "attendance", "requests", "notifications", "more"]);
+  const mobilePrimary = new Set(["index", "attendance", "requests", "notifications", ...(manager ? ["manager"] : [])]);
 
   return (
       <Tabs
@@ -97,7 +97,7 @@ function RoleAwareTabs() {
         <Tabs.Screen name="attendance" options={{ title: "الحضور", href: mobile && !mobilePrimary.has("attendance") ? null : "/attendance", tabBarIcon: ({ color }) => <IconSymbol size={23} name="calendar" color={color} /> }} />
         <Tabs.Screen name="requests" options={{ title: "الطلبات", href: mobile && !mobilePrimary.has("requests") ? null : "/requests", tabBarIcon: ({ color }) => <IconSymbol size={23} name="doc.text.fill" color={color} /> }} />
         <Tabs.Screen name="schedule" options={{ title: "الجدول", href: mobile ? null : (teamAccess ? "/schedule" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="calendar" color={color} /> }} />
-        <Tabs.Screen name="manager" options={{ title: "الفريق", href: mobile ? null : (teamAccess ? "/manager" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="person.2.fill" color={color} /> }} />
+        <Tabs.Screen name="manager" options={{ title: "لوحة القيادة", href: teamAccess ? "/manager" : null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="person.2.fill" color={color} /> }} />
         <Tabs.Screen name="reports" options={{ title: "التقارير", href: mobile ? null : (teamAccess ? "/reports" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="chart.bar.fill" color={color} /> }} />
         <Tabs.Screen name="audit" options={{ title: "سجل العمليات", href: mobile ? null : (manager ? "/audit" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="lock.shield.fill" color={color} /> }} />
         <Tabs.Screen name="payroll" options={{ title: "الرواتب", href: mobile ? null : (manager ? "/payroll" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="banknote" color={color} /> }} />
