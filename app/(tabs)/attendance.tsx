@@ -97,7 +97,16 @@ export default function AttendanceScreen() {
               </View>
             </View>
 
-            <View style={styles.syncRow}>\n              <View style={styles.syncCopy}>\n                <Text style={styles.syncTitle}>مزامنة الحضور</Text>\n                <Text style={styles.syncText}>تسجيل الغياب التلقائي وتحديث ساعات العمل والإضافي.</Text>\n              </View>\n              <Pressable style={styles.syncButton} onPress={() => syncAttendance.mutate({ month })} disabled={syncAttendance.isPending}>\n                <Text style={styles.syncButtonText}>{syncAttendance.isPending ? "جاري..." : "مزامنة الآن"}</Text>\n              </Pressable>\n            </View>\n            <SectionTitle title="سجل الأيام" subtitle="آخر تسجيلات الحضور والانصراف" />
+            <View style={styles.syncRow}>
+<View style={styles.syncCopy}>
+<Text style={styles.syncTitle}>مزامنة الحضور</Text>
+<Text style={styles.syncText}>تسجيل الغياب التلقائي وتحديث ساعات العمل والإضافي.</Text>
+</View>
+<Pressable style={styles.syncButton} onPress={() => syncAttendance.mutate({ month })} disabled={syncAttendance.isPending}>
+<Text style={styles.syncButtonText}>{syncAttendance.isPending ? "جاري..." : "مزامنة الآن"}</Text>
+</Pressable>
+</View>
+<SectionTitle title="سجل الأيام" subtitle="آخر تسجيلات الحضور والانصراف" />
           </>
         }
         renderItem={({ item }) => (
