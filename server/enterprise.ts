@@ -233,6 +233,7 @@ function isApprovedLeave(requests: Array<typeof staffRequests.$inferSelect>, sta
 export async function syncMonthlyAttendance(staffAccountId: number, month: string) {
   const db = await getDb(); if (!db) throw new Error("Database not available");
   const m = await getCompanyForStaff(staffAccountId); if (!m) throw new Error("Company not found");
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error("صيغة الشهر غير صحيحة. استخدم YYYY-MM.");
 
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
   const ids = new Set(members.map(x => x.staffAccountId));
@@ -258,7 +259,14 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
   for (const employee of staff) {
     if (closedStaffIds.has(employee.id)) continue;
     for (const date of dateRange(month)) {
-      const today = new Date().toISOString().slice(0, 10);
+      const todayParts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Africa/Cairo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date());
+      const todayValues = Object.fromEntries(todayParts.map(part => [part.type, part.value]));
+      const today = `${todayValues.year}-${todayValues.month}-${todayValues.day}`;
       if (date > today) continue;
 
       const scheduled = schedules.find(x => x.staffAccountId === employee.id && x.scheduleDate === date);
@@ -276,6 +284,16 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
       const onLeave = isApprovedLeave(requests, employee.id, date);
 
       if (onLeave) {
+        // Never overwrite a manager's attendance decision while syncing approved leave.
+        const hasReviewedException = Boolean(record?.note && (
+          record.note.includes("تم اعتماد التأخير") ||
+          record.note.includes("تم اعتماد الانصراف المبكر") ||
+          record.note.includes("تم اعتماد الغياب") ||
+          record.note.includes("تم إلغاء التأخير") ||
+          record.note.includes("تم إلغاء الانصراف المبكر") ||
+          record.note.includes("تم إلغاء الغياب")
+        ));
+        if (hasReviewedException) continue;
         if (!record) {
           await dbQueries.upsertAttendance({
             staffAccountId: employee.id,
@@ -364,8 +382,10 @@ export async function getAttendanceWorkSummary(staffAccountId: number, month: st
 
 export async function generatePayroll(staffAccountId: number, month: string) {
   const db = await getDb(); if (!db) throw new Error("Database not available");
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error("صيغة الشهر غير صحيحة. استخدم YYYY-MM.");
+  const m = await getCompanyForStaff(staffAccountId);
+  if (!m || !["owner","hr","accountant","manager","supervisor"].includes(m.role)) throw new Error("غير مصرح");
   await syncMonthlyAttendance(staffAccountId, month);
-  const m = await getCompanyForStaff(staffAccountId); if (!m || !["owner","hr","accountant","manager","supervisor"].includes(m.role)) throw new Error("غير مصرح");
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
   const ids = new Set(members.map(x=>x.staffAccountId));
   const staff = await db.select().from(staffAccounts).where(eq(staffAccounts.active,true));
@@ -685,6 +705,8 @@ export async function listCompanySalaryAdjustments(staffAccountId:number, month?
 export async function createSalaryAdjustment(actorId:number,input:{staffAccountId:number;month:string;type:"allowance"|"bonus"|"incentive"|"penalty"|"deduction";title:string;amount:number;note?:string}) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId); if(!m || m.role!=="owner") throw new Error("غير مصرح");
+  if (!/^\d{4}-\d{2}$/.test(input.month)) throw new Error("صيغة الشهر غير صحيحة. استخدم YYYY-MM.");
+  if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("قيمة الإضافة أو الخصم يجب أن تكون أكبر من صفر.");
   await assertStaffInCompany(actorId,input.staffAccountId);
   await assertPayrollEditable(actorId,input.month);
   const result=await db.insert(salaryAdjustments).values({...input,companyId:m.companyId,createdBy:actorId});
