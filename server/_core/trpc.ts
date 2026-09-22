@@ -21,14 +21,16 @@ const requireStaff = t.middleware(async (opts) => {
 
 const requireManager = t.middleware(async (opts) => {
   if (!opts.ctx.staffUser) throw new TRPCError({ code: "UNAUTHORIZED", message: "يجب تسجيل الدخول بحساب الشركة." });
-  if (opts.ctx.staffUser.role !== "manager") throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
-  return opts.next({ ctx: { ...opts.ctx, staffUser: opts.ctx.staffUser } });
+  const membership = await getMembership(opts.ctx.staffUser.id);
+  if (!membership || !["owner", "manager"].includes(membership.role)) throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+  return opts.next({ ctx: { ...opts.ctx, staffUser: opts.ctx.staffUser, membership } });
 });
 
 const requireSupervisor = t.middleware(async (opts) => {
   if (!opts.ctx.staffUser) throw new TRPCError({ code: "UNAUTHORIZED", message: "يجب تسجيل الدخول بحساب الشركة." });
-  if (!["manager", "supervisor"].includes(opts.ctx.staffUser.role)) throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
-  return opts.next({ ctx: { ...opts.ctx, staffUser: opts.ctx.staffUser } });
+  const membership = await getMembership(opts.ctx.staffUser.id);
+  if (!membership || !["owner", "manager", "supervisor"].includes(membership.role)) throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+  return opts.next({ ctx: { ...opts.ctx, staffUser: opts.ctx.staffUser, membership } });
 });
 
 export const protectedProcedure = t.procedure.use(requireUser);
