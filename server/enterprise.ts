@@ -17,26 +17,17 @@ export async function getMembership(staffAccountId: number) {
   const membership = rows[0];
   if (!membership) return undefined;
 
-  // One-time recovery for the primary Islam account: keep the legacy manager
-  // account aligned with the tenant owner role so the account is not locked out
-  // by an accidental membership-role downgrade.
-  const staff = (await db.select({ id: staffAccounts.id, name: staffAccounts.name, role: staffAccounts.role })
+  // A legacy manager account is the tenant owner in this application.
+  // Keep the two role sources synchronized so an old/stale membership row
+  // can never lock the primary admin out of company tools.
+  const staff = (await db.select({ id: staffAccounts.id, role: staffAccounts.role })
     .from(staffAccounts)
     .where(eq(staffAccounts.id, staffAccountId))
     .limit(1))[0];
-  const normalizedName = String(staff?.name ?? "").trim().toLowerCase();
-  const isIslamAccount = /إسلام|اسلام|islam|eslam/.test(normalizedName);
-  if (isIslamAccount) {
-    if (staff?.role !== "manager") {
-      await db.update(staffAccounts)
-        .set({ role: "manager", updatedAt: new Date() })
-        .where(eq(staffAccounts.id, staffAccountId));
-    }
-    if (membership.role !== "owner") {
-      await db.update(companyMembers)
-        .set({ role: "owner", updatedAt: new Date() })
-        .where(eq(companyMembers.id, membership.id));
-    }
+  if (staff?.role === "manager" && membership.role !== "owner") {
+    await db.update(companyMembers)
+      .set({ role: "owner", updatedAt: new Date() })
+      .where(eq(companyMembers.id, membership.id));
     return (await db.select().from(companyMembers).where(eq(companyMembers.id, membership.id)).limit(1))[0];
   }
   return membership;
