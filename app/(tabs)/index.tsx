@@ -39,7 +39,8 @@ export default function HomeScreen(){
     if (role === "manager") {
       router.replace("/manager" as never);
     }
-  }, [role]);\n  useEffect(() => {
+  }, [role]);
+  useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(timer);
   }, []);
