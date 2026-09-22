@@ -78,7 +78,7 @@ export default function RequestsScreen() {
         {isManagerException && request.source === "penalty" ? <View style={styles.actionRow}>
           <Pressable disabled={cancelPenalty.isPending} onPress={async()=>{await cancelPenalty.mutateAsync({id:Number(request.adjustmentId)});await refresh();}} style={styles.cancelAction}><Text style={styles.cancelActionText}>إلغاء الجزاء</Text></Pressable>
         </View> : null}
-      </Pressable>;
+      </View>;
     })}
     {filteredRequests.length === 0 && <Text style={styles.empty}>{requests.length === 0 ? "لم ترسل أي طلبات بعد." : `لا توجد طلبات بحالة ${activeFilter}.`}</Text>}
   </ScrollView>
