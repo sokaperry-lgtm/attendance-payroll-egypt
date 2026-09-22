@@ -51,10 +51,12 @@ function tone(s: ShiftTemplate | null | undefined, paletteIndex?: number) {
 
 export default function ScheduleScreen() {
   const { role, employee, staffMembers, shiftTemplates, schedules, teamSchedules, saveSchedule } = useAppData();
-  const week = useMemo(makeWeek, []);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const week = useMemo(() => makeWeek(weekOffset), [weekOffset]);
   const [selectedEmployee, setSelectedEmployee] = useState(staffMembers[0]?.id ?? employee.id);
   const [selectedDay, setSelectedDay] = useState(week[0].key);
   const [saving, setSaving] = useState(false);
+  const weekRange = `${week[0]?.date ?? ""} — ${week[6]?.date ?? ""}`;
   const visible = role === "manager" ? teamSchedules : schedules;
   const member = staffMembers.find(m => m.id === selectedEmployee);
 
@@ -87,6 +89,21 @@ export default function ScheduleScreen() {
             <Text style={styles.title}>الجدول</Text>
             <Text style={styles.subtitle}>{role === "manager" ? "شوف الفريق كله في جدول واحد وحدد الورديات من نفس الشاشة." : "جدول أسبوعك بالكامل بشكل واضح وسريع."}</Text>
           </View>
+        </View>
+
+        <View style={styles.weekNavigator}>
+          <Pressable style={styles.weekNavButton} onPress={() => setWeekOffset(v => v + 1)}>
+            <IconSymbol name="chevron.left" size={17} color="#163A63" />
+            <Text style={styles.weekNavText}>التالي</Text>
+          </Pressable>
+          <Pressable style={styles.weekCurrentButton} onPress={() => setWeekOffset(0)}>
+            <Text style={styles.weekCurrentText}>{weekOffset === 0 ? "هذا الأسبوع" : "العودة للحالي"}</Text>
+            <Text style={styles.weekRangeText}>{weekRange}</Text>
+          </Pressable>
+          <Pressable style={styles.weekNavButton} onPress={() => setWeekOffset(v => v - 1)}>
+            <Text style={styles.weekNavText}>السابق</Text>
+            <IconSymbol name="chevron.right" size={17} color="#163A63" />
+          </Pressable>
         </View>
 
         <View style={styles.hero}>
@@ -206,6 +223,12 @@ export default function ScheduleScreen() {
 
 const styles = StyleSheet.create({
   content:{padding:20,paddingBottom:50,gap:14},
+  weekNavigator:{flexDirection:"row",alignItems:"stretch",justifyContent:"space-between",gap:8},
+  weekNavButton:{flex:1,minHeight:52,backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E1E7EF",borderRadius:15,paddingHorizontal:10,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:5},
+  weekNavText:{color:"#163A63",fontSize:10,fontWeight:"800"},
+  weekCurrentButton:{flex:1.35,minHeight:52,backgroundColor:"#EEF5FB",borderWidth:1,borderColor:"#C9DCEC",borderRadius:15,alignItems:"center",justifyContent:"center",paddingHorizontal:8},
+  weekCurrentText:{color:"#163A63",fontSize:11,fontWeight:"900"},
+  weekRangeText:{color:"#667085",fontSize:9,marginTop:2,fontWeight:"700"},
   header:{flexDirection:"row-reverse",alignItems:"center",gap:12},
   headerIcon:{width:52,height:52,borderRadius:17,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},
   headerCopy:{flex:1},eyebrow:{color:"#7B8798",fontSize:9,fontWeight:"900",textAlign:"right",letterSpacing:1},title:{color:"#172033",fontSize:29,fontWeight:"900",textAlign:"right",marginTop:3},subtitle:{color:"#667085",fontSize:11,lineHeight:18,textAlign:"right",marginTop:4},
