@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { showAlert } from "@/lib/alert";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -10,6 +10,8 @@ const requestPalette: Record<string, { bg: string; text: string }> = { "قيد �
 
 export default function RequestsScreen() {
   const { role, requests, submitRequest, refresh } = useAppData();
+  const { width } = useWindowDimensions();
+  const compact = width < 600;
   const reviewRequest = trpc.requests.review.useMutation();
   const waiveAttendance = trpc.requests.waiveAttendance.useMutation();
   const reviewAttendanceException = trpc.requests.reviewAttendanceException.useMutation();
@@ -44,7 +46,7 @@ export default function RequestsScreen() {
   }
 
   return <ScreenContainer><ScrollView contentContainerStyle={styles.content}>
-    <View style={styles.header}><View><Text style={styles.eyebrow}>طلباتك وموافقاتك</Text><Text style={styles.title}>الطلبات</Text><Text style={styles.subtitle}>إجازات، أذونات ومأموريات</Text></View><Pressable onPress={() => setModalOpen(true)} style={styles.addButton}><Text style={styles.addButtonText}>+ طلب جديد</Text></Pressable></View>
+    <View style={[styles.header, compact && styles.headerCompact]}><View><Text style={styles.eyebrow}>طلباتك وموافقاتك</Text><Text style={styles.title}>الطلبات</Text><Text style={styles.subtitle}>إجازات، أذونات ومأموريات</Text></View><Pressable onPress={() => setModalOpen(true)} style={[styles.addButton, compact && styles.addButtonCompact]}><Text style={styles.addButtonText}>+ طلب جديد</Text></Pressable></View>
     {role !== "employee" ? <View style={styles.absenceReviewPanel}>
       <View style={styles.absenceReviewHeader}>
         <View style={styles.absenceReviewBadge}><Text style={styles.absenceReviewBadgeText}>{pendingAbsenceReviews.length}</Text></View>
