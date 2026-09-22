@@ -47,5 +47,3 @@ export default function HomeScreen(){
   const notificationsQuery=trpc.notifications.list.useQuery();
   const [working,setWorking]=useState(false);
   const [gpsMessage,setGpsMessage]=useState("الموقع جاهز للتحقق");
-  const isCheckedOut = todayRecord?.checkOut ? true : false;
-  const isWeeklyOff = false;
