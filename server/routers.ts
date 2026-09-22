@@ -139,28 +139,13 @@ export const appRouter = router({
 
       // Detect overtime automatically from the actual checkout time.
       // A manager must approve the generated request before it reaches payroll.
-      const scheduledMinutes = scheduled?.shift
-        ? (() => {
-            const start = timeMinutes(scheduled.shift.startTime);
-            const end = timeMinutes(scheduled.shift.endTime);
-            const raw = end - start;
-            return scheduled.shift.crossesMidnight && raw <= 0 ? raw + 24 * 60 : raw > 0 ? raw : raw + 24 * 60;
-          })()
-        : (() => {
-            const start = timeMinutes(ctx.staffUser.shiftStart);
-            const end = timeMinutes(ctx.staffUser.shiftEnd);
-            const raw = end - start;
-            return raw > 0 ? raw : raw + 24 * 60;
-          })();
-
-      const actualMinutes = (() => {
-        const start = timeMinutes(current.checkIn!);
-        const end = timeMinutes(input.time);
-        const raw = end - start;
-        return raw >= 0 ? raw : raw + 24 * 60;
-      })();
-
-      const overtimeMinutes = Math.max(0, actualMinutes - scheduledMinutes);
+      const overtimeMinutes = enterprise.overtimeAfterShiftEndMinutes(
+        current.checkIn!,
+        input.time,
+        scheduled?.shift?.startTime ?? ctx.staffUser.shiftStart,
+        scheduled?.shift?.endTime ?? ctx.staffUser.shiftEnd,
+        scheduled?.shift?.crossesMidnight ?? false
+      );
       if (overtimeMinutes >= 30) {
         const overtimeHours = Number((overtimeMinutes / 60).toFixed(2));
 
