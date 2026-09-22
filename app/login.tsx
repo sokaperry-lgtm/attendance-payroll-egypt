@@ -15,9 +15,11 @@ export default function LoginScreen() {
   const statusQuery = trpc.system.bootstrapStatus.useQuery();
   const loginMutation = trpc.auth.login.useMutation();
   const setupMutation = trpc.system.setupManager.useMutation();
+  const resetMutation = trpc.system.resetAndSetup.useMutation();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [resetMode, setResetMode] = useState(false);
   const isSetup = statusQuery.data?.hasManager === false;
 
   useEffect(() => {
@@ -30,9 +32,11 @@ export default function LoginScreen() {
         showAlert("بيانات ناقصة", "اكتب البيانات المطلوبة أولًا.");
         return;
       }
-      const result = isSetup
-        ? await setupMutation.mutateAsync({ phone, password, name })
-        : await loginMutation.mutateAsync({ phone, password });
+      const result = resetMode
+        ? await resetMutation.mutateAsync({ confirm: "RESET-STAFF", phone, password, name })
+        : isSetup
+          ? await setupMutation.mutateAsync({ phone, password, name })
+          : await loginMutation.mutateAsync({ phone, password });
 
       // Persist the staff session on both web and native. Web requests also
       // send this token as a Bearer header, so login survives cookie quirks.
@@ -47,7 +51,7 @@ export default function LoginScreen() {
     }
   }
 
-  const busy = loginMutation.isPending || setupMutation.isPending;
+  const busy = loginMutation.isPending || setupMutation.isPending || resetMutation.isPending;
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]} containerClassName="bg-background">
@@ -79,18 +83,18 @@ export default function LoginScreen() {
         </View>
         <View style={[styles.card, isWide && styles.cardWide]}>
           <View style={styles.cardHeader}><View style={styles.statusDot} /><Text style={styles.cardStatus}>SECURE COMPANY ACCESS</Text></View>
-          <Text style={styles.kicker}>{isSetup ? "إعداد النظام" : "بوابة الشركة"}</Text>
-          <Text style={styles.title}>{isSetup ? "إعداد حساب المدير" : "مرحبًا بعودتك"}</Text>
-          <Text style={styles.subtitle}>{isSetup ? "أنشئ حسابك الإداري الأول، وبعدها أضف فريقك." : "سجّل دخولك للوصول إلى لوحة العمل الخاصة بشركتك."}</Text>
+          <Text style={styles.kicker}>{resetMode ? "إعادة تهيئة النظام" : isSetup ? "إعداد النظام" : "بوابة الشركة"}</Text>
+          <Text style={styles.title}>{resetMode ? "ابدأ من جديد" : isSetup ? "إعداد حساب المدير" : "مرحبًا بعودتك"}</Text>
+          <Text style={styles.subtitle}>{resetMode ? "سيتم حذف حسابات الموظفين وبيانات الحضور والطلبات والرواتب الحالية، مع الاحتفاظ بإعدادات الشركة والفرع." : isSetup ? "أنشئ حسابك الإداري الأول، وبعدها أضف فريقك." : "سجّل دخولك للوصول إلى لوحة العمل الخاصة بشركتك."}</Text>
           {isSetup && <><Text style={styles.label}>اسم المدير</Text><TextInput value={name} onChangeText={setName} placeholder="اسمك" placeholderTextColor="#8592A6" style={styles.input} textAlign="right" /></>}
           <Text style={styles.label}>رقم الهاتف</Text>
           <TextInput value={phone} onChangeText={setPhone} placeholder="01xxxxxxxxx" placeholderTextColor="#8592A6" keyboardType="phone-pad" style={styles.input} textAlign="right" />
           <Text style={styles.label}>كلمة المرور</Text>
           <TextInput value={password} onChangeText={setPassword} placeholder={isSetup ? "6 أحرف على الأقل" : "كلمة المرور"} placeholderTextColor="#8592A6" secureTextEntry style={styles.input} textAlign="right" />
-          <Pressable onPress={handleSubmit} disabled={busy} style={({ pressed }) => [styles.button, busy && styles.buttonDisabled, pressed && !busy && styles.buttonPressed]}>
-            <Text style={styles.buttonText}>{busy ? "جاري الدخول..." : isSetup ? "إنشاء حساب المدير" : "دخول إلى النظام"}</Text>
+          {resetMode && <View style={{ backgroundColor: "#3A2418", borderRadius: 12, padding: 10, marginTop: 8 }}><Text style={{ color: "#FDBA74", fontSize: 11, lineHeight: 17, textAlign: "right" }}>⚠️ إعادة التهيئة ستمسح كل حسابات الموظفين وسجلاتهم الحالية.</Text></View>}\n          <Pressable onPress={handleSubmit} disabled={busy} style={({ pressed }) => [styles.button, busy && styles.buttonDisabled, pressed && !busy && styles.buttonPressed]}>
+            <Text style={styles.buttonText}>{busy ? "جاري التنفيذ..." : resetMode ? "مسح الحسابات والبدء من جديد" : isSetup ? "إنشاء حساب المدير" : "دخول إلى النظام"}</Text>
           </Pressable>
-          <Text style={styles.securityNote}>بيانات الدخول مشفرة ومخصصة لحسابات الشركة.</Text>
+          <Pressable onPress={() => setResetMode((v) => !v)} disabled={busy} style={{ marginTop: 14 }}><Text style={{ color: "#60A5FA", fontSize: 11, textAlign: "center", fontWeight: "700" }}>{resetMode ? "رجوع لتسجيل الدخول" : "إعادة تهيئة الحسابات من الصفر"}</Text></Pressable>\n          <Text style={styles.securityNote}>بيانات الدخول مشفرة ومخصصة لحسابات الشركة.</Text>
         </View>
         <Text style={styles.footer}>حاضر · منصة إدارة الموارد البشرية للشركات</Text>
       </KeyboardAvoidingView>
