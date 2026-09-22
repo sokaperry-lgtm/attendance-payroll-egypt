@@ -24,6 +24,7 @@ export default function SettingsScreen() {
   const updateBranch = trpc.companyAdmin.updateBranch.useMutation();
   const toggleBranch = trpc.companyAdmin.toggleBranch.useMutation();
   const assignBranch = trpc.companyAdmin.assignBranch.useMutation();
+  const updateRole = trpc.companyAdmin.role.useMutation();
 
   const [companyName, setCompanyName] = useState("");
   const [legalName, setLegalName] = useState("");
@@ -121,6 +122,14 @@ export default function SettingsScreen() {
     } catch (e: any) { showAlert("تعذر نقل الموظف", e?.message ?? "حدث خطأ غير متوقع."); }
   }
 
+  async function changeRole(staffAccountId: number, nextRole: CompanyRole) {
+    try {
+      await updateRole.mutateAsync({ staffAccountId, role: nextRole });
+      await members.refetch();
+      showAlert("تم تحديث الصلاحية", "تم تطبيق الدور الجديد على حساب الموظف.");
+    } catch (e: any) { showAlert("تعذر تغيير الصلاحية", e?.message ?? "حدث خطأ غير متوقع."); }
+  }
+
   const activeBranch = branches.data?.filter(b => b.active).length ?? 0;
   const employeeCount = overview.data?.employeeCount ?? 0;
 
@@ -200,14 +209,24 @@ export default function SettingsScreen() {
                 <View style={styles.memberInfo}>
                   <Text style={styles.memberName}>{member.name}</Text>
                   <Text style={styles.memberMeta}>{member.title ?? "موظف"} · {member.branchName ?? "بدون فرع"}</Text>
+                  <Text style={styles.roleCaption}>الدور الحالي: {roleLabel(member.membershipRole)}</Text>
                 </View>
-                <View style={styles.branchChips}>
-                  {(branches.data ?? []).filter(b => b.active).map(b => (
-                    <Pressable key={b.id} onPress={() => moveMember(member.id, b.id)} style={[styles.chip, member.branchId === b.id && styles.chipActive]}>
-                      <Text style={[styles.chipText, member.branchId === b.id && styles.chipTextActive]}>{b.name}</Text>
-                    </Pressable>
-                  ))}
-                  <Pressable onPress={() => moveMember(member.id, null)} style={[styles.chip, !member.branchId && styles.chipActive]}><Text style={[styles.chipText, !member.branchId && styles.chipTextActive]}>بدون فرع</Text></Pressable>
+                <View style={styles.memberControls}>
+                  <View style={styles.branchChips}>
+                    {(branches.data ?? []).filter(b => b.active).map(b => (
+                      <Pressable key={b.id} onPress={() => moveMember(member.id, b.id)} style={[styles.chip, member.branchId === b.id && styles.chipActive]}>
+                        <Text style={[styles.chipText, member.branchId === b.id && styles.chipTextActive]}>{b.name}</Text>
+                      </Pressable>
+                    ))}
+                    <Pressable onPress={() => moveMember(member.id, null)} style={[styles.chip, !member.branchId && styles.chipActive]}><Text style={[styles.chipText, !member.branchId && styles.chipTextActive]}>بدون فرع</Text></Pressable>
+                  </View>
+                  <View style={styles.roleChips}>
+                    {(["hr","manager","supervisor","accountant","employee"] as CompanyRole[]).map(r => (
+                      <Pressable key={r} onPress={() => changeRole(member.id, r)} style={[styles.chip, member.membershipRole === r && styles.roleChipActive]}>
+                        <Text style={[styles.chipText, member.membershipRole === r && styles.chipTextActive]}>{roleLabel(r)}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
                 </View>
               </View>
             ))}
@@ -250,6 +269,10 @@ function Row({ label, value }: { label:string; value:string }) {
 function Stat({ value, label }: { value:string; label:string }) {
   return <View style={styles.stat}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>;
 }
+type CompanyRole = "owner" | "hr" | "manager" | "supervisor" | "accountant" | "employee";
+function roleLabel(role?: string) {
+  return ({ owner:"مالك", hr:"HR", manager:"مدير", supervisor:"مشرف", accountant:"محاسب", employee:"موظف" } as Record<string,string>)[role ?? ""] ?? role ?? "—";
+}
 
 const styles=StyleSheet.create({
   content:{padding:22,paddingBottom:60,gap:16,maxWidth:1200,width:"100%",alignSelf:"center"},
@@ -261,6 +284,6 @@ const styles=StyleSheet.create({
   grid:{flexDirection:"row-reverse",flexWrap:"wrap",gap:10},gridOne:{flexDirection:"column"},label:{color:"#667085",fontSize:10,fontWeight:"700",textAlign:"right",marginBottom:5},input:{borderWidth:1,borderColor:"#D9E0E8",borderRadius:11,padding:10,color:"#172033",fontSize:12,backgroundColor:"#FBFCFE",marginBottom:8},primaryButton:{backgroundColor:"#163A63",borderRadius:13,padding:13,alignItems:"center",justifyContent:"center",flex:1},primaryText:{color:"#FFFFFF",fontWeight:"900",fontSize:12},secondaryButton:{borderWidth:1,borderColor:"#D9E0E8",borderRadius:13,padding:12,alignItems:"center",justifyContent:"center",flex:1},secondaryText:{color:"#163A63",fontWeight:"900",fontSize:12},actionRow:{flexDirection:"row-reverse",gap:9,marginTop:4},
   branchLayout:{flexDirection:"row-reverse",gap:12},branchLayoutCompact:{flexDirection:"column"},branchList:{width:300,gap:8},branchCard:{borderWidth:1,borderColor:"#EDF1F5",borderRadius:15,padding:13,backgroundColor:"#FBFCFE",gap:5},branchCardActive:{borderColor:"#9CB8D5",backgroundColor:"#F5F9FD"},branchCardTop:{flexDirection:"row-reverse",alignItems:"center",gap:7},statusDot:{width:8,height:8,borderRadius:4},branchName:{color:"#172033",fontSize:13,fontWeight:"900",textAlign:"right",flex:1},branchMeta:{color:"#667085",fontSize:9,textAlign:"right"},branchMiniRow:{flexDirection:"row-reverse",gap:5,alignItems:"center"},miniValue:{color:"#163A63",fontSize:10,fontWeight:"900"},miniLabel:{color:"#98A2B3",fontSize:8},addBranch:{borderWidth:1,borderStyle:"dashed",borderColor:"#9CB8D5",borderRadius:14,padding:13,alignItems:"center"},addBranchText:{color:"#163A63",fontWeight:"900",fontSize:11},
   editor:{flex:1,borderWidth:1,borderColor:"#EDF1F5",borderRadius:17,padding:15,gap:8},editorHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},editorSub:{color:"#98A2B3",fontSize:9,textAlign:"right",marginTop:2},badge:{backgroundColor:"#E7F4EF",paddingHorizontal:9,paddingVertical:5,borderRadius:8},badgeText:{color:"#2E7D68",fontSize:8,fontWeight:"900"},
-  memberList:{gap:7},memberRow:{borderWidth:1,borderColor:"#EDF1F5",borderRadius:14,padding:11,flexDirection:"row-reverse",alignItems:"center",gap:12},memberRowCompact:{flexDirection:"column",alignItems:"stretch"},memberInfo:{minWidth:190,flex:1},memberName:{color:"#172033",fontSize:12,fontWeight:"900",textAlign:"right"},memberMeta:{color:"#98A2B3",fontSize:9,textAlign:"right",marginTop:2},branchChips:{flexDirection:"row-reverse",flexWrap:"wrap",gap:6},chip:{borderWidth:1,borderColor:"#D9E0E8",borderRadius:10,paddingHorizontal:9,paddingVertical:7,backgroundColor:"#FFFFFF"},chipActive:{backgroundColor:"#163A63",borderColor:"#163A63"},chipText:{color:"#667085",fontSize:9,fontWeight:"800"},chipTextActive:{color:"#FFFFFF"},
+  memberList:{gap:7},memberRow:{borderWidth:1,borderColor:"#EDF1F5",borderRadius:14,padding:11,flexDirection:"row-reverse",alignItems:"center",gap:12},memberRowCompact:{flexDirection:"column",alignItems:"stretch"},memberInfo:{minWidth:190,flex:1},memberName:{color:"#172033",fontSize:12,fontWeight:"900",textAlign:"right"},memberMeta:{color:"#98A2B3",fontSize:9,textAlign:"right",marginTop:2},roleCaption:{color:"#163A63",fontSize:9,fontWeight:"800",textAlign:"right",marginTop:4},memberControls:{flex:2,gap:7},branchChips:{flexDirection:"row-reverse",flexWrap:"wrap",gap:6},roleChips:{flexDirection:"row-reverse",flexWrap:"wrap",gap:6},chip:{borderWidth:1,borderColor:"#D9E0E8",borderRadius:10,paddingHorizontal:9,paddingVertical:7,backgroundColor:"#FFFFFF"},chipActive:{backgroundColor:"#163A63",borderColor:"#163A63"},roleChipActive:{backgroundColor:"#2E7D68",borderColor:"#2E7D68"},chipText:{color:"#667085",fontSize:9,fontWeight:"800"},chipTextActive:{color:"#FFFFFF"},
   bottomGrid:{flexDirection:"row-reverse",gap:12},bottomGridOne:{flexDirection:"column"},statusRow:{flexDirection:"row-reverse",justifyContent:"space-between",paddingVertical:10,borderBottomWidth:1,borderBottomColor:"#F7F9FC"},value:{color:"#163A63",fontSize:11,fontWeight:"900"},securityButton:{marginTop:8,backgroundColor:"#163A63",borderRadius:12,padding:12,flexDirection:"row-reverse",alignItems:"center",justifyContent:"center",gap:8},securityButtonText:{color:"#FFFFFF",fontSize:10,fontWeight:"800"},hint:{color:"#667085",fontSize:11,textAlign:"right"},denied:{flex:1,alignItems:"center",justifyContent:"center",gap:12},deniedTitle:{color:"#172033",fontSize:19,fontWeight:"800"}
 });
