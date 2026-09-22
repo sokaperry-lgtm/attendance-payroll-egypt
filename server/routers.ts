@@ -14,7 +14,7 @@ const staffView = async (staff: Awaited<ReturnType<typeof db.getStaffAccountById
 
   id: staff.id, phone: staff.phone, name: staff.name, title: staff.title, department: staff.department,
   role: staff.role, baseSalary: staff.baseSalary, shiftStart: staff.shiftStart, shiftEnd: staff.shiftEnd, active: staff.active,
-, membershipRole: (await enterprise.getMembership(staff.id))?.role ?? (staff.role === "manager" ? "manager" : staff.role === "supervisor" ? "supervisor" : "employee"),
+  membershipRole: (await enterprise.getMembership(staff.id))?.role ?? (staff.role === "manager" ? "manager" : staff.role === "supervisor" ? "supervisor" : "employee"),
 }) : null;
 
 export const appRouter = router({
