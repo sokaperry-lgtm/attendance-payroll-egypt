@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/lib/payroll";
@@ -12,6 +12,8 @@ export default function EmployeeProfileScreen() {
   const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
   const staffAccountId = Number(rawId);
   const [tab, setTab] = useState<Tab>("overview");
+  const { width } = useWindowDimensions();
+  const compact = width < 700;
 
   const me = trpc.auth.me.useQuery(undefined, { retry: false });
   const canLoad = (me.data?.role === "manager" || me.data?.role === "supervisor") && Number.isInteger(staffAccountId) && staffAccountId > 0;
@@ -50,7 +52,7 @@ export default function EmployeeProfileScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Pressable onPress={() => router.back()}><Text style={styles.back}>‹ رجوع للموظفين</Text></Pressable>
 
-        <View style={styles.hero}>
+        <View style={[styles.hero, compact && styles.heroCompact]}>
           <View style={styles.avatar}><Text style={styles.avatarText}>{initials(employee.name)}</Text></View>
           <View style={styles.heroText}>
             <Text style={styles.kicker}>EMPLOYEE 360</Text>
@@ -60,7 +62,7 @@ export default function EmployeeProfileScreen() {
           </View>
         </View>
 
-        <View style={styles.kpis}>
+        <View style={[styles.kpis, compact && styles.kpisCompact]}>
           <Kpi label="معدل الحضور" value={`${attendanceRate}%`} />
           <Kpi label="أيام الحضور" value={String(present)} />
           <Kpi label="دقائق التأخير" value={`${late} د`} />
@@ -68,7 +70,7 @@ export default function EmployeeProfileScreen() {
           <Kpi label="طلبات قيد المراجعة" value={String(pendingRequests)} />
         </View>
 
-        <View style={styles.tabs}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
           {([
             ["overview", "نظرة عامة"],
             ["schedule", "الجدول"],
@@ -86,7 +88,7 @@ export default function EmployeeProfileScreen() {
 
         {tab === "overview" && (
           <>
-            <View style={styles.grid}>
+            <View style={[styles.grid, compact && styles.gridCompact]}>
               <Card title="بيانات الموظف">
                 <Row label="الهاتف" value={employee.phone || "—"} />
                 <Row label="القسم" value={employee.department || "—"} />
@@ -115,7 +117,7 @@ export default function EmployeeProfileScreen() {
                 <Row key={r.id} label={String(r.scheduleDate)} value={r.shift ? `${r.shift.name} · ${r.shift.startTime}–${r.shift.endTime}` : "بدون وردية"} />
               )) : <Empty text="لا يوجد جدول مسجل لهذا الموظف." />}
             </Card>
-            <View style={styles.infoGrid}>
+            <View style={[styles.infoGrid, compact && styles.gridCompact]}>
               <Card title="نظرة سريعة"><Row label="أيام مجدولة" value={String(schedules.length)} /><Row label="أيام الحضور" value={String(present)} /></Card>
               <Card title="الإجازات"><Row label="إجازات معتمدة" value={String(approvedLeave)} /><Row label="طلبات قيد المراجعة" value={String(pendingRequests)} /></Card>
             </View>
@@ -161,6 +163,7 @@ const styles = StyleSheet.create({
   content: { padding: 22, paddingBottom: 70, gap: 14, maxWidth: 1180, width: "100%", alignSelf: "center" },
   back: { color: "#163A63", fontSize: 13, fontWeight: "800", textAlign: "right", paddingVertical: 6 },
   hero: { backgroundColor: "#163A63", borderRadius: 24, padding: 22, flexDirection: "row-reverse", alignItems: "center", gap: 16 },
+  heroCompact: { flexDirection: "column", alignItems: "stretch" },
   avatar: { width: 72, height: 72, borderRadius: 22, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
   avatarText: { color: "#163A63", fontSize: 23, fontWeight: "900" },
   heroText: { flex: 1 },
@@ -170,15 +173,17 @@ const styles = StyleSheet.create({
   phone: { color: "#FFFFFF", opacity: 0.75, fontSize: 11, textAlign: "right", marginTop: 5 },
   heroBadges:{flexDirection:"row-reverse",gap:7,marginTop:10},heroBadge:{color:"#163A63",backgroundColor:"#FFFFFF",borderRadius:8,paddingHorizontal:9,paddingVertical:4,fontSize:9,fontWeight:"900"},heroBadgeGhost:{color:"#FFFFFF",backgroundColor:"rgba(255,255,255,0.12)",borderRadius:8,paddingHorizontal:9,paddingVertical:4,fontSize:9,fontWeight:"800"},
   kpis: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 12 },
+  kpisCompact: { flexDirection: "column" },
   kpi: { flexGrow: 1, flexBasis: 180, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E4E7EC", borderRadius: 18, padding: 16, minHeight: 88, justifyContent: "center" },
   kpiValue: { color: "#163A63", fontSize: 20, fontWeight: "900", textAlign: "right" },
   kpiLabel: { color: "#667085", fontSize: 11, fontWeight: "700", textAlign: "right", marginTop: 5 },
-  tabs: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 8, backgroundColor: "#F7F9FC", borderRadius: 16, padding: 7, borderWidth: 1, borderColor: "#E4E7EC" },
+  tabs: { flexDirection: "row-reverse", alignItems: "center", gap: 8, backgroundColor: "#F7F9FC", borderRadius: 16, padding: 7, borderWidth: 1, borderColor: "#E4E7EC" },
   tab: { flexGrow: 1, minWidth: 120, paddingVertical: 11, paddingHorizontal: 14, borderRadius: 11, alignItems: "center" },
   tabActive: { backgroundColor: "#163A63" },
   tabText: { color: "#667085", fontSize: 12, fontWeight: "800" },
   tabTextActive: { color: "#FFFFFF" },
   grid: { flexDirection: "row-reverse", gap: 14, flexWrap: "wrap" },
+  gridCompact: { flexDirection: "column" },
   infoGrid: { flexDirection: "row-reverse", gap: 14, flexWrap: "wrap" },
   card: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E4E7EC", borderRadius: 18, padding: 18, flexGrow: 1, flexBasis: 360 },
   cardTitle: { color: "#172033", fontSize: 16, fontWeight: "900", textAlign: "right", marginBottom: 8 },
