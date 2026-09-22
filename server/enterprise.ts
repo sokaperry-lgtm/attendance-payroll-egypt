@@ -799,7 +799,7 @@ export async function reviewAttendanceException(actorId:number,input:{staffAccou
   let nextNote=noteText.replace(/\s*·\s*(?:تم اعتماد|تم إلغاء )?(?:التأخير|الانصراف المبكر|الغياب)/g,"").trim();
   if(input.action==="cancel"){
     if(input.kind==="late") row.lateMinutes=0;
-    if(input.kind==="absence") row.status="حاضر";
+    if(input.kind==="absence") row.status="مأمورية";
     if(input.kind==="early") nextNote=nextNote.replace(/انصراف مبكر:\s*\d+\s*دقيقة/g,"").trim();
     nextNote=(nextNote?nextNote+" · ":"")+"تم إلغاء "+(input.kind==="late"?"التأخير":input.kind==="early"?"الانصراف المبكر":"الغياب");
   }
