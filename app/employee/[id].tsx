@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/lib/payroll";
 
-type Tab = "overview" | "attendance" | "requests" | "payroll" | "documents";
+type Tab = "overview" | "schedule" | "attendance" | "requests" | "payroll" | "audit" | "documents";
 
 export default function EmployeeProfileScreen() {
   const router = useRouter();
@@ -33,11 +33,17 @@ export default function EmployeeProfileScreen() {
   const documents = data.documents ?? [];
   const adjustments = data.adjustments ?? [];
   const advances = data.advances ?? [];
+  const schedules = data.schedules ?? [];
+  const audit = data.audit ?? [];
   const present = attendance.filter((r) => r.status === "حاضر" || r.status === "متأخر").length;
   const absent = attendance.filter((r) => r.status === "غياب").length;
   const late = attendance.reduce((sum, r) => sum + Number(r.lateMinutes || 0), 0);
   const approvedRequests = requests.filter((r) => r.status === "مقبول").length;
   const latestPayroll = payroll[0];  const attendanceRate = attendance.length ? Math.round((present / attendance.length) * 100) : 0;  const recentAttendance = useMemo(() => attendance.slice(0, 8), [attendance]);
+  const workSchedules = useMemo(() => schedules.slice(0, 14), [schedules]);
+  const currentMonthPayroll = latestPayroll ? Number(latestPayroll.netSalary || 0) : 0;
+  const pendingRequests = requests.filter((r) => r.status === "قيد المراجعة").length;
+  const approvedLeave = requests.filter((r) => r.status === "مقبول" && String(r.type || "").includes("إجاز")).length;
 
   return (
     <Screen>
@@ -58,15 +64,18 @@ export default function EmployeeProfileScreen() {
           <Kpi label="معدل الحضور" value={`${attendanceRate}%`} />
           <Kpi label="أيام الحضور" value={String(present)} />
           <Kpi label="دقائق التأخير" value={`${late} د`} />
-          <Kpi label="آخر صافي راتب" value={latestPayroll ? formatMoney(Number(latestPayroll.netSalary || 0)) : "—"} />
+          <Kpi label="آخر صافي راتب" value={latestPayroll ? formatMoney(currentMonthPayroll) : "—"} />
+          <Kpi label="طلبات قيد المراجعة" value={String(pendingRequests)} />
         </View>
 
         <View style={styles.tabs}>
           {([
             ["overview", "نظرة عامة"],
+            ["schedule", "الجدول"],
             ["attendance", "الحضور"],
             ["requests", "الطلبات"],
             ["payroll", "الرواتب"],
+            ["audit", "سجل العمليات"],
             ["documents", "المستندات"],
           ] as const).map(([key, label]) => (
             <Pressable key={key} onPress={() => setTab(key)} style={[styles.tab, tab === key && styles.tabActive]}>
@@ -86,7 +95,8 @@ export default function EmployeeProfileScreen() {
               </Card>
               <Card title="ملخص النشاط">
                 <Row label="الطلبات المقبولة" value={String(approvedRequests)} />
-                <Row label="كل الطلبات" value={String(requests.length)} />
+                <Row label="طلبات قيد المراجعة" value={String(pendingRequests)} />
+                <Row label="إجازات معتمدة" value={String(approvedLeave)} />
                 <Row label="تعديلات الراتب" value={String(adjustments.length)} />
                 <Row label="السلف" value={String(advances.length)} />
               </Card>
@@ -98,6 +108,20 @@ export default function EmployeeProfileScreen() {
           </>
         )}
 
+        {tab === "schedule" && (
+          <>
+            <Card title="جدول الموظف">
+              {workSchedules.length ? workSchedules.map((r:any) => (
+                <Row key={r.id} label={String(r.scheduleDate)} value={r.shift ? `${r.shift.name} · ${r.shift.startTime}–${r.shift.endTime}` : "بدون وردية"} />
+              )) : <Empty text="لا يوجد جدول مسجل لهذا الموظف." />}
+            </Card>
+            <View style={styles.infoGrid}>
+              <Card title="نظرة سريعة"><Row label="أيام مجدولة" value={String(schedules.length)} /><Row label="أيام الحضور" value={String(present)} /></Card>
+              <Card title="الإجازات"><Row label="إجازات معتمدة" value={String(approvedLeave)} /><Row label="طلبات قيد المراجعة" value={String(pendingRequests)} /></Card>
+            </View>
+          </>
+        )}
+
         {tab === "attendance" && <Card title="سجل الحضور">{attendance.length ? attendance.slice(0, 30).map((r) => <Row key={r.id} label={String(r.date)} value={r.checkIn && r.checkOut ? `${r.checkIn} → ${r.checkOut}` : String(r.status || "—")} />) : <Empty text="لا توجد سجلات حضور." />}</Card>}
         {tab === "requests" && <Card title="الطلبات">{requests.length ? requests.slice(0, 30).map((r) => <Row key={r.id} label={`${r.type} · ${r.fromDate}`} value={String(r.status || "—")} />) : <Empty text="لا توجد طلبات." />}</Card>}
         {tab === "payroll" && (
@@ -105,6 +129,13 @@ export default function EmployeeProfileScreen() {
             <Card title="بيانات الراتب"><Row label="الراتب الأساسي" value={formatMoney(employee.baseSalary)} /><Row label="تعديلات الراتب" value={String(adjustments.length)} /><Row label="السلف" value={String(advances.length)} /></Card>
             <Card title="سجل الرواتب">{payroll.length ? payroll.slice(0, 20).map((r) => <Row key={r.id} label={String(r.month)} value={formatMoney(Number(r.netSalary || 0))} />) : <Empty text="لا توجد مسيرات مسجلة." />}</Card>
           </>
+        )}
+        {tab === "audit" && (
+          <Card title="سجل عمليات الموظف">
+            {audit.length ? audit.slice(0, 40).map((r:any) => (
+              <Row key={r.id} label={r.createdAt ? new Date(r.createdAt).toLocaleString("ar-EG") : "—"} value={String(r.action || "عملية")} />
+            )) : <Empty text="لا توجد عمليات مسجلة لهذا الموظف." />}
+          </Card>
         )}
         {tab === "documents" && <Card title="مستندات الموظف">{documents.length ? documents.map((d) => <Row key={d.id} label={`${d.type} · ${d.title}`} value={d.expiryDate ? String(d.expiryDate) : "—"} />) : <Empty text="لا توجد مستندات." />}</Card>}
       </ScrollView>
@@ -148,6 +179,7 @@ const styles = StyleSheet.create({
   tabText: { color: "#667085", fontSize: 12, fontWeight: "800" },
   tabTextActive: { color: "#FFFFFF" },
   grid: { flexDirection: "row-reverse", gap: 14, flexWrap: "wrap" },
+  infoGrid: { flexDirection: "row-reverse", gap: 14, flexWrap: "wrap" },
   card: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E4E7EC", borderRadius: 18, padding: 18, flexGrow: 1, flexBasis: 360 },
   cardTitle: { color: "#172033", fontSize: 16, fontWeight: "900", textAlign: "right", marginBottom: 8 },
   row: { flexDirection: "row-reverse", justifyContent: "space-between", paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: "#E4E7EC", gap: 10 },
