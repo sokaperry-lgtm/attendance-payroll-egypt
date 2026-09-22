@@ -620,21 +620,109 @@ export async function getSecuritySummary(staffAccountId:number) {
   return { sessionPolicy:"30 days", passwordHash:"scrypt", tenantIsolation:"company membership", auditLog:true, roleBasedAccess:true };
 }
 
+function leaveDays(fromDate:string,toDate:string) {
+  const from=new Date(fromDate+"T00:00:00");
+  const to=new Date(toDate+"T00:00:00");
+  return Math.floor((to.getTime()-from.getTime())/86400000)+1;
+}
+
+function leaveKind(type:"إجازة"|"إجازة مرضية"|"إجازة طارئة") {
+  return type==="إجازة" ? "annual" : type==="إجازة مرضية" ? "sick" : "emergency";
+}
+
+export async function validateLeaveRequest(
+  staffAccountId:number,
+  fromDate:string,
+  toDate:string,
+  type:"إجازة"|"إجازة مرضية"|"إجازة طارئة"
+) {
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(fromDate) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(toDate)) throw new Error("صيغة تاريخ الإجازة غير صحيحة.");
+  if(fromDate>toDate) throw new Error("تاريخ بداية الإجازة يجب أن يكون قبل أو مساويًا لتاريخ النهاية.");
+  if(fromDate.slice(0,4)!==toDate.slice(0,4)) throw new Error("لا يمكن أن تمتد الإجازة بين سنتين. قدم طلبين منفصلين.");
+  const days=leaveDays(fromDate,toDate);
+  if(days<1 || days>366) throw new Error("مدة الإجازة غير صحيحة.");
+  const actor=await getCompanyForStaff(staffAccountId); if(!actor) throw new Error("Company not found");
+  await assertPayrollEditable(staffAccountId,fromDate.slice(0,7));
+  if(toDate.slice(0,7)!==fromDate.slice(0,7)) await assertPayrollEditable(staffAccountId,toDate.slice(0,7));
+
+  const existing=await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,staffAccountId));
+  const overlap=existing.find(r =>
+    ["إجازة","إجازة مرضية","إجازة طارئة"].includes(r.type) &&
+    r.status!=="مرفوض" &&
+    r.fromDate<=toDate &&
+    r.toDate>=fromDate
+  );
+  if(overlap) throw new Error("يوجد طلب إجازة آخر متداخل مع هذه الفترة.");
+
+  const balance=await ensureLeaveBalance(staffAccountId,Number(fromDate.slice(0,4)));
+  if(!balance) throw new Error("تعذر قراءة رصيد الإجازات.");
+  const kind=leaveKind(type);
+  const available=kind==="annual" ? balance.annualDays-balance.annualUsed : kind==="sick" ? balance.sickDays-balance.sickUsed : balance.emergencyDays-balance.emergencyUsed;
+  if(available<days) throw new Error("رصيد الإجازة غير كافٍ لهذه المدة.");
+  return {days,available,kind};
+}
+
 export async function consumeLeaveBalance(staffAccountId:number, fromDate:string, toDate:string, kind:"annual"|"sick"|"emergency") {
-  const db=await getDb(); if(!db) return;
-  const days=Math.max(1,Math.floor((new Date(toDate).getTime()-new Date(fromDate).getTime())/86400000)+1);
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const days=leaveDays(fromDate,toDate);
+  if(days<1) throw new Error("مدة الإجازة غير صحيحة.");
   const year=Number(fromDate.slice(0,4));
   const balance=await ensureLeaveBalance(staffAccountId,year);
-  if(!balance) return;
+  if(!balance) throw new Error("تعذر قراءة رصيد الإجازات.");
+  const now=new Date();
   if(kind==="annual"){
-    if(balance.annualDays-balance.annualUsed < days) throw new Error("رصيد الإجازات السنوية غير كافٍ.");
-    await db.update(leaveBalances).set({annualUsed:balance.annualUsed+days,updatedAt:new Date()}).where(eq(leaveBalances.id,balance.id));
+    if(balance.annualDays-balance.annualUsed<days) throw new Error("رصيد الإجازات السنوية غير كافٍ.");
+    const changed=await db.update(leaveBalances).set({annualUsed:balance.annualUsed+days,updatedAt:now}).where(and(eq(leaveBalances.id,balance.id),eq(leaveBalances.annualUsed,balance.annualUsed)));
+    if(!changed[0]?.affectedRows) throw new Error("تم تحديث رصيد الإجازات بالفعل. حاول مرة أخرى.");
   } else if(kind==="sick") {
-    if(balance.sickDays-balance.sickUsed < days) throw new Error("رصيد الإجازات المرضية غير كافٍ.");
-    await db.update(leaveBalances).set({sickUsed:balance.sickUsed+days,updatedAt:new Date()}).where(eq(leaveBalances.id,balance.id));
+    if(balance.sickDays-balance.sickUsed<days) throw new Error("رصيد الإجازات المرضية غير كافٍ.");
+    const changed=await db.update(leaveBalances).set({sickUsed:balance.sickUsed+days,updatedAt:now}).where(and(eq(leaveBalances.id,balance.id),eq(leaveBalances.sickUsed,balance.sickUsed)));
+    if(!changed[0]?.affectedRows) throw new Error("تم تحديث رصيد الإجازات بالفعل. حاول مرة أخرى.");
   } else {
-    if(balance.emergencyDays-balance.emergencyUsed < days) throw new Error("رصيد الإجازات الطارئة غير كافٍ.");
-    await db.update(leaveBalances).set({emergencyUsed:balance.emergencyUsed+days,updatedAt:new Date()}).where(eq(leaveBalances.id,balance.id));
+    if(balance.emergencyDays-balance.emergencyUsed<days) throw new Error("رصيد الإجازات الطارئة غير كافٍ.");
+    const changed=await db.update(leaveBalances).set({emergencyUsed:balance.emergencyUsed+days,updatedAt:now}).where(and(eq(leaveBalances.id,balance.id),eq(leaveBalances.emergencyUsed,balance.emergencyUsed)));
+    if(!changed[0]?.affectedRows) throw new Error("تم تحديث رصيد الإجازات بالفعل. حاول مرة أخرى.");
+  }
+}
+
+export async function reviewLeaveRequest(actorId:number,id:number,status:"مقبول"|"مرفوض") {
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const requests=await listCompanyRequests(actorId);
+  const existing=requests.find((r:any)=>r.id===id);
+  if(!existing || existing.source!=="request") throw new Error("طلب الإجازة غير موجود.");
+  if(existing.status!=="قيد المراجعة") throw new Error("هذا الطلب تمت معالجته بالفعل.");
+  if(!["إجازة","إجازة مرضية","إجازة طارئة"].includes(existing.type)) throw new Error("نوع الطلب ليس إجازة.");
+  await assertStaffInCompany(actorId,existing.staffAccountId);
+  await assertPayrollEditable(actorId,existing.fromDate.slice(0,7));
+  if(existing.toDate.slice(0,7)!==existing.fromDate.slice(0,7)) await assertPayrollEditable(actorId,existing.toDate.slice(0,7));
+
+  const kind=leaveKind(existing.type as "إجازة"|"إجازة مرضية"|"إجازة طارئة");
+  let consumed=false;
+  if(status==="مقبول"){
+    await validateLeaveRequest(existing.staffAccountId,existing.fromDate,existing.toDate,existing.type as "إجازة"|"إجازة مرضية"|"إجازة طارئة");
+    await consumeLeaveBalance(existing.staffAccountId,existing.fromDate,existing.toDate,kind);
+    consumed=true;
+  }
+  try {
+    const row=await db.approveRequest(id,actorId,status);
+    if(!row) throw new Error("تعذر تحديث طلب الإجازة.");
+    if(status==="مقبول") {
+      await syncMonthlyAttendance(actorId,existing.fromDate.slice(0,7));
+      if(existing.toDate.slice(0,7)!==existing.fromDate.slice(0,7)) await syncMonthlyAttendance(actorId,existing.toDate.slice(0,7));
+    }
+    const m=await getCompanyForStaff(actorId);
+    if(m) await writeAudit(actorId,m.companyId,"leave.request."+status,"request",String(id),{staffAccountId:existing.staffAccountId,type:existing.type,fromDate:existing.fromDate,toDate:existing.toDate,days:leaveDays(existing.fromDate,existing.toDate)});
+    await createNotification(existing.staffAccountId,"request","تم تحديث طلب الإجازة","حالة طلب الإجازة أصبحت: "+status);
+    return row;
+  } catch(error) {
+    if(consumed) {
+      const balance=await ensureLeaveBalance(existing.staffAccountId,Number(existing.fromDate.slice(0,4)));
+      if(kind==="annual") await db.update(leaveBalances).set({annualUsed:Math.max(0,balance.annualUsed-leaveDays(existing.fromDate,existing.toDate)),updatedAt:new Date()}).where(eq(leaveBalances.id,balance.id));
+      if(kind==="sick") await db.update(leaveBalances).set({sickUsed:Math.max(0,balance.sickUsed-leaveDays(existing.fromDate,existing.toDate)),updatedAt:new Date()}).where(eq(leaveBalances.id,balance.id));
+      if(kind==="emergency") await db.update(leaveBalances).set({emergencyUsed:Math.max(0,balance.emergencyUsed-leaveDays(existing.fromDate,existing.toDate)),updatedAt:new Date()}).where(eq(leaveBalances.id,balance.id));
+    }
+    throw error;
   }
 }
 
