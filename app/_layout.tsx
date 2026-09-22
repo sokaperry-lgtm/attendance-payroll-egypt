@@ -89,6 +89,7 @@ export default function RootLayout() {
           <StaffAuthGate>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="manager" options={{ headerShown: false }} />
               <Stack.Screen name="login" />
               <Stack.Screen name="oauth/callback" />
             </Stack>
