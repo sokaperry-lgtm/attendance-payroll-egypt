@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -238,7 +238,7 @@ export default function SettingsScreen() {
   );
 }
 
-function Section({ title, subtitle, children }: { title:string; subtitle:string; children:React.ReactNode }) {
+function Section({ title, subtitle, children }: { title:string; subtitle:string; children:ReactNode }) {
   return <View style={styles.card}><Text style={styles.cardTitle}>{title}</Text><Text style={styles.cardSub}>{subtitle}</Text>{children}</View>;
 }
 function Field({ label, value, set, keyboard="default" }: { label:string; value:string; set:(v:string)=>void; keyboard?:any }) {
