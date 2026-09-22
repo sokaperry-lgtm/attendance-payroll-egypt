@@ -36,7 +36,7 @@ export const appRouter = router({
     }),
   }),
   auth: router({
-    me: publicProcedure.query(({ ctx }) => staffView(ctx.staffUser)),
+    me: publicProcedure.query(async ({ ctx }) => await staffView(ctx.staffUser)),
     login: publicProcedure.input(loginInput).mutation(async ({ ctx, input }) => {
       const staff = await db.authenticateStaff(input.phone, input.password);
       if (!staff) throw new Error("رقم الهاتف أو كلمة المرور غير صحيحة.");
@@ -44,7 +44,7 @@ export const appRouter = router({
       await enterprise.writeAudit(staff.id, membership.companyId, "auth.login", "staff", String(staff.id), { role: staff.role });
       const token = await db.createStaffSession(staff.id);
       ctx.res.cookie(INTERNAL_SESSION_COOKIE, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
-      return { token, staff: staffView(staff) };
+      return { token, staff: await staffView(staff) };
     }),
     logout: staffProcedure.mutation(async ({ ctx }) => {
       const authHeader = ctx.req.headers.authorization || ctx.req.headers.Authorization;
@@ -90,7 +90,7 @@ export const appRouter = router({
       const updated = await db.updateStaffAccount(id, changes);
       if (changes.role) await enterprise.syncCompanyMemberRole(ctx.staffUser.id, id, changes.role);
       await enterprise.writeAudit(ctx.staffUser.id, (await enterprise.getCompanyForStaff(ctx.staffUser.id))!.companyId, "staff.updated", "staff", String(id), changes);
-      return staffView(updated);
+      return await staffView(updated);
     }),
   }),
   company: router({
