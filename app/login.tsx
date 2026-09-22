@@ -28,7 +28,7 @@ export default function LoginScreen() {
 
   async function handleSubmit() {
     try {
-      if (!phone.trim() || !password.trim() || (isSetup && !name.trim())) {
+      if (!phone.trim() || !password.trim() || ((isSetup || resetMode) && name.trim().length < 2)) {
         showAlert("بيانات ناقصة", "اكتب البيانات المطلوبة أولًا.");
         return;
       }
@@ -86,7 +86,7 @@ export default function LoginScreen() {
           <Text style={styles.kicker}>{resetMode ? "إعادة تهيئة النظام" : isSetup ? "إعداد النظام" : "بوابة الشركة"}</Text>
           <Text style={styles.title}>{resetMode ? "ابدأ من جديد" : isSetup ? "إعداد حساب المدير" : "مرحبًا بعودتك"}</Text>
           <Text style={styles.subtitle}>{resetMode ? "سيتم حذف حسابات الموظفين وبيانات الحضور والطلبات والرواتب الحالية، مع الاحتفاظ بإعدادات الشركة والفرع." : isSetup ? "أنشئ حسابك الإداري الأول، وبعدها أضف فريقك." : "سجّل دخولك للوصول إلى لوحة العمل الخاصة بشركتك."}</Text>
-          {isSetup && <><Text style={styles.label}>اسم المدير</Text><TextInput value={name} onChangeText={setName} placeholder="اسمك" placeholderTextColor="#8592A6" style={styles.input} textAlign="right" /></>}
+          {(isSetup || resetMode) && <><Text style={styles.label}>اسم المدير</Text><TextInput value={name} onChangeText={setName} placeholder="اسمك" placeholderTextColor="#8592A6" style={styles.input} textAlign="right" /></>}
           <Text style={styles.label}>رقم الهاتف</Text>
           <TextInput value={phone} onChangeText={setPhone} placeholder="01xxxxxxxxx" placeholderTextColor="#8592A6" keyboardType="phone-pad" style={styles.input} textAlign="right" />
           <Text style={styles.label}>كلمة المرور</Text>
