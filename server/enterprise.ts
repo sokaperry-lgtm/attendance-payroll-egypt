@@ -457,6 +457,34 @@ export async function approvePayroll(staffAccountId:number, id:number) {
   const current=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
   if(!current) throw new Error("مسير الرواتب غير موجود.");
   if(current.status==="approved") return current;
+
+  // Always regenerate the draft before approval so the final payroll reflects
+  // the latest reviewed attendance, approved adjustments, and active advances.
+  await generatePayroll(staffAccountId, current.month);
+  const refreshed=(await db.select().from(payrollRecords).where(and(
+    eq(payrollRecords.id,id),
+    eq(payrollRecords.companyId,m.companyId)
+  )).limit(1))[0];
+  if(!refreshed) throw new Error("تعذر تحديث مسير الرواتب.");
+
+  // A payroll cannot be closed while any attendance exception for the month
+  // is still waiting for a manager decision.
+  const members=await db.select({staffAccountId:companyMembers.staffAccountId})
+    .from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
+  const memberIds=new Set(members.map(x=>x.staffAccountId));
+  const monthAttendance=await db.select().from(attendanceRecords);
+  const pending=monthAttendance.filter(r=>{
+    if(!memberIds.has(r.staffAccountId) || !r.date.startsWith(current.month)) return false;
+    const note=r.note||"";
+    const latePending=Number(r.lateMinutes||0)>0 && !note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
+    const earlyPending=note.includes("انصراف مبكر:") && !note.includes("تم اعتماد الانصراف المبكر") && !note.includes("تم إلغاء الانصراف المبكر");
+    const absencePending=r.status==="غياب" && !note.includes("تم اعتماد الغياب") && !note.includes("تم إلغاء الغياب");
+    return latePending || earlyPending || absencePending;
+  });
+  if(pending.length){
+    throw new Error("لا يمكن اعتماد مسير الشهر قبل مراجعة كل مخالفات الحضور المعلقة.");
+  }
+
   await db.update(payrollRecords).set({status:"approved",approvedAt:new Date(),updatedAt:new Date()}).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId)));
   const advances=await db.select().from(salaryAdvances).where(and(eq(salaryAdvances.staffAccountId,current.staffAccountId),eq(salaryAdvances.companyId,m.companyId),eq(salaryAdvances.status,"active")));
   for(const advance of advances){ if(advance.startMonth<=current.month && advance.remainingAmount>0){ const paid=Math.min(advance.installmentAmount,advance.remainingAmount); const remaining=advance.remainingAmount-paid; await db.update(salaryAdvances).set({remainingAmount:remaining,status:remaining===0?"completed":"active",updatedAt:new Date()}).where(eq(salaryAdvances.id,advance.id)); } }
