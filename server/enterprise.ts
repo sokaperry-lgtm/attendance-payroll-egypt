@@ -421,7 +421,9 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     }, 0);
     const earlyDeduction=Math.round((s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours/60)*earlyMinutes);
     const absenceDeduction=Math.round((s.baseSalary/PAYROLL_RULES.calendarDays)*PAYROLL_RULES.absencePenaltyDays*absences);
-    const approvedOvertimeHours=approvedOvertime.filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month)).reduce((sum,r)=>sum+Number(r.hours??0),0);
+    const approvedOvertimeHours=approvedOvertime
+      .filter(r=>r.staffAccountId===s.id && r.fromDate >= month+"-01" && r.fromDate <= month+"-31")
+      .reduce((sum,r)=>sum+Number(r.hours??0),0);
     const employeeSchedules=schedules.filter(r=>r.staffAccountId===s.id);
     const employeeShifts=shifts;
     // Overtime is payable only through an approved overtime request.
