@@ -1,4 +1,4 @@
-import { Pressable, Text, View, type ViewProps } from "react-native";
+import { Platform, Pressable, Text, View, useWindowDimensions, type ViewProps } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 
 import { cn } from "@/lib/utils";
@@ -51,7 +51,9 @@ export function ScreenContainer({
 }: ScreenContainerProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const showHome = pathname !== "/" && pathname !== "/login";
+  const { width } = useWindowDimensions();
+  const isMobileLayout = Platform.OS !== "web" || width < 900;
+  const showHome = isMobileLayout && pathname !== "/" && pathname !== "/login";
   return (
     <View
       className={cn(
