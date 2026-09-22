@@ -6,7 +6,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAppData, type RequestType } from "@/lib/app-data";
 import { trpc } from "@/lib/trpc";
 
-const requestPalette: Record<string, { bg: string; text: string }> = { "قيد المراجعة": { bg: "#EEF4FB", text: "#31577F" }, مقبول: { bg: "#EAF1F8", text: "#163A63" }, مرفوض: { bg: "#E6EDF5", text: "#0F2742" } };
+const requestPalette: Record<string, { bg: string; text: string }> = { "قيد المراجعة": { bg: "#EEF4FB", text: "#31577F" }, مقبول: { bg: "#EAF1F8", text: "#163A63" }, مرفوض: { bg: "#E6EDF5", text: "#0F2742" }, مستثنى: { bg: "#F2F5F8", text: "#667085" } };
 
 export default function RequestsScreen() {
   const { role, requests, submitRequest, refresh } = useAppData();
