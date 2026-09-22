@@ -50,7 +50,7 @@ function tone(s: ShiftTemplate | null | undefined, paletteIndex?: number) {
 }
 
 export default function ScheduleScreen() {
-  const { role, employee, staffMembers, shiftTemplates, schedules, teamSchedules, teamAttendance, saveSchedule } = useAppData();
+  const { role, employee, records, staffMembers, shiftTemplates, schedules, teamSchedules, teamAttendance, saveSchedule } = useAppData();
   const [weekOffset, setWeekOffset] = useState(0);
   const week = useMemo(() => makeWeek(weekOffset), [weekOffset]);
   const [selectedEmployee, setSelectedEmployee] = useState(staffMembers[0]?.id ?? employee.id);
