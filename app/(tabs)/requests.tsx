@@ -17,8 +17,9 @@ export default function RequestsScreen() {
   const leaveBalance = trpc.leave.balance.useQuery({year:new Date().getFullYear()});
   const [modalOpen, setModalOpen] = useState(false);
   const [type, setType] = useState<RequestType>("إجازة");
-  const [from, setFrom] = useState("2026-09-20");
-  const [to, setTo] = useState("2026-09-20");
+  const initialDate = new Date().toISOString().slice(0, 10);
+  const [from, setFrom] = useState(initialDate);
+  const [to, setTo] = useState(initialDate);
   const [hours, setHours] = useState("2");
   const [reason, setReason] = useState("");
   const [selectedRequest, setSelectedRequest] = useState<(typeof requests)[number] | null>(null);
