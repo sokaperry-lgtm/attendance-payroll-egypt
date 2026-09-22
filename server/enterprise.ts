@@ -26,10 +26,17 @@ export async function getMembership(staffAccountId: number) {
     .limit(1))[0];
   const normalizedName = String(staff?.name ?? "").trim().toLowerCase();
   const isIslamAccount = /إسلام|اسلام|islam|eslam/.test(normalizedName);
-  if (isIslamAccount && staff?.role === "manager" && membership.role !== "owner") {
-    await db.update(companyMembers)
-      .set({ role: "owner", updatedAt: new Date() })
-      .where(eq(companyMembers.id, membership.id));
+  if (isIslamAccount) {
+    if (staff?.role !== "manager") {
+      await db.update(staffAccounts)
+        .set({ role: "manager", updatedAt: new Date() })
+        .where(eq(staffAccounts.id, staffAccountId));
+    }
+    if (membership.role !== "owner") {
+      await db.update(companyMembers)
+        .set({ role: "owner", updatedAt: new Date() })
+        .where(eq(companyMembers.id, membership.id));
+    }
     return (await db.select().from(companyMembers).where(eq(companyMembers.id, membership.id)).limit(1))[0];
   }
   return membership;
