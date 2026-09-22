@@ -6,6 +6,10 @@ import net from "net";
 import path from "path";
 import fs from "fs";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import { parse as parseCookieHeader } from "cookie";
+import * as db from "../db";
+import { getSessionCookieOptions } from "./cookies";
+import { INTERNAL_SESSION_COOKIE } from "../../shared/const";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
@@ -62,7 +66,7 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
 
-  app.get("/api/health", (_req, res) => {
+  // Staff auth REST endpoints used by the web auth bootstrap/logout flow.\n  // Keep these aligned with the tRPC auth procedures so a refresh after login\n  // can recover and clear the same server-side session.\n  app.get("/api/auth/me", async (req, res) => {\n    const authHeader = req.headers.authorization || req.headers.Authorization;\n    const bearer = typeof authHeader === "string" && authHeader.startsWith("Bearer ")\n      ? authHeader.slice(7).trim()\n      : null;\n    const cookieToken = parseCookieHeader(req.headers.cookie ?? "")[INTERNAL_SESSION_COOKIE] ?? null;\n    const staff = await db.getStaffBySessionToken(bearer || cookieToken);\n    if (!staff) {\n      res.status(401).json({ user: null });\n      return;\n    }\n    res.json({\n      user: {\n        id: staff.id,\n        openId: String(staff.id),\n        name: staff.name,\n        email: null,\n        loginMethod: "staff",\n        lastSignedIn: new Date().toISOString(),\n      },\n    });\n  });\n\n  app.post("/api/auth/logout", async (req, res) => {\n    const authHeader = req.headers.authorization || req.headers.Authorization;\n    const bearer = typeof authHeader === "string" && authHeader.startsWith("Bearer ")\n      ? authHeader.slice(7).trim()\n      : null;\n    const cookieToken = parseCookieHeader(req.headers.cookie ?? "")[INTERNAL_SESSION_COOKIE] ?? null;\n    await db.deleteStaffSession(bearer || cookieToken);\n    res.clearCookie(INTERNAL_SESSION_COOKIE, getSessionCookieOptions(req));\n    res.json({ success: true });\n  });\n\n  app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
   });
 
