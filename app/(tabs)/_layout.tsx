@@ -111,26 +111,33 @@ function RoleAwareTabs() {
         accessibilityLabel="العودة للرئيسية"
         style={({ pressed }) => ({
           position: "absolute",
-          top: 14,
+          top: 12,
           left: 14,
           zIndex: 100,
-          width: 42,
+          minWidth: 92,
           height: 42,
+          paddingHorizontal: 12,
           borderRadius: 14,
           backgroundColor: "#FFFFFF",
           borderWidth: 1,
-          borderColor: "#E4E7EC",
+          borderColor: "#DCE5EE",
+          flexDirection: "row",
           alignItems: "center",
           justifyContent: "center",
+          gap: 7,
           shadowColor: "#172033",
-          shadowOpacity: 0.08,
+          shadowOpacity: 0.09,
           shadowRadius: 10,
           shadowOffset: { width: 0, height: 4 },
           elevation: 4,
-          opacity: pressed ? 0.7 : 1,
+          opacity: pressed ? 0.72 : 1,
+          transform: [{ scale: pressed ? 0.98 : 1 }],
         })}
       >
-        <IconSymbol name="arrow.left" size={19} color="#163A63" />
+        <IconSymbol name="house.fill" size={17} color="#163A63" />
+        <View>
+          <Text style={{ color: "#163A63", fontSize: 10, fontWeight: "900" }}>الرئيسية</Text>
+        </View>
       </Pressable>
       </View>
   );
