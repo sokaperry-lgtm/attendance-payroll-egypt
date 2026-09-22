@@ -9,7 +9,10 @@ import { trpc } from "@/lib/trpc";
 const requestPalette: Record<string, { bg: string; text: string }> = { "قيد المراجعة": { bg: "#EEF4FB", text: "#31577F" }, مقبول: { bg: "#EAF1F8", text: "#163A63" }, مرفوض: { bg: "#E6EDF5", text: "#0F2742" } };
 
 export default function RequestsScreen() {
-  const { requests, submitRequest } = useAppData();
+  const { role, requests, submitRequest, refresh } = useAppData();
+  const reviewRequest = trpc.requests.review.useMutation();
+  const waiveAttendance = trpc.requests.waiveAttendance.useMutation();
+  const cancelPenalty = trpc.requests.cancelPenalty.useMutation();
   const leaveBalance = trpc.leave.balance.useQuery({year:new Date().getFullYear()});
   const [modalOpen, setModalOpen] = useState(false);
   const [type, setType] = useState<RequestType>("إجازة");
@@ -53,7 +56,26 @@ export default function RequestsScreen() {
 </View>
 <View style={styles.sectionHead}><View><Text style={styles.sectionTitle}>سجل الطلبات</Text><Text style={styles.sectionHint}>اضغط على الطلب لعرض التفاصيل</Text></View></View>
     <View style={styles.filters}>{["الكل","قيد المراجعة","مقبول","مرفوض"].map(item => <View key={item} style={styles.filterChip}><Text style={styles.filterText}>{item}</Text></View>)}</View>
-    {requests.map((request) => { const palette = requestPalette[request.status] ?? requestPalette["قيد المراجعة"]; return <Pressable key={request.id} onPress={() => setSelectedRequest(request)} style={styles.requestCard}><View style={styles.requestTop}><View style={[styles.statusBadge, { backgroundColor: palette.bg }]}><Text style={[styles.statusText, { color: palette.text }]}>{request.status}</Text></View><Text style={styles.requestType}>{request.type}</Text></View><Text style={styles.requestDates}>{request.type === "أوفر تايم" ? `${request.from} · ${request.hours ?? 0} ساعة` : `${request.from} ${request.to !== request.from ? `— ${request.to}` : ""}`}</Text><Text style={styles.reason}>{request.reason}</Text></Pressable>; })}
+    {requests.map((request:any) => {
+      const palette = requestPalette[request.status] ?? requestPalette["قيد المراجعة"];
+      const isManagerException = role !== "employee" && request.source && request.source !== "request";
+      return <Pressable key={request.id} onPress={() => setSelectedRequest(request)} style={styles.requestCard}>
+        <View style={styles.requestTop}><View style={[styles.statusBadge, { backgroundColor: palette.bg }]}><Text style={[styles.statusText, { color: palette.text }]}>{request.status}</Text></View><Text style={styles.requestType}>{request.type}</Text></View>
+        {request.staffName ? <Text style={styles.staffName}>{request.staffName}</Text> : null}
+        <Text style={styles.requestDates}>{request.type === "أوفر تايم" ? request.from + " · " + (request.hours ?? 0) + " ساعة" : request.from + (request.to !== request.from ? " — " + request.to : "")}</Text>
+        <Text style={styles.reason}>{request.reason}</Text>
+        {role !== "employee" && request.source === "request" && request.status === "قيد المراجعة" ? <View style={styles.actionRow}>
+          <Pressable disabled={reviewRequest.isPending} onPress={async()=>{await reviewRequest.mutateAsync({id:Number(request.id),status:"مقبول"});await refresh();}} style={styles.acceptButton}><Text style={styles.acceptText}>اعتماد</Text></Pressable>
+          <Pressable disabled={reviewRequest.isPending} onPress={async()=>{await reviewRequest.mutateAsync({id:Number(request.id),status:"مرفوض"});await refresh();}} style={styles.rejectButton}><Text style={styles.rejectText}>رفض</Text></Pressable>
+        </View> : null}
+        {isManagerException && request.source === "attendance" ? <View style={styles.actionRow}>
+          <Pressable disabled={waiveAttendance.isPending} onPress={async()=>{await waiveAttendance.mutateAsync({staffAccountId:Number(request.staffAccountId),date:request.fromDate,kind:request.exceptionKind});await refresh();}} style={styles.cancelAction}><Text style={styles.cancelActionText}>إلغاء الخصم</Text></Pressable>
+        </View> : null}
+        {isManagerException && request.source === "penalty" ? <View style={styles.actionRow}>
+          <Pressable disabled={cancelPenalty.isPending} onPress={async()=>{await cancelPenalty.mutateAsync({id:Number(request.adjustmentId)});await refresh();}} style={styles.cancelAction}><Text style={styles.cancelActionText}>إلغاء الجزاء</Text></Pressable>
+        </View> : null}
+      </Pressable>;
+    })}
     {requests.length === 0 && <Text style={styles.empty}>لم ترسل أي طلبات بعد.</Text>}
   </ScrollView>
   <Modal visible={Boolean(selectedRequest)} transparent animationType="slide" onRequestClose={() => setSelectedRequest(null)}><View style={styles.modalBackdrop}><View style={styles.detailModal}><View style={styles.detailHead}><Text style={styles.detailTitle}>تفاصيل الطلب</Text><Pressable onPress={() => setSelectedRequest(null)}><Text style={styles.closeText}>إغلاق</Text></Pressable></View>{selectedRequest && <><Text style={styles.detailType}>{selectedRequest.type}</Text><Text style={styles.detailDates}>{selectedRequest.type === "أوفر تايم" ? `${selectedRequest.from} · ${selectedRequest.hours ?? 0} ساعة` : `${selectedRequest.from} إلى ${selectedRequest.to}`}</Text><View style={styles.detailStatus}><Text style={styles.detailStatusText}>{selectedRequest.status}</Text></View><Text style={styles.detailLabel}>سبب الطلب</Text><Text style={styles.detailReason}>{selectedRequest.reason}</Text><View style={styles.timeline}><Text style={styles.timelineTitle}>حالة المعالجة</Text><Text style={styles.timelineText}>{selectedRequest.status === "قيد المراجعة" ? "الطلب في انتظار مراجعة المدير." : selectedRequest.status === "مقبول" ? "تمت مراجعة الطلب واعتماده." : "تمت مراجعة الطلب ورفضه."}</Text></View></>}</View></View></Modal>
