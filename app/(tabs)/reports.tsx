@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { PageHeader, SectionTitle, SurfaceCard, UI } from "@/components/ui/design-system";
@@ -25,6 +25,8 @@ const toneMap: Record<Tone, { bg: string; color: string }> = {
 
 export default function ReportsScreen() {
   const { role } = useAppData();
+  const { width } = useWindowDimensions();
+  const compact = width < 700;
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const reportQuery = trpc.reports.month.useQuery({ month });
   const payrollQuery = trpc.payroll.list.useQuery({ month }, { enabled: role === "manager", retry: false });
@@ -74,9 +76,9 @@ export default function ReportsScreen() {
     <ScreenContainer>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <PageHeader eyebrow={`EXECUTIVE DASHBOARD · ${month}`} title="لوحة الحضور والرواتب" subtitle="قراءة تشغيلية مرئية لأداء الفريق وتكلفة الشهر." icon="chart.bar.fill" />
-        <View style={styles.toolbar}>
+        <View style={[styles.toolbar, compact && styles.toolbarCompact]}>
           <View><Text style={styles.toolbarTitle}>{role === "manager" ? "لوحة الإدارة" : "لوحة الفريق"}</Text><Text style={styles.toolbarHint}>تقرير شهر {month}</Text></View>
-          <View style={styles.toolbarActions}><View style={styles.monthPicker}><Pressable onPress={() => setMonth(shiftMonth(month, 1))}><Text style={styles.monthArrow}>‹</Text></Pressable><Text style={styles.monthValue}>{month}</Text><Pressable onPress={() => setMonth(shiftMonth(month, -1))}><Text style={styles.monthArrow}>›</Text></Pressable></View>
+          <View style={[styles.toolbarActions, compact && styles.toolbarActionsCompact]}><View style={styles.monthPicker}><Pressable onPress={() => setMonth(shiftMonth(month, 1))}><Text style={styles.monthArrow}>‹</Text></Pressable><Text style={styles.monthValue}>{month}</Text><Pressable onPress={() => setMonth(shiftMonth(month, -1))}><Text style={styles.monthArrow}>›</Text></Pressable></View>
             <Pressable onPress={() => setFilterOpen(true)} style={({ pressed }) => [styles.filterButton, pressed && styles.pressed]}>
               <IconSymbol name="line.3.horizontal.decrease" size={16} color={UI.primary} />
               <Text style={styles.filterText}>{selectedEmployeeId === "all" ? "كل الموظفين" : employees[0]?.name || "موظف"}</Text>
@@ -96,7 +98,7 @@ export default function ReportsScreen() {
           <KpiCard label="طلبات معلقة" value={summary.pendingRequests} caption="بانتظار المراجعة" tone="purple" icon="doc.text.fill" />
         </View>}
 
-        <View style={styles.chartRow}>
+        <View style={[styles.chartRow, compact && styles.chartRowCompact]}>
           <SurfaceCard style={styles.chartCard}>
             <SectionTitle title="معدل الحضور اليومي" subtitle="آخر 7 أيام مسجلة" />
             <View style={styles.barChart}>
@@ -156,12 +158,12 @@ function MetricCard({ label, value, tone }: { label: string; value: string; tone
 const styles = StyleSheet.create({
   content: { padding: 22, paddingBottom: 60, gap: 14, maxWidth: 1240, width: "100%", alignSelf: "center" },
   state: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }, stateText: { color: UI.muted, fontSize: 13 },
-  toolbar: { flexDirection: "row-reverse", justifyContent: "space-between", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 16, padding: 13, borderWidth: 1, borderColor: "#D6E2DC" }, toolbarActions: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
+  toolbarCompact: { flexDirection: "column", alignItems: "stretch" }, toolbar: { flexDirection: "row-reverse", justifyContent: "space-between", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 16, padding: 13, borderWidth: 1, borderColor: "#D6E2DC" }, toolbarActionsCompact: { flexWrap: "wrap", justifyContent: "stretch" }, toolbarActions: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
   monthPicker: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#F6F8FA", borderRadius: 11, paddingHorizontal: 8, paddingVertical: 5 }, monthArrow: { color: UI.primary, fontSize: 20, fontWeight: "900", lineHeight: 20 }, monthValue: { color: UI.ink, fontSize: 10, fontWeight: "900", minWidth: 58, textAlign: "center" },
   toolbarTitle: { color: UI.ink, fontSize: 13, fontWeight: "900", textAlign: "right" }, toolbarHint: { color: UI.muted, fontSize: 10, marginTop: 3, textAlign: "right" },
   filterButton: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D6E2DC", borderRadius: 11, paddingVertical: 9, paddingHorizontal: 11, flexDirection: "row-reverse", alignItems: "center", gap: 6, maxWidth: 170 }, filterText: { color: UI.primary, fontSize: 10, fontWeight: "900" }, exportButton: { backgroundColor: UI.primary, borderRadius: 11, paddingVertical: 10, paddingHorizontal: 14, flexDirection: "row-reverse", alignItems: "center", gap: 7 }, exportText: { color: "#FFFFFF", fontSize: 11, fontWeight: "900" }, disabled: { backgroundColor: "#2A3346" }, pressed: { opacity: 0.82 },
   kpiGrid: { flexDirection: "row-reverse", gap: 10, flexWrap: "wrap" }, kpiCard: { flex: 1, minWidth: 190, minHeight: 142 }, kpiIcon: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center", marginBottom: 12 }, kpiLabel: { color: UI.muted, fontSize: 11, textAlign: "right" }, kpiValue: { color: UI.ink, fontSize: 25, fontWeight: "900", marginTop: 4, textAlign: "right" }, kpiCaption: { fontSize: 9, fontWeight: "700", marginTop: 8, textAlign: "right" },
-  chartRow: { flexDirection: "row-reverse", gap: 12, flexWrap: "wrap" }, chartCard: { flex: 1.55, minWidth: 330 }, chartCardSmall: { flex: 1, minWidth: 290 },
+  chartRowCompact: { flexDirection: "column" }, chartRow: { flexDirection: "row-reverse", gap: 12, flexWrap: "wrap" }, chartCard: { flex: 1.55, minWidth: 330 }, chartCardSmall: { flex: 1, minWidth: 290 },
   barChart: { height: 220, flexDirection: "row-reverse", alignItems: "flex-end", justifyContent: "space-around", gap: 8, paddingTop: 22 }, barColumn: { flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end", gap: 6 }, barValue: { color: UI.ink, fontSize: 9, fontWeight: "800" }, barTrack: { height: 145, width: 24, backgroundColor: "#F3F0EA", borderRadius: 9, justifyContent: "flex-end", overflow: "hidden" }, barFill: { width: "100%", backgroundColor: UI.primary, borderRadius: 9 }, barLabel: { color: UI.muted, fontSize: 9 }, empty: { color: "#8A918D", fontSize: 11, textAlign: "center", padding: 20 },
   distributionBar: { height: 18, flexDirection: "row-reverse", borderRadius: 9, overflow: "hidden", backgroundColor: "#F3F0EA", marginVertical: 17 }, distributionSegment: { height: "100%" }, distributionNote: { color: UI.muted, fontSize: 9, textAlign: "center", marginBottom: 14 }, legend: { gap: 8 }, legendRow: { flexDirection: "row-reverse", alignItems: "center", gap: 6 }, legendDot: { width: 8, height: 8, borderRadius: 4 }, legendLabel: { color: UI.muted, fontSize: 10, flex: 1, textAlign: "right" }, legendValue: { color: UI.ink, fontSize: 10, fontWeight: "800", width: 26, textAlign: "right" }, legendTrack: { flex: 1, height: 5, backgroundColor: "#F3F0EA", borderRadius: 9, overflow: "hidden" }, legendFill: { height: "100%", borderRadius: 9 },
   payrollGrid: { flexDirection: "row-reverse", gap: 10, flexWrap: "wrap" }, metricCard: { flex: 1, minWidth: 190, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: UI.border, borderTopWidth: 4, borderRadius: 16, padding: 15 }, metricLabel: { color: UI.muted, fontSize: 10, textAlign: "right" }, metricValue: { fontSize: 17, fontWeight: "900", marginTop: 9, textAlign: "right" },
