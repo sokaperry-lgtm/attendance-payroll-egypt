@@ -65,7 +65,7 @@ export default function ScheduleScreen() {
   const [detailSaving, setDetailSaving] = useState(false);
   const [detailForm, setDetailForm] = useState({ checkIn: "", checkOut: "", lateMinutes: "0", status: "حاضر" as "حاضر" | "متأخر" | "غياب" | "إجازة" | "مأمورية", note: "" });
   const weekRange = `${week[0]?.date ?? ""} — ${week[6]?.date ?? ""}`;
-  const adminRole = role === "owner" || adminRole;
+  const adminRole = role === "owner" || role === "manager";
   const visible = adminRole ? teamSchedules : schedules;
   const attendanceVisible = adminRole ? teamAttendance : records;
   const weekDayStats = useMemo(() => week.map((day) => ({
