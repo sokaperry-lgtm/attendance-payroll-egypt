@@ -15,7 +15,7 @@ function FormField({ label, value, onChangeText, placeholder, numeric, secure }:
 
 function ManagerScreenContent() {
   const router = useRouter();
-  const { role, employee, branch, requests, records, payroll, staffMembers, approveRequest, createStaffAccount, updateStaffAccount, updateBranch } = useAppData();
+  const { role, employee, branch, requests, records, payroll, staffMembers, approveRequest, createStaffAccount, updateStaffAccount, updateBranch, refresh } = useAppData();
   const [addOpen, setAddOpen] = useState(false);
   const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
   const [branchOpen, setBranchOpen] = useState(false);
@@ -37,6 +37,7 @@ function ManagerScreenContent() {
   const [teamSearch, setTeamSearch] = useState("");
   const [teamFilter, setTeamFilter] = useState<"all" | "active" | "inactive">("all");
   const [approvalBusy, setApprovalBusy] = useState<string | null>(null);
+  const reviewAttendanceException = trpc.requests.reviewAttendanceException.useMutation();
   const currentMonth = new Date().toISOString().slice(0, 7);
   const previousMonthDate = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
   const previousMonth = `${previousMonthDate.getFullYear()}-${String(previousMonthDate.getMonth() + 1).padStart(2, "0")}`;
@@ -59,6 +60,7 @@ function ManagerScreenContent() {
     return Array.from(grouped.entries()).sort(([a],[b])=>a.localeCompare(b)).slice(-7).map(([date,v])=>({date,rate:v.total?Math.round(v.present/v.total*100):0}));
   }, [records]);
   const pending = requests.filter((item) => item.status === "قيد المراجعة").length;
+  const pendingAbsences = requests.filter((item:any) => item.status === "قيد المراجعة" && item.source === "attendance" && item.exceptionKind === "absence");
   const presentCount = records.filter((record) => record.status === "حاضر").length;
   const lateCount = records.filter((record) => record.status === "متأخر").length;
   const absentCount = records.filter((record) => record.status === "غياب").length;
@@ -203,19 +205,25 @@ function ManagerScreenContent() {
     </View>
     <View style={styles.approvalInbox}>
       <View style={styles.approvalHeader}>
-        <View><Text style={styles.approvalTitle}>صندوق قرارات المدير</Text><Text style={styles.approvalHint}>طلبات تحتاج قرارًا الآن</Text></View>
+        <View><Text style={styles.approvalTitle}>صندوق قرارات المدير</Text><Text style={styles.approvalHint}>{pendingAbsences.length ? `فيه ${pendingAbsences.length} غياب محتاج قرار قبل احتسابه` : "طلبات ومخالفات تحتاج قرارًا الآن"}</Text></View>
         <Pressable onPress={() => router.push("/requests")} style={styles.approvalViewAll}><Text style={styles.approvalViewAllText}>عرض الكل</Text></Pressable>
       </View>
-      {requests.filter((item) => item.status === "قيد المراجعة").slice(0, 4).map((item) => (
-        <View key={item.id} style={styles.approvalItem}>
-          <View style={styles.approvalAvatar}><Text style={styles.approvalAvatarText}>{String((item as any).staffName ?? "مو").split(" ").slice(0,2).map((x:string)=>x[0] ?? "").join("")}</Text></View>
-          <View style={styles.approvalCopy}><Text style={styles.approvalName}>{(item as any).staffName ?? "موظف"}</Text><Text style={styles.approvalType}>{item.type} · {item.from}{item.to !== item.from ? " — " + item.to : ""}</Text></View>
+      {requests.filter((item) => item.status === "قيد المراجعة").slice(0, 4).map((item:any) => {
+        const isAbsence = item.source === "attendance" && item.exceptionKind === "absence";
+        return <View key={item.id} style={styles.approvalItem}>
+          <View style={styles.approvalAvatar}><Text style={styles.approvalAvatarText}>{String(item.staffName ?? "مو").split(" ").slice(0,2).map((x:string)=>x[0] ?? "").join("")}</Text></View>
+          <View style={styles.approvalCopy}><Text style={styles.approvalName}>{item.staffName ?? "موظف"}</Text><Text style={styles.approvalType}>{isAbsence ? "غياب يحتاج مراجعة" : item.type} · {item.from}{item.to !== item.from ? " — " + item.to : ""}</Text></View>
           <View style={styles.approvalActions}>
-            <Pressable disabled={approvalBusy === String(item.id)} onPress={async()=>{setApprovalBusy(String(item.id));try{await approveRequest(String(item.id),"مقبول");showAlert("تم الاعتماد","تم اعتماد الطلب وإبلاغ الموظف.");}catch(error){showAlert("تعذر الاعتماد",error instanceof Error?error.message:"حدث خطأ أثناء اعتماد الطلب.");}finally{setApprovalBusy(null);}}} style={styles.approveMini}><Text style={styles.approveMiniText}>اعتماد</Text></Pressable>
-            <Pressable disabled={approvalBusy === String(item.id)} onPress={async()=>{setApprovalBusy(String(item.id));try{await approveRequest(String(item.id),"مرفوض");showAlert("تم الرفض","تم رفض الطلب وإبلاغ الموظف.");}catch(error){showAlert("تعذر الرفض",error instanceof Error?error.message:"حدث خطأ أثناء رفض الطلب.");}finally{setApprovalBusy(null);}}} style={styles.rejectMini}><Text style={styles.rejectMiniText}>رفض</Text></Pressable>
+            {isAbsence ? <>
+              <Pressable disabled={approvalBusy === String(item.id)} onPress={async()=>{setApprovalBusy(String(item.id));try{await reviewAttendanceException.mutateAsync({staffAccountId:Number(item.staffAccountId),date:String(item.fromDate),kind:"absence",action:"approve"});await refresh();showAlert("تم اعتماد الغياب","تم تثبيت الغياب وسيُحتسب في مسير الراتب.");}catch(error){showAlert("تعذر اعتماد الغياب",error instanceof Error?error.message:"حدث خطأ.");}finally{setApprovalBusy(null);}}} style={styles.approveMini}><Text style={styles.approveMiniText}>اعتماد الغياب</Text></Pressable>
+              <Pressable disabled={approvalBusy === String(item.id)} onPress={async()=>{setApprovalBusy(String(item.id));try{await reviewAttendanceException.mutateAsync({staffAccountId:Number(item.staffAccountId),date:String(item.fromDate),kind:"absence",action:"cancel"});await refresh();showAlert("تم إلغاء الغياب","لن يتم احتساب خصم الغياب على الموظف.");}catch(error){showAlert("تعذر إلغاء الغياب",error instanceof Error?error.message:"حدث خطأ.");}finally{setApprovalBusy(null);}}} style={styles.rejectMini}><Text style={styles.rejectMiniText}>إلغاء الغياب</Text></Pressable>
+            </> : <>
+              <Pressable disabled={approvalBusy === String(item.id)} onPress={async()=>{setApprovalBusy(String(item.id));try{await approveRequest(String(item.id),"مقبول");showAlert("تم الاعتماد","تم اعتماد الطلب وإبلاغ الموظف.");}catch(error){showAlert("تعذر الاعتماد",error instanceof Error?error.message:"حدث خطأ أثناء اعتماد الطلب.");}finally{setApprovalBusy(null);}}} style={styles.approveMini}><Text style={styles.approveMiniText}>اعتماد</Text></Pressable>
+              <Pressable disabled={approvalBusy === String(item.id)} onPress={async()=>{setApprovalBusy(String(item.id));try{await approveRequest(String(item.id),"مرفوض");showAlert("تم الرفض","تم رفض الطلب وإبلاغ الموظف.");}catch(error){showAlert("تعذر الرفض",error instanceof Error?error.message:"حدث خطأ أثناء رفض الطلب.");}finally{setApprovalBusy(null);}}} style={styles.rejectMini}><Text style={styles.rejectMiniText}>رفض</Text></Pressable>
+            </>}
           </View>
-        </View>
-      ))}
+        </View>;
+      })}
       {pending === 0 ? <View style={styles.approvalEmpty}><IconSymbol name="checkmark.circle.fill" size={18} color="#15803D" /><Text style={styles.approvalEmptyText}>لا توجد قرارات معلقة — كل الطلبات محدثة.</Text></View> : null}
     </View>
     <View style={styles.managerHero}><View style={styles.heroTop}><View style={styles.heroIcon}><IconSymbol name="chart.bar" size={25} color="#FFFFFF" /></View><View style={styles.heroText}><Text style={styles.heroEyebrow}>OPERATIONS OVERVIEW</Text><Text style={styles.heroTitle}>الفريق شغال بشكل مستقر</Text><Text style={styles.heroHint}>تابع الحضور والطلبات والرواتب من لوحة واحدة.</Text></View></View><View style={styles.heroMetrics}><View><Text style={styles.heroMetricValue}>{staffMembers.length}</Text><Text style={styles.heroMetricLabel}>موظف</Text></View><View><Text style={styles.heroMetricValue}>{presentCount > 0 ? "1" : "0"}</Text><Text style={styles.heroMetricLabel}>حاضر اليوم</Text></View><View><Text style={styles.heroMetricValue}>{pending}</Text><Text style={styles.heroMetricLabel}>طلبات معلقة</Text></View></View></View>
