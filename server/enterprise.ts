@@ -241,11 +241,22 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
   const shifts = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
   const requests = await db.select().from(staffRequests);
   const existing = await db.select().from(attendanceRecords);
+  // A closed payroll month is immutable: do not auto-create or rewrite attendance
+  // for employees whose payroll is already approved.
+  const approvedPayrollRows = await db.select({
+    staffAccountId: payrollRecords.staffAccountId,
+  }).from(payrollRecords).where(and(
+    eq(payrollRecords.companyId, m.companyId),
+    eq(payrollRecords.month, month),
+    eq(payrollRecords.status, "approved"),
+  ));
+  const closedStaffIds = new Set(approvedPayrollRows.map(row => row.staffAccountId));
 
   let createdAbsences = 0;
   let markedLeaves = 0;
 
   for (const employee of staff) {
+    if (closedStaffIds.has(employee.id)) continue;
     for (const date of dateRange(month)) {
       const today = new Date().toISOString().slice(0, 10);
       if (date > today) continue;
@@ -368,8 +379,13 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const existing=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.staffAccountId,s.id),eq(payrollRecords.month,month))).limit(1))[0];
     if(existing && existing.status==="approved") { result.push(existing); skippedApproved++; continue; }
     const records=attendance.filter(x=>x.staffAccountId===s.id && x.date.startsWith(month));
-    const absences=records.filter(x=>x.status==="غياب").length;
-    const lateMinutes=records.reduce((a,x)=>a+x.lateMinutes,0);
+    // Auto-detected absences are not deducted until explicitly approved.
+    const absences=records.filter(x=>x.status==="غياب" && (x.note || "").includes("تم اعتماد الغياب")).length;
+    // Late deductions are only chargeable after explicit manager approval.
+    const lateMinutes=records.reduce((total, record) => {
+      if (!(record.note || "").includes("تم اعتماد التأخير")) return total;
+      return total + Math.max(0, Number(record.lateMinutes || 0));
+    }, 0);
     const lateDeduction=Math.round((s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours/60)*lateMinutes);
     const earlyMinutes=records.reduce((total, record) => {
       // Early departure is a payroll deduction only after the manager explicitly approves it.
@@ -388,14 +404,9 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const approvedOvertimeHours=approvedOvertime.filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month)).reduce((sum,r)=>sum+Number(r.hours??0),0);
     const employeeSchedules=schedules.filter(r=>r.staffAccountId===s.id);
     const employeeShifts=shifts;
-    const automaticOvertimeHours=records.reduce((sum, record) => {
-      if (!record.checkIn || !record.checkOut) return sum;
-      const schedule=employeeSchedules.find(item=>item.scheduleDate===record.date);
-      const shift=schedule ? employeeShifts.find(item=>item.id===schedule.shiftTemplateId) : undefined;
-      const scheduledMinutes=shift ? shiftMinutes(shift.startTime, shift.endTime, shift.crossesMidnight) : shiftMinutes(s.shiftStart, s.shiftEnd);
-      return sum + Math.max(0, shiftMinutes(record.checkIn, record.checkOut) - scheduledMinutes) / 60;
-    }, 0);
-    const overtimeHours=Math.max(approvedOvertimeHours, automaticOvertimeHours);
+    // Overtime is payable only through an approved overtime request.
+    // Staying longer on site is not automatically treated as payable overtime.
+    const overtimeHours=approvedOvertimeHours;
     const overtimeRate=s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours;
     const overtimeValue=Math.round(overtimeHours*overtimeRate);
     const adjustments=await db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.staffAccountId,s.id),eq(salaryAdjustments.month,month)));
