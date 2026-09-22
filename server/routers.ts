@@ -34,6 +34,18 @@ export const appRouter = router({
       ctx.res.cookie(INTERNAL_SESSION_COOKIE, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
       return { token, staff: await staffView(staff) };
     }),
+    resetAndSetup: publicProcedure.input(z.object({
+      confirm: z.literal("RESET-STAFF"),
+      phone: z.string().min(3).max(32),
+      password: z.string().min(6).max(120),
+      name: z.string().min(2).max(160),
+    })).mutation(async ({ ctx, input }) => {
+      const staff = await db.resetStaffAccountsAndCreateManager(input);
+      await enterprise.ensureCompanyForStaff(staff.id, "الشركة الرئيسية");
+      const token = await db.createStaffSession(staff.id);
+      ctx.res.cookie(INTERNAL_SESSION_COOKIE, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
+      return { token, staff: await staffView(staff) };
+    }),
   }),
   auth: router({
     me: publicProcedure.query(async ({ ctx }) => await staffView(ctx.staffUser)),
