@@ -65,8 +65,9 @@ export default function ScheduleScreen() {
   const [detailSaving, setDetailSaving] = useState(false);
   const [detailForm, setDetailForm] = useState({ checkIn: "", checkOut: "", lateMinutes: "0", status: "حاضر" as "حاضر" | "متأخر" | "غياب" | "إجازة" | "مأمورية", note: "" });
   const weekRange = `${week[0]?.date ?? ""} — ${week[6]?.date ?? ""}`;
-  const visible = role === "manager" ? teamSchedules : schedules;
-  const attendanceVisible = role === "manager" ? teamAttendance : records;
+  const adminRole = role === "owner" || adminRole;
+  const visible = adminRole ? teamSchedules : schedules;
+  const attendanceVisible = adminRole ? teamAttendance : records;
   const weekDayStats = useMemo(() => week.map((day) => ({
     ...day,
     scheduled: visible.filter((entry) => entry.scheduleDate === day.key).length,
@@ -77,7 +78,7 @@ export default function ScheduleScreen() {
   const selectedAttendance = attendanceFor(selectedEmployee, selectedDay);
   const todayKeyValue = dateKey(new Date());
   const workforceStats = useMemo(() => {
-    const people = role === "manager" ? staffMembers : [employee];
+    const people = adminRole ? staffMembers : [employee];
     const cells = people.flatMap(person => week.map(day => ({ person, day, entry: findSchedule(visible, person.id, day.key), attendance: attendanceFor(person.id, day.key) })));
     return {
       scheduled: cells.filter(x => x.entry?.shift && x.entry.shift.kind !== "weekly_off").length,
@@ -108,7 +109,7 @@ export default function ScheduleScreen() {
   }
 
   const stats = useMemo(() => {
-    const source = role === "manager" ? teamSchedules : schedules;
+    const source = adminRole ? teamSchedules : schedules;
     const total = source.filter(e => week.some(d => d.key === e.scheduleDate)).length;
     const work = source.filter(e => week.some(d => d.key === e.scheduleDate) && e.shift?.kind !== "weekly_off").length;
     const off = source.filter(e => week.some(d => d.key === e.scheduleDate) && e.shift?.kind === "weekly_off").length;
@@ -118,7 +119,7 @@ export default function ScheduleScreen() {
   const statusCounts = { all: staffMembers.length * 7, حاضر: workforceStats.present, متأخر: workforceStats.late, غياب: workforceStats.absent, إجازة: workforceStats.leave, فارغ: Math.max(0, stats.open) };
 
   function openDayDetail(personId: string, day: string) {
-    if (role !== "manager") return;
+    if (!adminRole) return;
     setSelectedEmployee(personId);
     setSelectedDay(day);
     const attendance = attendanceFor(personId, day);
@@ -155,7 +156,7 @@ export default function ScheduleScreen() {
   }
 
   async function assignShift(shift: ShiftTemplate) {
-    if (role !== "manager" || !selectedEmployee) return;
+    if (!adminRole || !selectedEmployee) return;
     setSaving(true);
     try {
       await saveSchedule({ staffAccountId: Number(selectedEmployee), scheduleDate: selectedDay, shiftTemplateId: shift.id });
@@ -171,9 +172,9 @@ export default function ScheduleScreen() {
         <View style={styles.header}>
           <View style={styles.headerIcon}><IconSymbol name="calendar" size={24} color="#FFF" /></View>
           <View style={styles.headerCopy}>
-            <Text style={styles.eyebrow}>{role === "manager" ? "WORKFORCE SCHEDULE" : "MY WORK SCHEDULE"}</Text>
+            <Text style={styles.eyebrow}>{adminRole ? "WORKFORCE SCHEDULE" : "MY WORK SCHEDULE"}</Text>
             <Text style={styles.title}>الجدول</Text>
-            <Text style={styles.subtitle}>{role === "manager" ? "شوف الفريق كله في جدول واحد وحدد الورديات من نفس الشاشة." : "جدول أسبوعك بالكامل بشكل واضح وسريع."}</Text>
+            <Text style={styles.subtitle}>{adminRole ? "شوف الفريق كله في جدول واحد وحدد الورديات من نفس الشاشة." : "جدول أسبوعك بالكامل بشكل واضح وسريع."}</Text>
           </View>
         </View>
 
@@ -194,7 +195,7 @@ export default function ScheduleScreen() {
 
         <View style={styles.dayStrip}>
           {weekDayStats.map((day) => (
-            <Pressable key={day.key} onPress={() => role === "manager" && setSelectedDay(day.key)} style={[styles.dayMini, day.isToday && styles.dayMiniToday, day.key === selectedDay && role === "manager" && styles.dayMiniSelected]}>
+            <Pressable key={day.key} onPress={() => adminRole && setSelectedDay(day.key)} style={[styles.dayMini, day.isToday && styles.dayMiniToday, day.key === selectedDay && adminRole && styles.dayMiniSelected]}>
               <Text style={styles.dayMiniLabel}>{day.label.slice(0, 2)}</Text>
               <Text style={styles.dayMiniDate}>{day.day}</Text>
               <Text style={styles.dayMiniCount}>{day.scheduled} {day.scheduled === 1 ? "وردية" : "ورديات"}</Text>
@@ -202,14 +203,14 @@ export default function ScheduleScreen() {
           ))}
         </View>
 
-        {role === "manager" && <View style={styles.workforceSummary}>
+        {adminRole && <View style={styles.workforceSummary}>
           <View style={styles.summaryTitleRow}><View><Text style={styles.sectionTitle}>ملخص التشغيل</Text><Text style={styles.sectionHint}>حالة الفريق خلال الأسبوع المحدد</Text></View><View style={styles.liveBadge}><View style={styles.liveDot} /><Text style={styles.liveText}>LIVE</Text></View></View>
           <View style={styles.summaryGrid}>
             {[{key:"scheduled",label:"أيام عمل",value:workforceStats.scheduled,bg:"#EEF6FF",color:"#1677D2"},{key:"present",label:"حاضر",value:workforceStats.present,bg:"#E7F7EF",color:"#08704A"},{key:"late",label:"متأخر",value:workforceStats.late,bg:"#FFF4DB",color:"#9A6400"},{key:"absent",label:"غياب",value:workforceStats.absent,bg:"#FFF0F0",color:"#9F2638"},{key:"leave",label:"إجازة",value:workforceStats.leave,bg:"#EAF3FF",color:"#2F6DB3"}].map(item => <View key={item.key} style={[styles.summaryCard,{backgroundColor:item.bg}]}><Text style={[styles.summaryValue,{color:item.color}]}>{item.value}</Text><Text style={[styles.summaryLabel,{color:item.color}]}>{item.label}</Text></View>)}
           </View>
         </View>}
 
-        {role === "manager" && <View style={styles.filterBar}>
+        {adminRole && <View style={styles.filterBar}>
           <Text style={styles.filterTitle}>تصفية الجدول</Text>
           <ScrollView horizontal inverted showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
             {(["all","حاضر","متأخر","غياب","إجازة","فارغ"] as const).map(filter => <Pressable key={filter} onPress={() => setStatusFilter(filter)} style={[styles.filterChip,statusFilter===filter&&styles.filterChipActive]}><Text style={[styles.filterChipText,statusFilter===filter&&styles.filterChipTextActive]}>{filter === "all" ? "الكل" : filter} · {statusCounts[filter]}</Text></Pressable>)}
@@ -219,7 +220,7 @@ export default function ScheduleScreen() {
         <View style={styles.hero}>
           <View style={styles.heroTop}>
             <View style={styles.weekPill}><Text style={styles.weekPillText}>السبت → الجمعة</Text></View>
-            <View><Text style={styles.heroKicker}>WEEKLY ROSTER · SAT → FRI</Text><Text style={styles.heroTitle}>{role === "manager" ? "خطة تشغيل الفريق" : "خطة عملك"}</Text></View>
+            <View><Text style={styles.heroKicker}>WEEKLY ROSTER · SAT → FRI</Text><Text style={styles.heroTitle}>{adminRole ? "خطة تشغيل الفريق" : "خطة عملك"}</Text></View>
           </View>
           <View style={styles.heroStats}>
             <View><Text style={styles.heroStatValue}>{stats.total}</Text><Text style={styles.heroStatLabel}>مجدول</Text></View>
@@ -227,11 +228,11 @@ export default function ScheduleScreen() {
             <View><Text style={styles.heroStatValue}>{stats.work}</Text><Text style={styles.heroStatLabel}>أيام عمل</Text></View>
             <View style={styles.heroDivider} />
             <View><Text style={styles.heroStatValue}>{stats.off}</Text><Text style={styles.heroStatLabel}>إجازات</Text></View>
-            {role === "manager" && <><View style={styles.heroDivider} /><View><Text style={styles.heroStatValue}>{stats.open}</Text><Text style={styles.heroStatLabel}>فارغ</Text></View></>}
+            {adminRole && <><View style={styles.heroDivider} /><View><Text style={styles.heroStatValue}>{stats.open}</Text><Text style={styles.heroStatLabel}>فارغ</Text></View></>}
           </View>
         </View>
 
-        {role === "manager" && (
+        {adminRole && (
           <View style={styles.teamBar}>
             <View style={styles.teamBarTop}>
               <View><Text style={styles.sectionTitle}>فريق العمل</Text><Text style={styles.sectionHint}>اختار موظفًا لفتح خلايا جدوله وتعديلها</Text></View>
@@ -255,24 +256,24 @@ export default function ScheduleScreen() {
               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#B7791F" }]} /><Text>إجازة</Text></View>
               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#A1ACBA" }]} /><Text>فارغ</Text></View>
             </View>
-            <View><Text style={styles.sectionTitle}>جدول الأسبوع</Text><Text style={styles.sectionHint}>{role === "manager" ? "اضغط أي خلية لتحديد الموظف واليوم" : "مواعيدك اليومية في عرض واحد"}</Text></View>
+            <View><Text style={styles.sectionTitle}>جدول الأسبوع</Text><Text style={styles.sectionHint}>{adminRole ? "اضغط أي خلية لتحديد الموظف واليوم" : "مواعيدك اليومية في عرض واحد"}</Text></View>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.gridScroll}>
             <View>
               <View style={styles.gridRow}>
-                {role === "manager" && <View style={[styles.nameHeader, styles.corner]}><Text style={styles.nameHeaderText}>الموظف</Text></View>}
+                {adminRole && <View style={[styles.nameHeader, styles.corner]}><Text style={styles.nameHeaderText}>الموظف</Text></View>}
                 {week.map(d => (
-                  <Pressable key={d.key} onPress={() => role === "manager" && setSelectedDay(d.key)} style={[styles.dayHeader, d.isToday && styles.dayHeaderToday, d.key === selectedDay && role === "manager" && styles.dayHeaderSelected]}>
+                  <Pressable key={d.key} onPress={() => adminRole && setSelectedDay(d.key)} style={[styles.dayHeader, d.isToday && styles.dayHeaderToday, d.key === selectedDay && adminRole && styles.dayHeaderSelected]}>
                     <Text style={styles.dayHeaderLabel}>{d.label}</Text>
                     <Text style={styles.dayHeaderDate}>{d.day}</Text>
                   </Pressable>
                 ))}
               </View>
 
-              {(role === "manager" ? staffMembers : [employee]).filter(person => role !== "manager" || week.some(d => cellMatchesFilter(person.id, d.key, findSchedule(visible, person.id, d.key)))).map(person => (
+              {(adminRole ? staffMembers : [employee]).filter(person => role !== "manager" || week.some(d => cellMatchesFilter(person.id, d.key, findSchedule(visible, person.id, d.key)))).map(person => (
                 <View key={person.id} style={styles.gridRow}>
-                  {role === "manager" && (
+                  {adminRole && (
                     <Pressable onPress={() => setSelectedEmployee(person.id)} style={[styles.nameCell, person.id === selectedEmployee && styles.nameCellSelected]}>
                       <View style={styles.nameAvatar}><Text style={styles.nameAvatarText}>{person.name.slice(0, 1)}</Text></View>
                       <View style={styles.nameCopy}><Text style={styles.nameText} numberOfLines={1}>{person.name}</Text><Text style={styles.nameRole} numberOfLines={1}>{person.jobTitle ?? "موظف"}</Text></View>
@@ -282,9 +283,9 @@ export default function ScheduleScreen() {
                     const entry = findSchedule(visible, person.id, d.key);
                     const shiftIndex = entry?.shift ? shiftTemplates.findIndex(s => String(s.id) === String(entry.shift?.id)) : -1;
                     const t = tone(entry?.shift, shiftIndex >= 0 ? shiftIndex : 0);
-                    const selected = role === "manager" && person.id === selectedEmployee && d.key === selectedDay;
+                    const selected = adminRole && person.id === selectedEmployee && d.key === selectedDay;
                     return (
-                      <Pressable key={d.key} onPress={() => { if (role === "manager") openDayDetail(person.id, d.key); }} style={[styles.gridCell, selected && styles.gridCellSelected]}>
+                      <Pressable key={d.key} onPress={() => { if (adminRole) openDayDetail(person.id, d.key); }} style={[styles.gridCell, selected && styles.gridCellSelected]}>
                         {(() => {
                           const attendance = attendanceFor(person.id, d.key);
                           const a = attendanceTone(attendance?.status);
@@ -314,10 +315,10 @@ export default function ScheduleScreen() {
               ))}
             </View>
           </ScrollView>
-          <Text style={styles.gridHint}>{role === "manager" ? "اسحب الجدول يمينًا ويسارًا على الشاشات الصغيرة. اضغط الخلية ثم اختر الوردية من لوحة التعيين." : "يمكنك مراجعة الجدول الأسبوعي بالكامل من نفس الشاشة."}</Text>
+          <Text style={styles.gridHint}>{adminRole ? "اسحب الجدول يمينًا ويسارًا على الشاشات الصغيرة. اضغط الخلية ثم اختر الوردية من لوحة التعيين." : "يمكنك مراجعة الجدول الأسبوعي بالكامل من نفس الشاشة."}</Text>
         </View>
 
-        {role === "manager" && member && (
+        {adminRole && member && (
           <View style={styles.assignCard}>
             <View style={styles.assignHeader}>
               <View style={styles.selectedDayPill}><Text style={styles.selectedDayPillText}>{week.find(d => d.key === selectedDay)?.label} · {week.find(d => d.key === selectedDay)?.date}</Text></View>
@@ -340,7 +341,7 @@ export default function ScheduleScreen() {
         )}
 
         <View style={styles.note}><IconSymbol name="checkmark" size={16} color="#2F6DB3" /><Text style={styles.noteText}>الجدول هنا هو مصدر التشغيل للوردية؛ وأي وردية تتجاوز منتصف الليل تُحسب على يوم بدايتها.</Text></View>
-      {role === "manager" && member && (
+      {adminRole && member && (
         <Modal visible={detailOpen} animationType="slide" transparent onRequestClose={() => !detailSaving && setDetailOpen(false)}>
           <View style={styles.detailBackdrop}>
             <View style={styles.detailCard}>
