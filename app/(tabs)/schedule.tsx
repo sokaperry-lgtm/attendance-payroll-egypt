@@ -8,12 +8,12 @@ import { useAppData, type ScheduleEntry, type ShiftTemplate } from "@/lib/app-da
 const dayNames = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
 
 function dateKey(date: Date) { return date.toISOString().slice(0, 10); }
-function makeWeek() {
+function makeWeek(weekOffset = 0) {
   const today = new Date();
   today.setHours(12, 0, 0, 0);
   const saturdayOffset = (today.getDay() + 1) % 7;
   const saturday = new Date(today);
-  saturday.setDate(today.getDate() - saturdayOffset);
+  saturday.setDate(today.getDate() - saturdayOffset + (weekOffset * 7));
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(saturday);
     d.setDate(saturday.getDate() + i);
