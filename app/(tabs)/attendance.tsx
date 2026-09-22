@@ -166,7 +166,10 @@ export default function AttendanceScreen() {
             <View style={styles.rowMain}>
               <View style={styles.rowHeader}>
                 <Text style={styles.rowDate}>{formatDate(item.date)}</Text>
-                <StatusBadge label={item.status} tone={statusTone[item.status] || "neutral"} />
+                <StatusBadge
+                  label={item.status === "غياب" && !(item.note || "").includes("تم اعتماد الغياب") && !(item.note || "").includes("تم إلغاء الغياب") ? "غياب · بانتظار الاعتماد" : item.status}
+                  tone={item.status === "غياب" && !(item.note || "").includes("تم اعتماد الغياب") && !(item.note || "").includes("تم إلغاء الغياب") ? "warning" : statusTone[item.status] || "neutral"}
+                />
               </View>
               <Text style={styles.rowTime}>
                 {item.checkIn ? `دخول ${item.checkIn}` : "بدون تسجيل دخول"}
