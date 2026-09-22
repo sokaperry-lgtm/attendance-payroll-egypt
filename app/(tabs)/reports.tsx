@@ -117,7 +117,7 @@ export default function ReportsScreen() {
           <MetricCard label="خصومات الغياب" value={`${payrollSummary.totalAbsenceDeductions.toLocaleString("ar-EG")} ج.م`} tone="red" />
           <MetricCard label="الأوفر تايم" value={`${payrollSummary.totalOvertime.toLocaleString("ar-EG")} ج.م`} tone="orange" />
           <MetricCard label="المسيرات المعتمدة" value={`${payrollSummary.approvedPayroll} / ${payrollSummary.totalPayrollRows}`} tone="green" />
-        </View>
+        </View>}
 
         <View style={styles.chartRow}>
           <SurfaceCard style={styles.chartCard}>
