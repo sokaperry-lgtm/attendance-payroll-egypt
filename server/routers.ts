@@ -163,14 +163,26 @@ export const appRouter = router({
       const overtimeMinutes = Math.max(0, actualMinutes - scheduledMinutes);
       if (overtimeMinutes >= 30) {
         const overtimeHours = Number((overtimeMinutes / 60).toFixed(2));
-        await db.createRequest({
-          staffAccountId: ctx.staffUser.id,
-          type: "أوفر تايم",
-          fromDate: input.date,
-          toDate: input.date,
-          reason: `أوفر تايم تلقائي — الحضور ${current.checkIn} والانصراف ${input.time} — وقت إضافي ${overtimeHours} ساعة`,
-          hours: overtimeHours,
-        });
+
+        // One automatic overtime request per employee/day.
+        // This prevents duplicate requests if the checkout flow is retried.
+        const existingRequests = await db.listRequests(ctx.staffUser.id);
+        const hasOvertimeRequest = existingRequests.some((request) =>
+          request.type === "أوفر تايم" &&
+          request.fromDate === input.date &&
+          request.toDate === input.date
+        );
+
+        if (!hasOvertimeRequest) {
+          await db.createRequest({
+            staffAccountId: ctx.staffUser.id,
+            type: "أوفر تايم",
+            fromDate: input.date,
+            toDate: input.date,
+            reason: `أوفر تايم تلقائي — الحضور ${current.checkIn} والانصراف ${input.time} — وقت إضافي ${overtimeHours} ساعة`,
+            hours: overtimeHours,
+          });
+        }
       }
 
       return attendance;
