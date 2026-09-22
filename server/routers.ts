@@ -10,12 +10,18 @@ import { PAYROLL_RULES } from "../lib/payroll";
 function timeMinutes(value: string) { const [h,m]=value.split(":").map(Number); return (h||0)*60+(m||0); }
 
 const loginInput = z.object({ phone: z.string().min(3).max(32), password: z.string().min(4).max(120) });
-const staffView = async (staff: Awaited<ReturnType<typeof db.getStaffAccountById>> | null) => staff ? ({
-
-  id: staff.id, phone: staff.phone, name: staff.name, title: staff.title, department: staff.department,
-  role: staff.role, baseSalary: staff.baseSalary, shiftStart: staff.shiftStart, shiftEnd: staff.shiftEnd, active: staff.active,
-  membershipRole: (() => { const membershipRole = (await enterprise.getMembership(staff.id))?.role; return staff.role === "manager" && membershipRole !== "owner" && membershipRole !== "manager" ? "manager" : membershipRole ?? (staff.role === "manager" ? "manager" : staff.role === "supervisor" ? "supervisor" : "employee"); })(),
-}) : null;
+const staffView = async (staff: Awaited<ReturnType<typeof db.getStaffAccountById>> | null) => {
+  if (!staff) return null;
+  const membershipRole = (await enterprise.getMembership(staff.id))?.role;
+  const effectiveMembershipRole = staff.role === "manager" && membershipRole !== "owner" && membershipRole !== "manager"
+    ? "manager"
+    : membershipRole ?? (staff.role === "manager" ? "manager" : staff.role === "supervisor" ? "supervisor" : "employee");
+  return {
+    id: staff.id, phone: staff.phone, name: staff.name, title: staff.title, department: staff.department,
+    role: staff.role, baseSalary: staff.baseSalary, shiftStart: staff.shiftStart, shiftEnd: staff.shiftEnd, active: staff.active,
+    membershipRole: effectiveMembershipRole,
+  };
+};
 
 export const appRouter = router({
   system: router({
