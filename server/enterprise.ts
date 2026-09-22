@@ -618,7 +618,7 @@ export async function getSecuritySummary(staffAccountId:number) {
   return { sessionPolicy:"30 days", passwordHash:"scrypt", tenantIsolation:"company membership", auditLog:true, roleBasedAccess:true };
 }
 
-export async function consumeLeaveBalance(staffAccountId:number, fromDate:string, toDate:string, kind:"annual"|"sick") {
+export async function consumeLeaveBalance(staffAccountId:number, fromDate:string, toDate:string, kind:"annual"|"sick"|"emergency") {
   const db=await getDb(); if(!db) return;
   const days=Math.max(1,Math.floor((new Date(toDate).getTime()-new Date(fromDate).getTime())/86400000)+1);
   const year=Number(fromDate.slice(0,4));
@@ -627,9 +627,12 @@ export async function consumeLeaveBalance(staffAccountId:number, fromDate:string
   if(kind==="annual"){
     if(balance.annualDays-balance.annualUsed < days) throw new Error("رصيد الإجازات السنوية غير كافٍ.");
     await db.update(leaveBalances).set({annualUsed:balance.annualUsed+days,updatedAt:new Date()}).where(eq(leaveBalances.id,balance.id));
-  } else {
+  } else if(kind==="sick") {
     if(balance.sickDays-balance.sickUsed < days) throw new Error("رصيد الإجازات المرضية غير كافٍ.");
     await db.update(leaveBalances).set({sickUsed:balance.sickUsed+days,updatedAt:new Date()}).where(eq(leaveBalances.id,balance.id));
+  } else {
+    if(balance.emergencyDays-balance.emergencyUsed < days) throw new Error("رصيد الإجازات الطارئة غير كافٍ.");
+    await db.update(leaveBalances).set({emergencyUsed:balance.emergencyUsed+days,updatedAt:new Date()}).where(eq(leaveBalances.id,balance.id));
   }
 }
 
