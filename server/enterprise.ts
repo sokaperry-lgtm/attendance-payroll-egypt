@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb, getStaffAccountById } from "./db";
 import * as dbQueries from "./db";
 import { calculateEgyptPayroll } from "./egypt-payroll";
@@ -50,6 +50,15 @@ export async function assertStaffInCompany(actorStaffAccountId: number, targetSt
   const target = await getMembership(targetStaffAccountId);
   if (!target || target.companyId !== actor.companyId || !target.active) throw new Error("الموظف غير موجود في الشركة");
   return { actor, target };
+}
+
+export async function listCompanyAttendance(staffAccountId: number) {
+  const db = await getDb(); if (!db) return [];
+  const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
+  const members = await db.select({ staffAccountId: companyMembers.staffAccountId }).from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
+  const ids = members.map(x => x.staffAccountId);
+  if (!ids.length) return [];
+  return db.select().from(attendanceRecords).where(inArray(attendanceRecords.staffAccountId, ids)).orderBy(desc(attendanceRecords.date));
 }
 
 export async function listCompanyStaff(staffAccountId: number) {
