@@ -12,6 +12,7 @@ export default function RequestsScreen() {
   const { role, requests, submitRequest, refresh } = useAppData();
   const reviewRequest = trpc.requests.review.useMutation();
   const waiveAttendance = trpc.requests.waiveAttendance.useMutation();
+  const reviewAttendanceException = trpc.requests.reviewAttendanceException.useMutation();
   const cancelPenalty = trpc.requests.cancelPenalty.useMutation();
   const leaveBalance = trpc.leave.balance.useQuery({year:new Date().getFullYear()});
   const [modalOpen, setModalOpen] = useState(false);
@@ -69,7 +70,8 @@ export default function RequestsScreen() {
           <Pressable disabled={reviewRequest.isPending} onPress={async()=>{await reviewRequest.mutateAsync({id:Number(request.id),status:"مرفوض"});await refresh();}} style={styles.rejectButton}><Text style={styles.rejectText}>رفض</Text></Pressable>
         </View> : null}
         {isManagerException && request.source === "attendance" ? <View style={styles.actionRow}>
-          <Pressable disabled={waiveAttendance.isPending} onPress={async()=>{await waiveAttendance.mutateAsync({staffAccountId:Number(request.staffAccountId),date:request.fromDate,kind:request.exceptionKind});await refresh();}} style={styles.cancelAction}><Text style={styles.cancelActionText}>إلغاء الخصم</Text></Pressable>
+          <Pressable disabled={reviewAttendanceException.isPending} onPress={async()=>{await reviewAttendanceException.mutateAsync({staffAccountId:Number(request.staffAccountId),date:request.fromDate,kind:request.exceptionKind,action:"approve"});await refresh();}} style={styles.acceptButton}><Text style={styles.acceptText}>اعتماد الخصم</Text></Pressable>
+          <Pressable disabled={reviewAttendanceException.isPending} onPress={async()=>{await reviewAttendanceException.mutateAsync({staffAccountId:Number(request.staffAccountId),date:request.fromDate,kind:request.exceptionKind,action:"cancel"});await refresh();}} style={styles.cancelAction}><Text style={styles.cancelActionText}>إلغاء الخصم</Text></Pressable>
         </View> : null}
         {isManagerException && request.source === "penalty" ? <View style={styles.actionRow}>
           <Pressable disabled={cancelPenalty.isPending} onPress={async()=>{await cancelPenalty.mutateAsync({id:Number(request.adjustmentId)});await refresh();}} style={styles.cancelAction}><Text style={styles.cancelActionText}>إلغاء الجزاء</Text></Pressable>
