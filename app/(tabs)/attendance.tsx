@@ -18,7 +18,7 @@ const statusTone: Record<string, "success" | "warning" | "danger" | "neutral"> =
 export default function AttendanceScreen() {
   const { records, employee, role, refresh } = useAppData();
   const attendanceReview = trpc.requests.reviewAttendanceException.useMutation();
-  const managerRequests = trpc.requests.list.useQuery(undefined, { enabled: role === "manager" || role === "supervisor", retry: false });
+  const managerRequests = trpc.requests.list.useQuery(undefined, { enabled: (role === "owner" || role === "manager") || role === "supervisor", retry: false });
   const pendingAbsences = (managerRequests.data ?? []).filter((item: any) => item.source === "attendance" && item.exceptionKind === "absence" && item.status === "قيد المراجعة");
   const month = "2026-09";
   const workSummary = trpc.attendance.workSummary.useQuery({ month });
@@ -179,7 +179,7 @@ export default function AttendanceScreen() {
               {item.lateMinutes > 0 && (
                 <Text style={styles.lateText}>تأخير {item.lateMinutes} دقيقة</Text>
               )}
-              {(role === "manager" || role === "supervisor") &&
+              {((role === "owner" || role === "manager") || role === "supervisor") &&
                 item.status === "غياب" &&
                 !(item.note || "").includes("تم اعتماد الغياب") &&
                 !(item.note || "").includes("تم إلغاء الغياب") ? (
