@@ -78,7 +78,6 @@ export default function ScheduleScreen() {
       leave: cells.filter(x => x.attendance?.status === "إجازة" || x.entry?.shift?.kind === "weekly_off").length,
     };
   }, [role, staffMembers, employee, week, visible, attendanceVisible]);
-  const statusCounts = { all: staffMembers.length * 7, حاضر: workforceStats.present, متأخر: workforceStats.late, غياب: workforceStats.absent, إجازة: workforceStats.leave, فارغ: Math.max(0, stats.open) };
   const cellMatchesFilter = (personId: string, day: string, entry: ScheduleEntry | undefined) => {
     if (statusFilter === "all") return true;
     const attendance = attendanceFor(personId, day);
@@ -106,6 +105,8 @@ export default function ScheduleScreen() {
     const off = source.filter(e => week.some(d => d.key === e.scheduleDate) && e.shift?.kind === "weekly_off").length;
     return { total, work, off, open: Math.max(0, staffMembers.length * 7 - total) };
   }, [role, teamSchedules, schedules, week, staffMembers.length]);
+
+  const statusCounts = { all: staffMembers.length * 7, حاضر: workforceStats.present, متأخر: workforceStats.late, غياب: workforceStats.absent, إجازة: workforceStats.leave, فارغ: Math.max(0, stats.open) };
 
   async function assignShift(shift: ShiftTemplate) {
     if (role !== "manager" || !selectedEmployee) return;
