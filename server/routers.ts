@@ -175,14 +175,21 @@ export const appRouter = router({
   }),
   requests: router({
     list: staffProcedure.query(({ ctx }) => ctx.staffUser.role === "manager" ? enterprise.listCompanyRequests(ctx.staffUser.id) : db.listRequests(ctx.staffUser.id)),
-    create: staffProcedure.input(z.object({ type: z.string().max(32), fromDate: z.string().length(10), toDate: z.string().length(10), reason: z.string().min(2).max(1000), hours: z.number().min(0.5).max(24).optional() })).mutation(({ ctx, input }) => db.createRequest({ ...input, staffAccountId: ctx.staffUser.id })),
+    create: staffProcedure.input(z.object({ type: z.enum(["إجازة","إجازة مرضية","إجازة طارئة","إذن","مأمورية"]), fromDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), toDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), reason: z.string().min(2).max(1000), hours: z.number().min(0.5).max(24).optional() })).mutation(async ({ ctx, input }) => {
+      if (input.fromDate > input.toDate) throw new Error("تاريخ بداية الإجازة يجب أن يكون قبل أو مساويًا لتاريخ النهاية.");
+      if (!input.fromDate || !input.toDate) throw new Error("تواريخ الإجازة غير صحيحة.");
+      if (["إجازة","إجازة مرضية","إجازة طارئة"].includes(input.type)) {
+        await enterprise.validateLeaveRequest(ctx.staffUser.id, input.fromDate, input.toDate, input.type as "إجازة" | "إجازة مرضية" | "إجازة طارئة");
+      }
+      return db.createRequest({ ...input, staffAccountId: ctx.staffUser.id });
+    }),
     review: supervisorProcedure.input(z.object({ id: z.number().int(), status: z.enum(["مقبول", "مرفوض"]) })).mutation(async ({ ctx, input }) => {
       const existing = (await enterprise.listCompanyRequests(ctx.staffUser.id)).find(r => r.id === input.id);
       if (!existing) throw new Error("الطلب غير موجود.");
       if (existing.status !== "قيد المراجعة") throw new Error("هذا الطلب تمت معالجته بالفعل.");
-      if (input.status === "مقبول" && existing.type === "إجازة") await enterprise.consumeLeaveBalance(existing.staffAccountId, existing.fromDate, existing.toDate, "annual");
-      if (input.status === "مقبول" && existing.type === "إجازة مرضية") await enterprise.consumeLeaveBalance(existing.staffAccountId, existing.fromDate, existing.toDate, "sick");
-      if (input.status === "مقبول" && existing.type === "إجازة طارئة") await enterprise.consumeLeaveBalance(existing.staffAccountId, existing.fromDate, existing.toDate, "emergency");
+      if (input.status === "مقبول" && ["إجازة","إجازة مرضية","إجازة طارئة"].includes(existing.type)) {
+        return enterprise.reviewLeaveRequest(ctx.staffUser.id, input.id, input.status);
+      }
       const row = await db.approveRequest(input.id, ctx.staffUser.id, input.status);
       if (row) {
         await enterprise.createNotification(row.staffAccountId, "request", "تم تحديث طلبك", `حالة الطلب أصبحت: ${input.status}`);
