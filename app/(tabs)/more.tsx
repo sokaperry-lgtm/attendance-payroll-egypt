@@ -38,7 +38,7 @@ export default function MoreScreen() {
 }
 
 const styles = StyleSheet.create({
-  page:{padding:22,paddingBottom:50,gap:20,maxWidth:760,width:"100%",alignSelf:"center"},
+  root:{flex:1},\n  homeButton:{position:"absolute",top:12,right:16,zIndex:50,flexDirection:"row",alignItems:"center",gap:6,paddingHorizontal:11,paddingVertical:8,borderRadius:12,backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#DCE5EE",shadowColor:"#102A47",shadowOpacity:0.1,shadowRadius:8,shadowOffset:{width:0,height:3},elevation:4},\n  homeText:{color:"#163A63",fontSize:10,fontWeight:"900"},\n  page:{padding:22,paddingBottom:50,gap:20,maxWidth:760,width:"100%",alignSelf:"center"},
   header:{alignItems:"flex-end"},
   eyebrow:{fontSize:10,fontWeight:"900",letterSpacing:1,color:"#98A2B3"},
   title:{fontSize:28,fontWeight:"900",color:"#172033",marginTop:5,textAlign:"right"},
