@@ -10,9 +10,11 @@ import { PAYROLL_RULES } from "../lib/payroll";
 function timeMinutes(value: string) { const [h,m]=value.split(":").map(Number); return (h||0)*60+(m||0); }
 
 const loginInput = z.object({ phone: z.string().min(3).max(32), password: z.string().min(4).max(120) });
-const staffView = (staff: Awaited<ReturnType<typeof db.getStaffAccountById>> | null) => staff ? ({
+const staffView = async (staff: Awaited<ReturnType<typeof db.getStaffAccountById>> | null) => staff ? ({
+
   id: staff.id, phone: staff.phone, name: staff.name, title: staff.title, department: staff.department,
   role: staff.role, baseSalary: staff.baseSalary, shiftStart: staff.shiftStart, shiftEnd: staff.shiftEnd, active: staff.active,
+, membershipRole: (await enterprise.getMembership(staff.id))?.role ?? (staff.role === "manager" ? "manager" : staff.role === "supervisor" ? "supervisor" : "employee"),
 }) : null;
 
 export const appRouter = router({
@@ -24,7 +26,7 @@ export const appRouter = router({
       if (staff) await enterprise.ensureCompanyForStaff(staff.id, "الشركة الرئيسية");
       const token = await db.createStaffSession(staff!.id);
       ctx.res.cookie(INTERNAL_SESSION_COOKIE, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
-      return { token, staff: staffView(staff) };
+      return { token, staff: await staffView(staff) };
     }),
   }),
   auth: router({
@@ -74,7 +76,7 @@ export const appRouter = router({
           await enterprise.createNotification(staff.id, "welcome", "مرحبًا بك في الشركة", "تم إنشاء حسابك ويمكنك الآن تسجيل الدخول.");
         }
       }
-      return staffView(staff); }),
+      return await staffView(staff); }),
     update: hrProcedure.input(z.object({ id: z.number().int(), phone: z.string().min(3).max(32).optional(), password: z.string().min(6).max(120).optional(), name: z.string().min(2).max(160).optional(), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).optional(), role: z.enum(["manager","supervisor","employee"]).optional(), shiftStart: z.string().max(8).optional(), shiftEnd: z.string().max(8).optional(), active: z.boolean().optional() })).mutation(async ({ ctx, input }) => {
       const { id, ...changes } = input;
       await enterprise.assertStaffInCompany(ctx.staffUser.id, id);
