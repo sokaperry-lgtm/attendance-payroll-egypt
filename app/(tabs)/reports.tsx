@@ -7,8 +7,9 @@ import { exportAttendanceReportPdf, type AttendancePdfReport } from "@/lib/atten
 import { showAlert } from "@/lib/alert";
 import { buildDepartmentStats, buildStatusStats, buildWeeklyStats, calculateAttendanceRate, summarizePayroll } from "@/lib/dashboard-utils";
 import { trpc } from "@/lib/trpc";
+import { useAppData } from "@/lib/app-data";
 
-const month = new Date().toISOString().slice(0, 7);
+function shiftMonth(value: string, delta: number) { const [y, m] = value.split("-").map(Number); const d = new Date(y, m - 1 + delta, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
 
 type ReportRecord = { date: string; status: string; lateMinutes: number; checkIn?: string | null; checkOut?: string | null };
 type ReportEmployee = { id: number; name: string; department?: string | null; lateMinutes: number; absentDays: number; presentDays: number; pendingRequests?: number; records: ReportRecord[] };
@@ -23,8 +24,10 @@ const toneMap: Record<Tone, { bg: string; color: string }> = {
 };
 
 export default function ReportsScreen() {
+  const { role } = useAppData();
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const reportQuery = trpc.reports.month.useQuery({ month });
-  const payrollQuery = trpc.payroll.list.useQuery({ month });
+  const payrollQuery = trpc.payroll.list.useQuery({ month }, { enabled: role === "manager", retry: false });
   const [exporting, setExporting] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | "all">("all");
@@ -72,8 +75,8 @@ export default function ReportsScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <PageHeader eyebrow={`EXECUTIVE DASHBOARD · ${month}`} title="لوحة الحضور والرواتب" subtitle="قراءة تشغيلية مرئية لأداء الفريق وتكلفة الشهر." icon="chart.bar.fill" />
         <View style={styles.toolbar}>
-          <View><Text style={styles.toolbarTitle}>نظرة المدير</Text><Text style={styles.toolbarHint}>البيانات محدثة لهذا الشهر</Text></View>
-          <View style={styles.toolbarActions}>
+          <View><Text style={styles.toolbarTitle}>{role === "manager" ? "لوحة الإدارة" : "لوحة الفريق"}</Text><Text style={styles.toolbarHint}>تقرير شهر {month}</Text></View>
+          <View style={styles.toolbarActions}><View style={styles.monthPicker}><Pressable onPress={() => setMonth(shiftMonth(month, 1))}><Text style={styles.monthArrow}>‹</Text></Pressable><Text style={styles.monthValue}>{month}</Text><Pressable onPress={() => setMonth(shiftMonth(month, -1))}><Text style={styles.monthArrow}>›</Text></Pressable></View>
             <Pressable onPress={() => setFilterOpen(true)} style={({ pressed }) => [styles.filterButton, pressed && styles.pressed]}>
               <IconSymbol name="line.3.horizontal.decrease" size={16} color={UI.primary} />
               <Text style={styles.filterText}>{selectedEmployeeId === "all" ? "كل الموظفين" : employees[0]?.name || "موظف"}</Text>
@@ -91,7 +94,7 @@ export default function ReportsScreen() {
           <KpiCard label="أيام الحضور" value={summary.presentDays} caption="حضور أو مأمورية" tone="green" icon="checkmark" />
           <KpiCard label="دقائق التأخير" value={summary.lateMinutes} caption="تحتاج متابعة" tone="orange" icon="clock" />
           <KpiCard label="طلبات معلقة" value={summary.pendingRequests} caption="بانتظار المراجعة" tone="purple" icon="doc.text.fill" />
-        </View>
+        </View>}
 
         <View style={styles.chartRow}>
           <SurfaceCard style={styles.chartCard}>
@@ -108,8 +111,8 @@ export default function ReportsScreen() {
           </SurfaceCard>
         </View>
 
-        <SectionTitle title="ملخص الرواتب" subtitle="التكلفة والاعتمادات لهذا الشهر" />
-        <View style={styles.payrollGrid}>
+        {role === "manager" && <SectionTitle title="ملخص الرواتب" subtitle="التكلفة والاعتمادات لهذا الشهر" />}
+        {role === "manager" && <View style={styles.payrollGrid}>
           <MetricCard label="صافي الرواتب" value={`${payrollSummary.totalPayroll.toLocaleString("ar-EG")} ج.م`} tone="blue" />
           <MetricCard label="خصومات الغياب" value={`${payrollSummary.totalAbsenceDeductions.toLocaleString("ar-EG")} ج.م`} tone="red" />
           <MetricCard label="الأوفر تايم" value={`${payrollSummary.totalOvertime.toLocaleString("ar-EG")} ج.م`} tone="orange" />
@@ -154,6 +157,7 @@ const styles = StyleSheet.create({
   content: { padding: 22, paddingBottom: 60, gap: 14, maxWidth: 1240, width: "100%", alignSelf: "center" },
   state: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }, stateText: { color: UI.muted, fontSize: 13 },
   toolbar: { flexDirection: "row-reverse", justifyContent: "space-between", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 16, padding: 13, borderWidth: 1, borderColor: "#D6E2DC" }, toolbarActions: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
+  monthPicker: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#F6F8FA", borderRadius: 11, paddingHorizontal: 8, paddingVertical: 5 }, monthArrow: { color: UI.primary, fontSize: 20, fontWeight: "900", lineHeight: 20 }, monthValue: { color: UI.ink, fontSize: 10, fontWeight: "900", minWidth: 58, textAlign: "center" },
   toolbarTitle: { color: UI.ink, fontSize: 13, fontWeight: "900", textAlign: "right" }, toolbarHint: { color: UI.muted, fontSize: 10, marginTop: 3, textAlign: "right" },
   filterButton: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D6E2DC", borderRadius: 11, paddingVertical: 9, paddingHorizontal: 11, flexDirection: "row-reverse", alignItems: "center", gap: 6, maxWidth: 170 }, filterText: { color: UI.primary, fontSize: 10, fontWeight: "900" }, exportButton: { backgroundColor: UI.primary, borderRadius: 11, paddingVertical: 10, paddingHorizontal: 14, flexDirection: "row-reverse", alignItems: "center", gap: 7 }, exportText: { color: "#FFFFFF", fontSize: 11, fontWeight: "900" }, disabled: { backgroundColor: "#2A3346" }, pressed: { opacity: 0.82 },
   kpiGrid: { flexDirection: "row-reverse", gap: 10, flexWrap: "wrap" }, kpiCard: { flex: 1, minWidth: 190, minHeight: 142 }, kpiIcon: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center", marginBottom: 12 }, kpiLabel: { color: UI.muted, fontSize: 11, textAlign: "right" }, kpiValue: { color: UI.ink, fontSize: 25, fontWeight: "900", marginTop: 4, textAlign: "right" }, kpiCaption: { fontSize: 9, fontWeight: "700", marginTop: 8, textAlign: "right" },
