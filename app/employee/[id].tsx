@@ -41,7 +41,9 @@ export default function EmployeeProfileScreen() {
   const absent = attendance.filter((r) => r.status === "غياب").length;
   const late = attendance.reduce((sum, r) => sum + Number(r.lateMinutes || 0), 0);
   const approvedRequests = requests.filter((r) => r.status === "مقبول").length;
-  const latestPayroll = payroll[0];  const attendanceRate = attendance.length ? Math.round((present / attendance.length) * 100) : 0;  const recentAttendance = useMemo(() => attendance.slice(0, 8), [attendance]);
+  const latestPayroll = payroll[0];
+  const attendanceRate = attendance.length ? Math.round((present / attendance.length) * 100) : 0;
+  const recentAttendance = useMemo(() => attendance.slice(0, 8), [attendance]);
   const workSchedules = useMemo(() => schedules.slice(0, 14), [schedules]);
   const currentMonthPayroll = latestPayroll ? Number(latestPayroll.netSalary || 0) : 0;
   const pendingRequests = requests.filter((r) => r.status === "قيد المراجعة").length;
