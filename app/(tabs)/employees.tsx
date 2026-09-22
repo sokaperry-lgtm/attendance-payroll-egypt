@@ -32,7 +32,7 @@ export default function EmployeesScreen() {
   const managerCount = staffMembers.filter((p) => p.role === "manager").length;
   const supervisorCount = staffMembers.filter((p) => p.role === "supervisor").length;
 
-  if (role !== "manager") return <ScreenContainer><State text="إدارة الموظفين للمدير فقط" /></ScreenContainer>;
+  if (role !== "owner" && role !== "manager") return <ScreenContainer><State text="إدارة الموظفين للمدير فقط" /></ScreenContainer>;
   if (loading) return <ScreenContainer><State text="جاري تحميل الفريق..." loading /></ScreenContainer>;
 
   const reset = () => {
