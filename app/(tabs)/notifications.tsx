@@ -3,12 +3,109 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
 
-export default function NotificationsScreen(){
- const q=trpc.notifications.list.useQuery();
- const read=trpc.notifications.read.useMutation({onSuccess:()=>q.refetch()});
- return <ScreenContainer><ScrollView contentContainerStyle={styles.content}>
-  <View style={styles.header}><View><Text style={styles.eyebrow}>WORKSPACE · ALERTS</Text><Text style={styles.title}>الإشعارات</Text><Text style={styles.sub}>كل تحديثات الطلبات والحضور والرواتب في مكان واحد.</Text></View><View style={styles.icon}><IconSymbol name="notifications" size={22} color="#668C7F"/></View></View>
-  {q.isLoading?<View style={styles.state}><ActivityIndicator color="#668C7F"/></View>:q.data?.length? q.data.map(n=><Pressable key={n.id} onPress={()=>!n.readAt&&read.mutate({id:n.id})} style={[styles.card,!n.readAt&&styles.unread]}><View style={styles.dotWrap}><View style={[styles.dot,{backgroundColor:n.readAt?"#2A3346":"#668C7F"}]}/></View><View style={styles.copy}><View style={styles.row}><Text style={styles.date}>{n.createdAt?new Date(n.createdAt).toLocaleString("ar-EG"):""}</Text><Text style={styles.cardTitle}>{n.title}</Text></View><Text style={styles.body}>{n.body}</Text>{!n.readAt&&<Text style={styles.mark}>اضغط لتحديد كمقروء</Text>}</View></Pressable>):<View style={styles.empty}><IconSymbol name="checkmark" size={28} color="#2E7D68"/><Text style={styles.emptyTitle}>مفيش إشعارات جديدة</Text><Text style={styles.emptyText}>أول ما يحصل تحديث مهم هيظهر هنا.</Text></View>}
- </ScrollView></ScreenContainer>
+const UI = {
+  navy: "#163A63",
+  navySoft: "#EEF4FA",
+  text: "#172033",
+  muted: "#667085",
+  border: "#E4E7EC",
+  white: "#FFFFFF",
+};
+
+export default function NotificationsScreen() {
+  const q = trpc.notifications.list.useQuery();
+  const read = trpc.notifications.read.useMutation({
+    onSuccess: () => q.refetch(),
+  });
+
+  return (
+    <ScreenContainer>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.eyebrow}>WORKSPACE · ALERTS</Text>
+            <Text style={styles.title}>الإشعارات</Text>
+            <Text style={styles.sub}>كل تحديثات الطلبات والحضور والرواتب في مكان واحد.</Text>
+          </View>
+          <View style={styles.iconBox}>
+            <IconSymbol name="notifications" size={23} color={UI.navy} />
+          </View>
+        </View>
+
+        {q.isLoading ? (
+          <View style={styles.state}>
+            <ActivityIndicator color={UI.navy} />
+            <Text style={styles.stateText}>جاري تحميل الإشعارات...</Text>
+          </View>
+        ) : q.data?.length ? (
+          q.data.map((n) => {
+            const unread = !n.readAt;
+            return (
+              <Pressable
+                key={n.id}
+                onPress={() => unread && read.mutate({ id: n.id })}
+                style={({ pressed }) => [styles.card, unread && styles.unread, pressed && styles.pressed]}
+              >
+                <View style={[styles.dot, unread && styles.dotUnread]} />
+                <View style={styles.copy}>
+                  <View style={styles.row}>
+                    <Text style={styles.cardTitle}>{n.title}</Text>
+                    {unread && <Text style={styles.badge}>جديد</Text>}
+                  </View>
+                  <Text style={styles.body}>{n.body}</Text>
+                  <Text style={styles.date}>
+                    {n.createdAt ? new Date(n.createdAt).toLocaleString("ar-EG") : ""}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })
+        ) : (
+          <View style={styles.empty}>
+            <View style={styles.emptyIcon}>
+              <IconSymbol name="checkmark" size={25} color={UI.navy} />
+            </View>
+            <Text style={styles.emptyTitle}>مفيش إشعارات جديدة</Text>
+            <Text style={styles.emptyText}>أول ما يحصل تحديث مهم هيظهر هنا.</Text>
+          </View>
+        )}
+      </ScrollView>
+    </ScreenContainer>
+  );
 }
-const styles=StyleSheet.create({content:{padding:22,paddingBottom:60,gap:12,maxWidth:900,width:"100%",alignSelf:"center"},header:{backgroundColor:"#FFFFFF",borderRadius:24,padding:20,flexDirection:"row-reverse",alignItems:"center",gap:14},eyebrow:{color:"#93C5FD",fontSize:9,fontWeight:"900",textAlign:"right"},title:{color:"#FFFFFF",fontSize:27,fontWeight:"900",textAlign:"right",marginTop:4},sub:{color:"#8A918D",fontSize:11,textAlign:"right",marginTop:4},icon:{width:50,height:50,borderRadius:16,backgroundColor:"#E8EEE9",alignItems:"center",justifyContent:"center"},card:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E7E2D9",borderRadius:18,padding:15,flexDirection:"row-reverse",gap:10},unread:{borderColor:"#93C5FD",backgroundColor:"#10161F"},dotWrap:{width:10,paddingTop:5},dot:{width:8,height:8,borderRadius:4},copy:{flex:1},row:{flexDirection:"row-reverse",justifyContent:"space-between",gap:10},cardTitle:{color:"#303735",fontWeight:"900",fontSize:13,textAlign:"right",flex:1},date:{color:"#8A918D",fontSize:9},body:{color:"#8A918D",fontSize:11,lineHeight:18,textAlign:"right",marginTop:6},mark:{color:"#668C7F",fontSize:9,fontWeight:"800",textAlign:"right",marginTop:7},state:{padding:40,alignItems:"center"},empty:{backgroundColor:"#E6F1EC",borderRadius:20,padding:25,alignItems:"center",gap:8},emptyTitle:{color:"#2E7D68",fontSize:16,fontWeight:"900"},emptyText:{color:"#7B817E",fontSize:11}});
+
+const styles = StyleSheet.create({
+  content: { padding: 22, paddingBottom: 60, gap: 12, maxWidth: 900, width: "100%", alignSelf: "center" },
+  header: {
+    backgroundColor: UI.white,
+    borderWidth: 1,
+    borderColor: UI.border,
+    borderRadius: 22,
+    padding: 20,
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 14,
+  },
+  headerCopy: { flex: 1 },
+  eyebrow: { color: UI.navy, fontSize: 9, fontWeight: "900", textAlign: "right", letterSpacing: 1 },
+  title: { color: UI.text, fontSize: 27, fontWeight: "900", textAlign: "right", marginTop: 4 },
+  sub: { color: UI.muted, fontSize: 11, textAlign: "right", marginTop: 4, lineHeight: 18 },
+  iconBox: { width: 50, height: 50, borderRadius: 16, backgroundColor: UI.navySoft, alignItems: "center", justifyContent: "center" },
+  card: { backgroundColor: UI.white, borderWidth: 1, borderColor: UI.border, borderRadius: 18, padding: 16, flexDirection: "row-reverse", gap: 11 },
+  unread: { borderColor: "#B8CDE3", backgroundColor: "#F7FAFD" },
+  pressed: { opacity: 0.78 },
+  dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#98A2B3", marginTop: 5 },
+  dotUnread: { backgroundColor: UI.navy },
+  copy: { flex: 1, gap: 5 },
+  row: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
+  cardTitle: { flex: 1, color: UI.text, fontSize: 14, fontWeight: "900", textAlign: "right" },
+  badge: { color: UI.navy, backgroundColor: UI.navySoft, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, fontSize: 9, fontWeight: "900" },
+  body: { color: UI.muted, fontSize: 12, lineHeight: 19, textAlign: "right" },
+  date: { color: "#98A2B3", fontSize: 9, textAlign: "right" },
+  state: { minHeight: 180, alignItems: "center", justifyContent: "center", gap: 10 },
+  stateText: { color: UI.muted, fontSize: 11 },
+  empty: { backgroundColor: UI.white, borderWidth: 1, borderColor: UI.border, borderRadius: 22, padding: 34, alignItems: "center", gap: 8 },
+  emptyIcon: { width: 54, height: 54, borderRadius: 18, backgroundColor: UI.navySoft, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  emptyTitle: { color: UI.text, fontSize: 16, fontWeight: "900" },
+  emptyText: { color: UI.muted, fontSize: 11 },
+});
