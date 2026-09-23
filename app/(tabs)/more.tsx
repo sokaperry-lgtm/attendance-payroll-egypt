@@ -9,7 +9,6 @@ const items = [
   { key: "hr-tools", title: "HR Tools", icon: "banknote", roles: ["owner", "manager", "hr"] },
   { key: "schedule", title: "الجدول", icon: "calendar", roles: ["owner", "manager", "hr", "supervisor"] },
   { key: "reports", title: "التقارير", icon: "chart.bar.fill", roles: ["owner", "manager", "hr", "accountant", "supervisor"] },
-  { key: "audit", title: "سجل العمليات", icon: "lock.shield.fill", roles: ["owner", "manager"] },
   { key: "payroll", title: "الرواتب", icon: "banknote", roles: ["owner", "manager", "hr", "accountant"] },
   { key: "employees", title: "الموظفون", icon: "person.2.fill", roles: ["owner", "manager", "hr"] },
   { key: "settings", title: "الإعدادات", icon: "settings", roles: ["owner", "manager"] },
