@@ -20,7 +20,9 @@ export default function AttendanceScreen() {
   const attendanceReview = trpc.requests.reviewAttendanceException.useMutation();
   const managerRequests = trpc.requests.list.useQuery(undefined, { enabled: (role === "owner" || role === "manager") || role === "supervisor", retry: false });
   const pendingAbsences = (managerRequests.data ?? []).filter((item: any) => item.source === "attendance" && item.exceptionKind === "absence" && item.status === "قيد المراجعة");
-  const month = "2026-09";
+  const now = new Date();
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const monthLabel = now.toLocaleDateString("ar-EG", { month: "long", year: "numeric" });
   const workSummary = trpc.attendance.workSummary.useQuery({ month });
   const syncAttendance = trpc.attendance.sync.useMutation({ onSuccess: () => workSummary.refetch() });
   const mySummary = workSummary.data?.employees?.find((x: any) => x.staffAccountId === employee.id);
@@ -44,7 +46,7 @@ export default function AttendanceScreen() {
             <PageHeader
               eyebrow="حساب الموظف"
               title="الحضور والانصراف"
-              subtitle={`${employee.name} · سبتمبر 2026`}
+              subtitle={`${employee.name} · ${monthLabel}`}
               icon="calendar"
             />
 
