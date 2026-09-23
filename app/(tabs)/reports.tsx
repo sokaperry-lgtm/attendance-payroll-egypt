@@ -27,9 +27,14 @@ export default function ReportsScreen() {
   const { role } = useAppData();
   const { width } = useWindowDimensions();
   const compact = width < 700;
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(() => {
+    const now = new Date();
+    return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+  });
+  const payrollAccess = ["owner", "manager", "hr", "accountant"].includes(role);
+  const adminPayrollView = ["owner", "manager", "hr", "accountant"].includes(role);
   const reportQuery = trpc.reports.month.useQuery({ month });
-  const payrollQuery = trpc.payroll.list.useQuery({ month }, { enabled: role === "owner" || role === "manager", retry: false });
+  const payrollQuery = trpc.payroll.list.useQuery({ month }, { enabled: payrollAccess, retry: false });
   const [exporting, setExporting] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | "all">("all");
@@ -113,8 +118,8 @@ export default function ReportsScreen() {
           </SurfaceCard>
         </View>
 
-        {(role === "owner" || role === "manager") && <SectionTitle title="ملخص الرواتب" subtitle="التكلفة والاعتمادات لهذا الشهر" />}
-        {(role === "owner" || role === "manager") && <View style={styles.payrollGrid}>
+        {adminPayrollView && <SectionTitle title="ملخص الرواتب" subtitle="التكلفة والاعتمادات لهذا الشهر" />}
+        {adminPayrollView && <View style={styles.payrollGrid}>
           <MetricCard label="صافي الرواتب" value={`${payrollSummary.totalPayroll.toLocaleString("ar-EG")} ج.م`} tone="blue" />
           <MetricCard label="خصومات الحضور" value={`${payrollSummary.totalAttendanceDeductions.toLocaleString("ar-EG")} ج.م`} tone="red" />
           <MetricCard label="الأوفر تايم" value={`${payrollSummary.totalOvertime.toLocaleString("ar-EG")} ج.م`} tone="orange" />
