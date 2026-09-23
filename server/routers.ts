@@ -304,6 +304,7 @@ export const appRouter = router({
   }),
   notifications: router({
     list: staffProcedure.query(({ ctx }) => enterprise.listNotifications(ctx.staffUser.id)),
+    unreadCount: staffProcedure.query(({ ctx }) => enterprise.getUnreadNotificationCount(ctx.staffUser.id)),
     read: staffProcedure.input(z.object({ id: z.number().int() })).mutation(({ ctx, input }) => enterprise.markNotificationRead(ctx.staffUser.id, input.id)),
   }),
   hrTools: router({
