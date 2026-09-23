@@ -16,7 +16,7 @@ export default function EmployeeProfileScreen() {
   const compact = width < 700;
 
   const me = trpc.auth.me.useQuery(undefined, { retry: false });
-  const canLoad = (me.data?.role === "manager" || me.data?.role === "supervisor") && Number.isInteger(staffAccountId) && staffAccountId > 0;
+  const canLoad = ["owner", "manager", "hr"].includes(me.data?.membershipRole ?? me.data?.role ?? "") && Number.isInteger(staffAccountId) && staffAccountId > 0;
   const profile = trpc.hrTools.employee360.useQuery({ staffAccountId }, { enabled: canLoad, retry: false });
 
   if (me.isLoading) return <Screen><Loading text="جاري التحقق من صلاحية الحساب..." /></Screen>;
