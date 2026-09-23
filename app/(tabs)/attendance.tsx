@@ -23,7 +23,8 @@ export default function AttendanceScreen() {
   const now = new Date();
   const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const monthLabel = now.toLocaleDateString("ar-EG", { month: "long", year: "numeric" });
-  const workSummary = trpc.attendance.workSummary.useQuery({ month });
+  const teamAccess = ["owner", "manager", "hr", "supervisor"].includes(role);
+  const workSummary = trpc.attendance.workSummary.useQuery({ month }, { enabled: teamAccess, retry: false });
   const syncAttendance = trpc.attendance.sync.useMutation({ onSuccess: () => workSummary.refetch() });
   const mySummary = workSummary.data?.employees?.find((x: any) => x.staffAccountId === employee.id);
   const workHours = mySummary?.workHours ?? 0;
@@ -148,7 +149,7 @@ export default function AttendanceScreen() {
               </View>
             </View>
 
-            <View style={styles.syncRow}>
+            {teamAccess && <View style={styles.syncRow}>
 <View style={styles.syncCopy}>
 <Text style={styles.syncTitle}>مزامنة الحضور</Text>
 <Text style={styles.syncText}>تسجيل الغياب التلقائي وتحديث ساعات العمل والإضافي.</Text>
@@ -156,7 +157,7 @@ export default function AttendanceScreen() {
 <Pressable style={styles.syncButton} onPress={() => syncAttendance.mutate({ month })} disabled={syncAttendance.isPending}>
 <Text style={styles.syncButtonText}>{syncAttendance.isPending ? "جاري..." : "مزامنة الآن"}</Text>
 </Pressable>
-</View>
+</View>}
 <SectionTitle title="سجل الأيام" subtitle="آخر تسجيلات الحضور والانصراف" />
           </>
         }
