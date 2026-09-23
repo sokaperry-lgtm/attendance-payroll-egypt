@@ -176,6 +176,7 @@ export const payrollRecords = mysqlTable("payroll_records", {
   overtime: int("overtime").default(0).notNull(),
   absenceDeduction: int("absenceDeduction").default(0).notNull(),
   lateDeduction: int("lateDeduction").default(0).notNull(),
+  earlyDeduction: int("earlyDeduction").default(0).notNull(),
   otherDeductions: int("otherDeductions").default(0).notNull(),
   advances: int("advances").default(0).notNull(),
   employeeSocialInsurance: int("employeeSocialInsurance").default(0).notNull(),
