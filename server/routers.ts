@@ -215,7 +215,9 @@ export const appRouter = router({
   }),
   requests: router({
     list: staffProcedure.query(async ({ ctx }) => {
-      if (ctx.staffUser.role === "manager" || ctx.staffUser.role === "supervisor") {
+      const membership = await enterprise.getMembership(ctx.staffUser.id);
+      const canViewTeamRequests = ["owner", "manager", "hr", "supervisor"].includes(membership?.role ?? "");
+      if (canViewTeamRequests) {
         await enterprise.syncMonthlyAttendance(ctx.staffUser.id, new Date().toISOString().slice(0, 7));
         return enterprise.listCompanyRequests(ctx.staffUser.id);
       }
