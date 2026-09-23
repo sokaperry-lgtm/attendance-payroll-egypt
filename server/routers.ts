@@ -241,7 +241,9 @@ export const appRouter = router({
       const membership = await enterprise.getMembership(ctx.staffUser.id);
       const canViewTeamRequests = ["owner", "manager", "hr", "supervisor"].includes(membership?.role ?? "");
       if (canViewTeamRequests) {
-        await enterprise.syncMonthlyAttendance(ctx.staffUser.id, new Date().toISOString().slice(0, 7));
+        const cairoParts = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit" }).formatToParts(new Date());
+        const cairoValues = Object.fromEntries(cairoParts.map(part => [part.type, part.value]));
+        await enterprise.syncMonthlyAttendance(ctx.staffUser.id, `${cairoValues.year}-${cairoValues.month}`);
         return enterprise.listCompanyRequests(ctx.staffUser.id);
       }
       return db.listRequests(ctx.staffUser.id);
