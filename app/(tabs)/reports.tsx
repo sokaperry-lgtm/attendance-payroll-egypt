@@ -116,7 +116,7 @@ export default function ReportsScreen() {
         {(role === "owner" || role === "manager") && <SectionTitle title="ملخص الرواتب" subtitle="التكلفة والاعتمادات لهذا الشهر" />}
         {(role === "owner" || role === "manager") && <View style={styles.payrollGrid}>
           <MetricCard label="صافي الرواتب" value={`${payrollSummary.totalPayroll.toLocaleString("ar-EG")} ج.م`} tone="blue" />
-          <MetricCard label="خصومات الغياب" value={`${payrollSummary.totalAbsenceDeductions.toLocaleString("ar-EG")} ج.م`} tone="red" />
+          <MetricCard label="خصومات الحضور" value={`${payrollSummary.totalAttendanceDeductions.toLocaleString("ar-EG")} ج.م`} tone="red" />
           <MetricCard label="الأوفر تايم" value={`${payrollSummary.totalOvertime.toLocaleString("ar-EG")} ج.م`} tone="orange" />
           <MetricCard label="المسيرات المعتمدة" value={`${payrollSummary.approvedPayroll} / ${payrollSummary.totalPayrollRows}`} tone="green" />
         </View>}
