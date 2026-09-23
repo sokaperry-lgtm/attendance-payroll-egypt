@@ -436,6 +436,35 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
       }
 
       if (!record) {
+        // Do not mark today absent before the employee's scheduled shift has ended.
+        // For overnight shifts, the shift ends on the following calendar day.
+        const todayParts = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Africa/Cairo",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).formatToParts(new Date());
+        const todayValues = Object.fromEntries(todayParts.map(part => [part.type, part.value]));
+        const today = `${todayValues.year}-${todayValues.month}-${todayValues.day}`;
+        if (date === today) {
+          const shiftEnd = shift?.endTime ?? employee.shiftEnd;
+          const nowTimeParts = new Intl.DateTimeFormat("en-GB", {
+            timeZone: "Africa/Cairo",
+            hour: "2-digit",
+            minute: "2-digit",
+            hourCycle: "h23",
+          }).formatToParts(new Date());
+          const nowValues = Object.fromEntries(nowTimeParts.map(part => [part.type, part.value]));
+          const nowMinutes = Number(nowValues.hour) * 60 + Number(nowValues.minute);
+          const endMinutes = minutesOf(shiftEnd) + (shift?.crossesMidnight ? 24 * 60 : 0);
+          // An overnight shift that starts today ends tomorrow, so it cannot be
+          // considered absent on its start date merely because checkout time passed.
+          const shiftStarted = minutesOf(shift?.startTime ?? employee.shiftStart);
+          const effectiveEnd = shift?.crossesMidnight && nowMinutes < shiftStarted
+            ? endMinutes - 24 * 60
+            : endMinutes;
+          if (nowMinutes < effectiveEnd) continue;
+        }
         await dbQueries.upsertAttendance({
           staffAccountId: employee.id,
           date,
