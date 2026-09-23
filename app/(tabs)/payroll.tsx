@@ -92,7 +92,7 @@ export default function PayrollScreen() {
   );
   const stats = useMemo(() => {
     const gross = rows.reduce((s, r) => s + r.grossSalary, 0);
-    const deductions = rows.reduce((s, r) => s + r.employeeSocialInsurance + r.employeeIncomeTax + r.absenceDeduction + r.lateDeduction + r.otherDeductions + r.advances, 0);
+    const deductions = rows.reduce((s, r) => s + r.employeeSocialInsurance + r.employeeIncomeTax + r.absenceDeduction + r.lateDeduction + (r.earlyDeduction ?? 0) + r.otherDeductions + r.advances, 0);
     const net = rows.reduce((s, r) => s + r.netSalary, 0);
     const approved = rows.filter(r => r.status === "approved").length;
     return { gross, deductions, net, approved };
@@ -109,7 +109,7 @@ export default function PayrollScreen() {
   if (!isAdmin) {
     const p = selfService.data?.payroll;
     const gross = p?.grossSalary ?? (employee.baseSalary + payroll.overtimeValue);
-    const deductions = p ? p.employeeSocialInsurance + p.employeeIncomeTax + p.absenceDeduction + p.lateDeduction + p.otherDeductions + p.advances : payroll.absenceDeduction + payroll.lateDeduction;
+    const deductions = p ? p.employeeSocialInsurance + p.employeeIncomeTax + p.absenceDeduction + p.lateDeduction + (p.earlyDeduction ?? 0) + p.otherDeductions + p.advances : payroll.absenceDeduction + payroll.lateDeduction;
     const net = p?.netSalary ?? payroll.net;
     return (
       <ScreenContainer>
@@ -216,7 +216,7 @@ export default function PayrollScreen() {
                 <View style={styles.salaryNotice}><Text style={styles.salaryNoticeTitle}>رواتب أساسية لم تدخل المسير بعد</Text><Text style={styles.salaryNoticeText}>أي موظف ظاهر هنا لديه راتب مسجل في ملفه، لكن لم يتم إنشاء سجل مسير لهذا الشهر بعد. اضغط «حساب المسير» لإضافته للمسير.</Text></View>
               )}
               {filteredRows.map(r => {
-            const deductions = r.absenceDeduction + r.lateDeduction + r.otherDeductions + r.advances;
+            const deductions = r.absenceDeduction + r.lateDeduction + (r.earlyDeduction ?? 0) + r.otherDeductions + r.advances;
             const gross = r.grossSalary;
             const isSelected = String(selectedRowId) === String(r.id);
             return (
@@ -270,7 +270,7 @@ export default function PayrollScreen() {
                 <Kpi label="الإجمالي" value={formatMoney(selected.grossSalary)} />
                 <Kpi label="التأمينات" value={formatMoney(selected.employeeSocialInsurance)} />
                 <Kpi label="الضريبة" value={formatMoney(selected.employeeIncomeTax)} />
-                <Kpi label="الغياب والتأخير" value={formatMoney(selected.absenceDeduction + selected.lateDeduction)} />
+                <Kpi label="الغياب والتأخير" value={formatMoney(selected.absenceDeduction + selected.lateDeduction + (selected.earlyDeduction ?? 0))} />
                 <Kpi label="خصومات أخرى" value={formatMoney(selected.otherDeductions)} />
                 <Kpi label="السلف" value={formatMoney(selected.advances)} />
                 <Kpi label="الصافي" value={formatMoney(selected.netSalary)} />
