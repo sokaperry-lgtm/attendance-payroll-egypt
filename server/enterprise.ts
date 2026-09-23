@@ -568,20 +568,19 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       if (!record.checkOut || !(record.note || "").includes("تم اعتماد الانصراف المبكر")) return total;
       const schedule = schedules.find(item => item.staffAccountId === s.id && item.scheduleDate === record.date);
       const shift = schedule ? shifts.find(item => item.id === schedule.shiftTemplateId) : undefined;
+      const shiftStart = shift?.startTime ?? s.shiftStart;
       const shiftEnd = shift?.endTime ?? s.shiftEnd;
-      const [eh, em] = shiftEnd.split(":").map(Number);
-      const [ah, am] = record.checkOut.split(":").map(Number);
-      const endMinutes = (eh || 0) * 60 + (em || 0);
-      const actualMinutes = (ah || 0) * 60 + (am || 0);
-      return total + Math.max(0, endMinutes - actualMinutes);
+      const crossesMidnight = shift?.crossesMidnight ?? false;
+      const scheduledEnd = minutesOf(shiftEnd) + (crossesMidnight ? 24 * 60 : 0);
+      let actualCheckout = minutesOf(record.checkOut);
+      if (crossesMidnight && actualCheckout < minutesOf(shiftStart)) actualCheckout += 24 * 60;
+      return total + Math.max(0, scheduledEnd - actualCheckout);
     }, 0);
     const earlyDeduction=Math.round((s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours/60)*earlyMinutes);
     const absenceDeduction=Math.round((s.baseSalary/PAYROLL_RULES.calendarDays)*PAYROLL_RULES.absencePenaltyDays*absences);
     const approvedOvertimeHours=approvedOvertime
-      .filter(r=>r.staffAccountId===s.id && r.fromDate >= month+"-01" && r.fromDate <= month+"-31")
-      .reduce((sum,r)=>sum+Number(r.hours??0),0);
-    const employeeSchedules=schedules.filter(r=>r.staffAccountId===s.id);
-    const employeeShifts=shifts;
+      .filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month))
+      .reduce((sum,r)=>sum+Math.max(0, Number(r.hours ?? 0)),0);
     // Overtime is payable only through an approved overtime request.
     // Staying longer on site is not automatically treated as payable overtime.
     const overtimeHours=approvedOvertimeHours;
