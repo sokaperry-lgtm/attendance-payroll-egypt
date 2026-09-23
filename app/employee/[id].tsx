@@ -37,12 +37,13 @@ export default function EmployeeProfileScreen() {
   const advances = data.advances ?? [];
   const schedules = data.schedules ?? [];
   const audit = data.audit ?? [];
-  const present = attendance.filter((r) => r.status === "حاضر" || r.status === "متأخر").length;
+  const present = attendance.filter((r) => ["حاضر", "متأخر", "مأمورية"].includes(String(r.status))).length;
   const absent = attendance.filter((r) => r.status === "غياب").length;
   const late = attendance.reduce((sum, r) => sum + Number(r.lateMinutes || 0), 0);
   const approvedRequests = requests.filter((r) => r.status === "مقبول").length;
   const latestPayroll = payroll[0];
-  const attendanceRate = attendance.length ? Math.round((present / attendance.length) * 100) : 0;
+  const trackedAttendanceDays = present + absent;
+  const attendanceRate = trackedAttendanceDays ? Math.round((present / trackedAttendanceDays) * 100) : 0;
   const recentAttendance = useMemo(() => attendance.slice(0, 8), [attendance]);
   const workSchedules = useMemo(() => schedules.slice(0, 14), [schedules]);
   const currentMonthPayroll = latestPayroll ? Number(latestPayroll.netSalary || 0) : 0;
