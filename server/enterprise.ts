@@ -17,19 +17,9 @@ export async function getMembership(staffAccountId: number) {
   const membership = rows[0];
   if (!membership) return undefined;
 
-  // A legacy manager account is the tenant owner in this application.
-  // Keep the two role sources synchronized so an old/stale membership row
-  // can never lock the primary admin out of company tools.
-  const staff = (await db.select({ id: staffAccounts.id, role: staffAccounts.role })
-    .from(staffAccounts)
-    .where(eq(staffAccounts.id, staffAccountId))
-    .limit(1))[0];
-  if (staff?.role === "manager" && membership.role !== "owner") {
-    await db.update(companyMembers)
-      .set({ role: "owner", updatedAt: new Date() })
-      .where(eq(companyMembers.id, membership.id));
-    return (await db.select().from(companyMembers).where(eq(companyMembers.id, membership.id)).limit(1))[0];
-  }
+  // Membership is the source of truth for company permissions.
+  // The legacy staff role is kept only for backwards compatibility and must
+  // never promote every manager into an owner.
   return membership;
 }
 
@@ -243,12 +233,16 @@ export async function setMemberRole(actorId: number, staffAccountId: number, rol
   const actor = await getCompanyForStaff(actorId);
   if (!actor || !["owner","manager"].includes(actor.role)) throw new Error("غير مصرح");
 
-  // Never allow privilege escalation through the membership role picker.
-  // "owner" is reserved for the original tenant owner and cannot be assigned
-  // from the regular staff-management flow.
-  if (role === "owner") throw new Error("لا يمكن تعيين دور المالك من شاشة الموظفين.");
-
+  // The owner is the tenant root account and can only be changed by the owner.
+  // Managers may manage ordinary members, but cannot demote or replace the owner.
   const target = await getMembership(staffAccountId);
+  if (!target || target.companyId !== actor.companyId || !target.active) {
+    throw new Error("الموظف غير موجود في الشركة");
+  }
+  if (target.role === "owner" && actor.role !== "owner") {
+    throw new Error("لا يمكن لمدير الشركة تغيير صلاحيات المالك.");
+  }
+  if (role === "owner") throw new Error("لا يمكن تعيين دور المالك من شاشة الموظفين.");
   if (!target || target.companyId !== actor.companyId || !target.active) {
     throw new Error("الموظف غير موجود في الشركة");
   }
@@ -722,9 +716,9 @@ export async function assertPayrollEditable(staffAccountId:number, month:string)
 export async function syncCompanyMemberRole(actorId:number,targetId:number,role:"manager"|"supervisor"|"employee") {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const actor=await getCompanyForStaff(actorId);
-  if(!actor || actor.role!=="owner") throw new Error("غير مصرح");
+  if(!actor || !["owner","manager"].includes(actor.role)) throw new Error("غير مصرح");
   const target=await assertStaffInCompany(actorId,targetId);
-  const companyRole=role==="manager"?"owner":role;
+  const companyRole=role;
   await db.update(companyMembers).set({role:companyRole,updatedAt:new Date()}).where(and(
     eq(companyMembers.id,target.target.id),
     eq(companyMembers.companyId,actor.companyId)
