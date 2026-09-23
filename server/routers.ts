@@ -254,7 +254,24 @@ export const appRouter = router({
       if (["إجازة","إجازة مرضية","إجازة طارئة"].includes(input.type)) {
         await enterprise.validateLeaveRequest(ctx.staffUser.id, input.fromDate, input.toDate, input.type as "إجازة" | "إجازة مرضية" | "إجازة طارئة");
       }
-      return db.createRequest({ ...input, staffAccountId: ctx.staffUser.id });
+      const row = await db.createRequest({ ...input, staffAccountId: ctx.staffUser.id });
+      if (row) {
+        const actorName = ctx.staffUser.name || "موظف";
+        const m = await enterprise.getCompanyForStaff(ctx.staffUser.id);
+        if (m) {
+          await enterprise.notifyCompanyRoles(
+            ctx.staffUser.id,
+            ["owner", "manager", "hr", "supervisor"],
+            "request",
+            "طلب جديد يحتاج مراجعة",
+            `${actorName} قدم طلب ${input.type} من ${input.fromDate} إلى ${input.toDate}.`
+          );
+          await enterprise.writeAudit(ctx.staffUser.id, m.companyId, "request.created", "request", String(row.id), {
+            type: input.type, fromDate: input.fromDate, toDate: input.toDate,
+          });
+        }
+      }
+      return row;
     }),
     review: supervisorProcedure.input(z.object({ id: z.number().int(), status: z.enum(["مقبول", "مرفوض"]) })).mutation(async ({ ctx, input }) => {
       const existing = (await enterprise.listCompanyRequests(ctx.staffUser.id)).find(r => r.id === input.id);
