@@ -6,6 +6,7 @@ import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { AppDataProvider, useAppData } from "@/lib/app-data";
+import { trpc } from "@/lib/trpc";
 
 export default function TabLayout() {
   return (
@@ -19,6 +20,7 @@ function RoleAwareTabs() {
     const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { role } = useAppData();
+  const notificationCount = trpc.notifications.unreadCount.useQuery(undefined, { refetchInterval: 30000 }).data ?? 0;
   const router = useRouter();
   const isDesktopWeb = Platform.OS === "web" && width >= 900;
 
@@ -97,7 +99,7 @@ function RoleAwareTabs() {
       >
         <Tabs.Screen name="index" options={{ title: "الرئيسية", href: mobile && !mobilePrimary.has("index") ? null : "/", tabBarIcon: ({ color }) => <IconSymbol size={23} name="house.fill" color={color} /> }} />
         <Tabs.Screen name="self-service" options={{ title: "ملفي", href: role === "employee" ? "/self-service" : null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="person.fill" color={color} /> }} />
-        <Tabs.Screen name="notifications" options={{ title: "الإشعارات", href: mobile && !mobilePrimary.has("notifications") ? null : "/notifications", tabBarIcon: ({ color }) => <IconSymbol size={23} name="notifications" color={color} /> }} />
+        <Tabs.Screen name="notifications" options={{ title: "الإشعارات", tabBarBadge: notificationCount > 0 ? (notificationCount > 99 ? "99+" : notificationCount) : undefined, tabBarBadgeStyle: { backgroundColor: "#163A63", color: "#FFFFFF", fontSize: 9, fontWeight: "800" }, href: mobile && !mobilePrimary.has("notifications") ? null : "/notifications", tabBarIcon: ({ color }) => <IconSymbol size={23} name="notifications" color={color} /> }} />
         <Tabs.Screen name="hr-tools" options={{ title: "HR Tools", href: mobile ? null : (employeeManagement ? "/hr-tools" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="banknote" color={color} /> }} />
         <Tabs.Screen name="attendance" options={{ title: "الحضور", href: mobile && !mobilePrimary.has("attendance") ? null : "/attendance", tabBarIcon: ({ color }) => <IconSymbol size={23} name="calendar" color={color} /> }} />
         <Tabs.Screen name="requests" options={{ title: "الطلبات", href: mobile && !mobilePrimary.has("requests") ? null : "/requests", tabBarIcon: ({ color }) => <IconSymbol size={23} name="doc.text.fill" color={color} /> }} />
