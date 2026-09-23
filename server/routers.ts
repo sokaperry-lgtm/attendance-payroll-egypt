@@ -334,8 +334,8 @@ export const appRouter = router({
       const membership = await enterprise.getMembership(ctx.staffUser.id);
       const role = membership?.role ?? "employee";
       const canManagePayroll =
-        ["owner", "manager", "hr", "accountant", "supervisor"].includes(role) ||
-        ["manager", "supervisor"].includes(ctx.staffUser.role);
+        ["owner", "manager", "hr", "accountant"].includes(role) ||
+        ["manager"].includes(ctx.staffUser.role);
       return { role, canManagePayroll };
     }),
   }),
