@@ -335,7 +335,7 @@ export const appRouter = router({
     }),
     payrollCsv: payrollProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ ctx, input }) => {
       const rows = await enterprise.getPayroll(ctx.staffUser.id, input.month);
-      return enterprise.toCsv(rows.map((r:any) => ({ staffAccountId:r.staffAccountId, month:r.month, baseSalary:r.baseSalary, socialInsurance:r.employeeSocialInsurance, incomeTax:r.employeeIncomeTax, absenceDeduction:r.absenceDeduction, lateDeduction:r.lateDeduction, netSalary:r.netSalary, status:r.status })));
+      return enterprise.toCsv(rows.map((r:any) => ({ staffAccountId:r.staffAccountId, month:r.month, baseSalary:r.baseSalary, grossSalary:r.grossSalary, overtime:r.overtime, absenceDeduction:r.absenceDeduction, lateDeduction:r.lateDeduction, earlyDeduction:r.earlyDeduction, otherDeductions:r.otherDeductions, advances:r.advances, socialInsurance:r.employeeSocialInsurance, incomeTax:r.employeeIncomeTax, netSalary:r.netSalary, status:r.status })));
     }),
   }),
 });
