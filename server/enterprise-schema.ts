@@ -23,6 +23,7 @@ const alterStatements = [
 `ALTER TABLE staff_accounts MODIFY COLUMN role ENUM('manager','supervisor','employee') NOT NULL DEFAULT 'employee'`,
 `ALTER TABLE payroll_records ADD COLUMN employeeSocialInsurance INT NOT NULL DEFAULT 0`,
 `ALTER TABLE payroll_records ADD COLUMN employeeIncomeTax INT NOT NULL DEFAULT 0`,
+`ALTER TABLE payroll_records ADD COLUMN earlyDeduction INT NOT NULL DEFAULT 0`,
 `ALTER TABLE staff_requests ADD COLUMN hours DECIMAL(5,2) NULL`,
 ];
 
