@@ -468,21 +468,26 @@ export async function getAttendanceWorkSummary(staffAccountId: number, month: st
   const attendance = (await db.select().from(attendanceRecords)).filter(x => x.date.startsWith(month) && ids.has(x.staffAccountId));
   const schedules = await db.select().from(weeklySchedules);
   const shifts = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
+  const approvedOvertime = await db.select().from(staffRequests).where(and(
+    eq(staffRequests.type, "أوفر تايم"),
+    eq(staffRequests.status, "مقبول")
+  ));
 
   const employees = staff.map(employee => {
     const rows = attendance.filter(x => x.staffAccountId === employee.id && x.checkIn && x.checkOut);
     let workMinutes = 0;
-    let overtimeMinutes = 0;
+    let approvedOvertimeMinutes = 0;
 
     for (const row of rows) {
       const schedule = schedules.find(x => x.staffAccountId === employee.id && x.scheduleDate === row.date);
       const shift = schedule ? shifts.find(x => x.id === schedule.shiftTemplateId) : undefined;
-      const start = row.checkIn!;
-      const end = row.checkOut!;
-      const actual = shiftMinutes(start, end);
-      const scheduledMinutes = shift ? shiftMinutes(shift.startTime, shift.endTime, shift.crossesMidnight) : shiftMinutes(employee.shiftStart, employee.shiftEnd);
+      const actual = shiftMinutes(row.checkIn!, row.checkOut!, shift?.crossesMidnight ?? false);
       workMinutes += actual;
-      overtimeMinutes += Math.max(0, actual - scheduledMinutes);
+    }
+
+    for (const request of approvedOvertime) {
+      if (request.staffAccountId !== employee.id || !request.fromDate.startsWith(month)) continue;
+      approvedOvertimeMinutes += Math.round(Number(request.hours ?? 0) * 60);
     }
 
     return {
@@ -490,8 +495,8 @@ export async function getAttendanceWorkSummary(staffAccountId: number, month: st
       name: employee.name,
       workMinutes,
       workHours: Number((workMinutes / 60).toFixed(2)),
-      overtimeMinutes,
-      overtimeHours: Number((overtimeMinutes / 60).toFixed(2)),
+      overtimeMinutes: approvedOvertimeMinutes,
+      overtimeHours: Number((approvedOvertimeMinutes / 60).toFixed(2)),
     };
   });
 
