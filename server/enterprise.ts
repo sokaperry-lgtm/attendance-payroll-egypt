@@ -291,8 +291,34 @@ export async function listNotifications(staffAccountId: number) {
 
 export async function createNotification(staffAccountId: number, type: string, title: string, body: string) {
   const db = await getDb(); if (!db) return undefined;
+  const membership = await getMembership(staffAccountId);
+  if (!membership || !membership.active) return undefined;
   const result = await db.insert(notifications).values({ staffAccountId, type, title, body });
   return (await db.select().from(notifications).where(eq(notifications.id, Number(result[0].insertId))).limit(1))[0];
+}
+
+export async function notifyCompanyRoles(actorId: number, roles: CompanyRole[], type: string, title: string, body: string) {
+  const db = await getDb(); if (!db) return 0;
+  const actor = await getCompanyForStaff(actorId);
+  if (!actor) return 0;
+  const members = await db.select({ staffAccountId: companyMembers.staffAccountId, role: companyMembers.role })
+    .from(companyMembers)
+    .where(and(eq(companyMembers.companyId, actor.companyId), eq(companyMembers.active, true)));
+  let sent = 0;
+  for (const member of members) {
+    if (member.staffAccountId === actorId || !roles.includes(member.role as CompanyRole)) continue;
+    const created = await createNotification(member.staffAccountId, type, title, body);
+    if (created) sent += 1;
+  }
+  return sent;
+}
+
+export async function getUnreadNotificationCount(staffAccountId: number) {
+  const db = await getDb(); if (!db) return 0;
+  const rows = await db.select({ id: notifications.id })
+    .from(notifications)
+    .where(and(eq(notifications.staffAccountId, staffAccountId), isNull(notifications.readAt)));
+  return rows.length;
 }
 
 export async function markNotificationRead(staffAccountId: number, id: number) {
