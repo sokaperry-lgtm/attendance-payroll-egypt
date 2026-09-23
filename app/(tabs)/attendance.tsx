@@ -164,8 +164,8 @@ export default function AttendanceScreen() {
         renderItem={({ item }) => (
           <View style={styles.row}>
             <View style={styles.dateBox}>
-              <Text style={styles.dateDay}>{new Date(item.date).getDate()}</Text>
-              <Text style={styles.dateMonth}>سبتمبر</Text>
+              <Text style={styles.dateDay}>{Number(item.date.split("-")[2])}</Text>
+              <Text style={styles.dateMonth}>{new Date(`${item.date}T12:00:00`).toLocaleDateString("ar-EG", { month: "long" })}</Text>
             </View>
             <View style={styles.rowMain}>
               <View style={styles.rowHeader}>
