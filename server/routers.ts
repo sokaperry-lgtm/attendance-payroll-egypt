@@ -7,7 +7,15 @@ import * as enterprise from "./enterprise";
 import * as db from "./db";
 import { PAYROLL_RULES } from "../lib/payroll";
 
-function timeMinutes(value: string) { const [h,m]=value.split(":").map(Number); return (h||0)*60+(m||0); }
+function timeMinutes(value: string) {
+  const match = /^(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$/.test(value);
+  if (!match) throw new Error("صيغة الوقت غير صحيحة.");
+  const [h,m]=value.split(":").map(Number);
+  return h*60+m;
+}
+function cairoToday() {
+  return new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+}
 
 const loginInput = z.object({ phone: z.string().min(3).max(32), password: z.string().min(4).max(120) });
 const staffView = async (staff: Awaited<ReturnType<typeof db.getStaffAccountById>> | null) => {
@@ -136,15 +144,24 @@ export const appRouter = router({
     team: supervisorProcedure.query(({ ctx }) => enterprise.listCompanyAttendance(ctx.staffUser.id)),
     sync: supervisorProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).mutation(({ ctx, input }) => enterprise.syncMonthlyAttendance(ctx.staffUser.id, input.month)),
     workSummary: supervisorProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).query(({ ctx, input }) => enterprise.getAttendanceWorkSummary(ctx.staffUser.id, input.month)),
-    managerUpdate: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), date: z.string().length(10), checkIn: z.string().max(8).nullable().optional(), checkOut: z.string().max(8).nullable().optional(), status: z.enum(["حاضر", "متأخر", "غياب", "إجازة", "مأمورية"]), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0).nullable().optional(), note: z.string().max(1000).nullable().optional() })).mutation(async ({ ctx, input }) => {
-      await enterprise.assertStaffInCompany(ctx.staffUser.id, input.staffAccountId);
+    managerUpdate: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), checkIn: z.string().max(8).nullable().optional(), checkOut: z.string().max(8).nullable().optional(), status: z.enum(["حاضر", "متأخر", "غياب", "إجازة", "مأمورية"]), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0).nullable().optional(), note: z.string().max(1000).nullable().optional() })).mutation(async ({ ctx, input }) => {
+      const access = await enterprise.assertStaffInCompany(ctx.staffUser.id, input.staffAccountId);
+      if (access.target.role === "owner" && access.actor.role !== "owner") throw new Error("لا يمكن تعديل حضور المالك من هذا الحساب.");
+      if (input.date > cairoToday()) throw new Error("لا يمكن تسجيل حضور بتاريخ مستقبلي.");
+      if (input.checkIn) timeMinutes(input.checkIn);
+      if (input.checkOut) timeMinutes(input.checkOut);
+      if (input.checkIn && input.checkOut && timeMinutes(input.checkOut) < timeMinutes(input.checkIn) && !String(input.note ?? "").includes("وردية ليلية")) {
+        throw new Error("وقت الانصراف لا يمكن أن يسبق وقت الحضور.");
+      }
       await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7));
       const row = await db.updateAttendanceByManager(input);
       const m = await enterprise.getCompanyForStaff(ctx.staffUser.id);
       if (m) await enterprise.writeAudit(ctx.staffUser.id, m.companyId, "attendance.updated", "attendance", String(row?.id ?? ""), {staffAccountId:input.staffAccountId,date:input.date,status:input.status});
       return row;
     }),
-    checkIn: staffProcedure.input(z.object({ date: z.string().length(10), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0) })).mutation(async ({ ctx, input }) => {
+    checkIn: staffProcedure.input(z.object({ date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0) })).mutation(async ({ ctx, input }) => {
+      timeMinutes(input.time);
+      if (input.date > cairoToday()) throw new Error("لا يمكن تسجيل حضور بتاريخ مستقبلي.");
       await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7));
       const branch = await enterprise.getBranchForStaff(ctx.staffUser.id);
       if (branch && input.distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الحضور المسموح (${branch.radiusMeters} متر).`);
@@ -160,7 +177,9 @@ export const appRouter = router({
       const status = late > 0 ? "متأخر" : "حاضر";
       return db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status, lateMinutes: late, distanceMeters: input.distanceMeters, note: scheduled?.shift ? `حسب جدول: ${scheduled.shift.name}` : null });
     }),
-    checkOut: staffProcedure.input(z.object({ date: z.string().length(10), time: z.string().max(8), distanceMeters: z.number().int().min(0) })).mutation(async ({ ctx, input }) => {
+    checkOut: staffProcedure.input(z.object({ date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), time: z.string().max(8), distanceMeters: z.number().int().min(0) })).mutation(async ({ ctx, input }) => {
+      timeMinutes(input.time);
+      if (input.date > cairoToday()) throw new Error("لا يمكن تسجيل انصراف بتاريخ مستقبلي.");
       await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7));
       const branch = await enterprise.getBranchForStaff(ctx.staffUser.id);
       if (branch && input.distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الانصراف المسموح (${branch.radiusMeters} متر).`);
@@ -172,7 +191,11 @@ export const appRouter = router({
 
       const scheduled = (await db.listSchedules(ctx.staffUser.id)).find(r => r.scheduleDate === input.date);
       const shiftEnd = scheduled?.shift?.endTime ?? ctx.staffUser.shiftEnd;
-      const earlyMinutes = Math.max(0, timeMinutes(shiftEnd) - timeMinutes(input.time));
+      const crossesMidnight = scheduled?.shift?.crossesMidnight ?? false;
+      const scheduledEnd = timeMinutes(shiftEnd) + (crossesMidnight ? 24 * 60 : 0);
+      let actualCheckout = timeMinutes(input.time);
+      if (crossesMidnight && actualCheckout < timeMinutes(scheduled?.shift?.startTime ?? ctx.staffUser.shiftStart)) actualCheckout += 24 * 60;
+      const earlyMinutes = Math.max(0, scheduledEnd - actualCheckout);
       const earlyNote = earlyMinutes > 0 ? `انصراف مبكر: ${earlyMinutes} دقيقة` : null;
       const note = [current.note, earlyNote].filter(Boolean).join(" · ") || null;
       const attendance = await db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: current.checkIn, checkOut: input.time, status: current.status, lateMinutes: current.lateMinutes, distanceMeters: current.distanceMeters, note });
