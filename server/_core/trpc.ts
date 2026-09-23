@@ -59,7 +59,7 @@ const requirePayrollAdmin = t.middleware(async (opts) => {
   const membership = await getMembership(opts.ctx.staffUser.id);
   const canManagePayroll =
     !!membership &&
-    ["owner", "manager", "hr", "accountant", "supervisor"].includes(membership.role);
+    ["owner", "manager", "hr", "accountant"].includes(membership.role);
   const legacyManagerAccess = ["manager", "supervisor"].includes(opts.ctx.staffUser.role);
   if (!canManagePayroll && !legacyManagerAccess) {
     throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
