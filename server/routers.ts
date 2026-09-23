@@ -105,8 +105,16 @@ export const appRouter = router({
       return await staffView(staff); }),
     update: hrProcedure.input(z.object({ id: z.number().int(), phone: z.string().min(3).max(32).optional(), password: z.string().min(6).max(120).optional(), name: z.string().min(2).max(160).optional(), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).optional(), role: z.enum(["manager","supervisor","employee"]).optional(), shiftStart: z.string().max(8).optional(), shiftEnd: z.string().max(8).optional(), active: z.boolean().optional() })).mutation(async ({ ctx, input }) => {
       const { id, ...changes } = input;
-      await enterprise.assertStaffInCompany(ctx.staffUser.id, id);
+      const access = await enterprise.assertStaffInCompany(ctx.staffUser.id, id);
       if (id === ctx.staffUser.id && (changes.active === false || changes.role === "employee" || changes.role === "supervisor")) throw new Error("لا يمكنك تعطيل حسابك أو خفض صلاحيتك من هنا.");
+      // Role changes are privileged operations. HR may manage employee data,
+      // but only owner/manager can change a member's access level.
+      if (changes.role && !["owner", "manager"].includes(access.actor.role)) {
+        throw new Error("غير مصرح بتغيير صلاحيات الموظفين.");
+      }
+      if (changes.role && access.target.role === "owner" && access.actor.role !== "owner") {
+        throw new Error("لا يمكن لمدير الشركة تغيير صلاحيات المالك.");
+      }
       const updated = await db.updateStaffAccount(id, changes);
       if (changes.role) await enterprise.syncCompanyMemberRole(ctx.staffUser.id, id, changes.role);
       await enterprise.writeAudit(ctx.staffUser.id, (await enterprise.getCompanyForStaff(ctx.staffUser.id))!.companyId, "staff.updated", "staff", String(id), changes);
