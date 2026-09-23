@@ -715,14 +715,23 @@ export async function assertPayrollEditable(staffAccountId:number, month:string)
 
 export async function syncCompanyMemberRole(actorId:number,targetId:number,role:"manager"|"supervisor"|"employee") {
   const db=await getDb(); if(!db) throw new Error("Database not available");
-  const actor=await getCompanyForStaff(actorId);
-  if(!actor || !["owner","manager"].includes(actor.role)) throw new Error("غير مصرح");
-  const target=await assertStaffInCompany(actorId,targetId);
-  const companyRole=role;
-  await db.update(companyMembers).set({role:companyRole,updatedAt:new Date()}).where(and(
-    eq(companyMembers.id,target.target.id),
-    eq(companyMembers.companyId,actor.companyId)
+  const access=await assertStaffInCompany(actorId,targetId);
+  if(!["owner","manager"].includes(access.actor.role)) throw new Error("غير مصرح");
+  if(access.target.role === "owner" && access.actor.role !== "owner") {
+    throw new Error("لا يمكن لمدير الشركة تغيير صلاحيات المالك.");
+  }
+
+  // This helper is only for legacy staff-role changes. Keep both role sources
+  // synchronized and never allow it to demote an owner.
+  await db.update(companyMembers).set({role,updatedAt:new Date()}).where(and(
+    eq(companyMembers.id,access.target.id),
+    eq(companyMembers.companyId,access.actor.companyId)
   ));
+  await db.update(staffAccounts).set({
+    role,
+    updatedAt:new Date(),
+  }).where(eq(staffAccounts.id,targetId));
+
   return getMembership(targetId);
 }
 
