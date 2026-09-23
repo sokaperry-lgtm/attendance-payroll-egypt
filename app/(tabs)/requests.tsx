@@ -16,10 +16,11 @@ export default function RequestsScreen() {
   const waiveAttendance = trpc.requests.waiveAttendance.useMutation();
   const reviewAttendanceException = trpc.requests.reviewAttendanceException.useMutation();
   const cancelPenalty = trpc.requests.cancelPenalty.useMutation();
-  const leaveBalance = trpc.leave.balance.useQuery({year:new Date().getFullYear()});
+  const currentYear = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Africa/Cairo", year: "numeric" }).format(new Date()));
+  const leaveBalance = trpc.leave.balance.useQuery({ year: currentYear });
   const [modalOpen, setModalOpen] = useState(false);
   const [type, setType] = useState<RequestType>("إجازة");
-  const initialDate = new Date().toISOString().slice(0, 10);
+  const initialDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date());
   const [from, setFrom] = useState(initialDate);
   const [to, setTo] = useState(initialDate);
   const [hours, setHours] = useState("2");
