@@ -349,7 +349,7 @@ export async function getMonthlyStaffReports(month: string, companyId?: number) 
     const members = await db.select({ staffAccountId: companyMembers.staffAccountId }).from(companyMembers).where(eq(companyMembers.companyId, companyId));
     companyStaffIds = new Set(members.map(member => member.staffAccountId));
   }
-  const employees = staff.filter((member) => member.role === "employee" && (companyStaffIds === null || companyStaffIds.has(member.id))).map((member) => {
+  const employees = staff.filter((member) => member.active && member.role !== "owner" && (companyStaffIds === null || companyStaffIds.has(member.id))).map((member) => {
     const records = attendance.filter((record) => record.staffAccountId === member.id && record.date.startsWith(month));
     const memberRequests = requests.filter((request) => request.staffAccountId === member.id && (request.fromDate.startsWith(month) || request.toDate.startsWith(month)));
     const attendanceSummary = summarizeAttendance(records);
