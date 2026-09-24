@@ -659,7 +659,7 @@ export async function approvePayroll(staffAccountId:number, id:number) {
   const memberIds=new Set(members.map(x=>x.staffAccountId));
   const monthAttendance=await db.select().from(attendanceRecords);
   const pending=monthAttendance.filter(r=>{
-    if(!memberIds.has(r.staffAccountId) || !r.date.startsWith(current.month)) return false;
+    if(r.staffAccountId !== current.staffAccountId || !r.date.startsWith(current.month)) return false;
     const note=r.note||"";
     const latePending=Number(r.lateMinutes||0)>0 && !note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
     const earlyPending=note.includes("انصراف مبكر:") && !note.includes("تم اعتماد الانصراف المبكر") && !note.includes("تم إلغاء الانصراف المبكر");
@@ -762,13 +762,14 @@ export async function getPayroll(staffAccountId:number, month:string) {
   return db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.month,month))).orderBy(desc(payrollRecords.netSalary));
 }
 
-export async function assertPayrollEditable(staffAccountId:number, month:string) {
+export async function assertPayrollEditable(staffAccountId:number, month:string, targetStaffAccountId?:number) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(staffAccountId); if(!m) throw new Error("Company not found");
   const approved=(await db.select({id:payrollRecords.id}).from(payrollRecords).where(and(
     eq(payrollRecords.companyId,m.companyId),
     eq(payrollRecords.month,month),
-    eq(payrollRecords.status,"approved")
+    eq(payrollRecords.status,"approved"),
+    ...(targetStaffAccountId ? [eq(payrollRecords.staffAccountId,targetStaffAccountId)] : [])
   )).limit(1))[0];
   if(approved) throw new Error("مسير هذا الشهر تم اعتماده ولا يمكن تعديل الحضور بعد الإغلاق.");
   return true;
