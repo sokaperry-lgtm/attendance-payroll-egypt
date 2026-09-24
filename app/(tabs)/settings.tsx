@@ -82,7 +82,8 @@ export default function SettingsScreen() {
   async function saveBranch() {
     if (!selectedBranch) return;
     const radius = Number(branchForm.radiusMeters);
-    if (!branchForm.name.trim() || !branchForm.address.trim() || !Number.isFinite(radius) || radius < 50) {
+    const latitude = Number(branchForm.latitude); const longitude = Number(branchForm.longitude);
+    if (!branchForm.name.trim() || !branchForm.address.trim() || !Number.isFinite(radius) || radius < 50 || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
       return showAlert("بيانات غير صحيحة", "راجع اسم الفرع والعنوان ونطاق GPS.");
     }
     try {
@@ -93,8 +94,8 @@ export default function SettingsScreen() {
   }
 
   async function addBranch() {
-    const radius = Number(branchForm.radiusMeters);
-    if (!branchForm.name.trim() || !branchForm.address.trim() || !Number.isFinite(radius) || radius < 50) {
+    const radius = Number(branchForm.radiusMeters); const latitude = Number(branchForm.latitude); const longitude = Number(branchForm.longitude);
+    if (!branchForm.name.trim() || !branchForm.address.trim() || !Number.isFinite(radius) || radius < 50 || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
       return showAlert("بيانات ناقصة", "اكتب اسم الفرع والعنوان ونطاق GPS صحيح.");
     }
     try {
@@ -181,7 +182,7 @@ export default function SettingsScreen() {
                   <View style={styles.branchMiniRow}><Text style={styles.miniValue}>{b.employeeCount ?? 0}</Text><Text style={styles.miniLabel}>موظف</Text><Text style={styles.miniValue}>{b.radiusMeters}m</Text><Text style={styles.miniLabel}>GPS</Text></View>
                 </Pressable>
               ))}
-              <Pressable onPress={() => { setShowNewBranch(true); setBranchForm({ name:"", address:"", latitude:"30.0444", longitude:"31.2357", radiusMeters:"200" }); }} style={styles.addBranch}><Text style={styles.addBranchText}>＋ إضافة فرع جديد</Text></Pressable>
+              <Pressable onPress={() => { setShowNewBranch(true); setBranchForm({ name:"", address:"", latitude:"", longitude:"", radiusMeters:"200" }); }} style={styles.addBranch}><Text style={styles.addBranchText}>＋ إضافة فرع جديد</Text></Pressable>
             </View>
 
             <View style={styles.editor}>
@@ -283,7 +284,7 @@ const styles=StyleSheet.create({
   card:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#F2F5F8",borderRadius:20,padding:18,gap:8},cardTitle:{color:"#172033",fontSize:16,fontWeight:"900",textAlign:"right"},cardSub:{color:"#98A2B3",fontSize:10,textAlign:"right",marginBottom:6},
   grid:{flexDirection:"row-reverse",flexWrap:"wrap",gap:10},gridOne:{flexDirection:"column"},label:{color:"#667085",fontSize:10,fontWeight:"700",textAlign:"right",marginBottom:5},input:{borderWidth:1,borderColor:"#D9E0E8",borderRadius:11,padding:10,color:"#172033",fontSize:12,backgroundColor:"#FBFCFE",marginBottom:8},primaryButton:{backgroundColor:"#163A63",borderRadius:13,padding:13,alignItems:"center",justifyContent:"center",flex:1},primaryText:{color:"#FFFFFF",fontWeight:"900",fontSize:12},secondaryButton:{borderWidth:1,borderColor:"#D9E0E8",borderRadius:13,padding:12,alignItems:"center",justifyContent:"center",flex:1},secondaryText:{color:"#163A63",fontWeight:"900",fontSize:12},actionRow:{flexDirection:"row-reverse",gap:9,marginTop:4},
   branchLayout:{flexDirection:"row-reverse",gap:12},branchLayoutCompact:{flexDirection:"column"},branchList:{width:300,gap:8},branchCard:{borderWidth:1,borderColor:"#EDF1F5",borderRadius:15,padding:13,backgroundColor:"#FBFCFE",gap:5},branchCardActive:{borderColor:"#9CB8D5",backgroundColor:"#F5F9FD"},branchCardTop:{flexDirection:"row-reverse",alignItems:"center",gap:7},statusDot:{width:8,height:8,borderRadius:4},branchName:{color:"#172033",fontSize:13,fontWeight:"900",textAlign:"right",flex:1},branchMeta:{color:"#667085",fontSize:9,textAlign:"right"},branchMiniRow:{flexDirection:"row-reverse",gap:5,alignItems:"center"},miniValue:{color:"#163A63",fontSize:10,fontWeight:"900"},miniLabel:{color:"#98A2B3",fontSize:8},addBranch:{borderWidth:1,borderStyle:"dashed",borderColor:"#9CB8D5",borderRadius:14,padding:13,alignItems:"center"},addBranchText:{color:"#163A63",fontWeight:"900",fontSize:11},
-  editor:{flex:1,borderWidth:1,borderColor:"#EDF1F5",borderRadius:17,padding:15,gap:8},editorHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},editorSub:{color:"#98A2B3",fontSize:9,textAlign:"right",marginTop:2},badge:{backgroundColor:"#E7F4EF",paddingHorizontal:9,paddingVertical:5,borderRadius:8},badgeText:{color:"#2E7D68",fontSize:8,fontWeight:"900"},
-  memberList:{gap:7},memberRow:{borderWidth:1,borderColor:"#EDF1F5",borderRadius:14,padding:11,flexDirection:"row-reverse",alignItems:"center",gap:12},memberRowCompact:{flexDirection:"column",alignItems:"stretch"},memberInfo:{minWidth:190,flex:1},memberName:{color:"#172033",fontSize:12,fontWeight:"900",textAlign:"right"},memberMeta:{color:"#98A2B3",fontSize:9,textAlign:"right",marginTop:2},roleCaption:{color:"#163A63",fontSize:9,fontWeight:"800",textAlign:"right",marginTop:4},memberControls:{flex:2,gap:7},branchChips:{flexDirection:"row-reverse",flexWrap:"wrap",gap:6},roleChips:{flexDirection:"row-reverse",flexWrap:"wrap",gap:6},chip:{borderWidth:1,borderColor:"#D9E0E8",borderRadius:10,paddingHorizontal:9,paddingVertical:7,backgroundColor:"#FFFFFF"},chipActive:{backgroundColor:"#163A63",borderColor:"#163A63"},roleChipActive:{backgroundColor:"#2E7D68",borderColor:"#2E7D68"},chipText:{color:"#667085",fontSize:9,fontWeight:"800"},chipTextActive:{color:"#FFFFFF"},
+  editor:{flex:1,borderWidth:1,borderColor:"#EDF1F5",borderRadius:17,padding:15,gap:8},editorHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},editorSub:{color:"#98A2B3",fontSize:9,textAlign:"right",marginTop:2},badge:{backgroundColor:"#EEF4FA",paddingHorizontal:9,paddingVertical:5,borderRadius:8},badgeText:{color:"#31577F",fontSize:8,fontWeight:"900"},
+  memberList:{gap:7},memberRow:{borderWidth:1,borderColor:"#EDF1F5",borderRadius:14,padding:11,flexDirection:"row-reverse",alignItems:"center",gap:12},memberRowCompact:{flexDirection:"column",alignItems:"stretch"},memberInfo:{minWidth:190,flex:1},memberName:{color:"#172033",fontSize:12,fontWeight:"900",textAlign:"right"},memberMeta:{color:"#98A2B3",fontSize:9,textAlign:"right",marginTop:2},roleCaption:{color:"#163A63",fontSize:9,fontWeight:"800",textAlign:"right",marginTop:4},memberControls:{flex:2,gap:7},branchChips:{flexDirection:"row-reverse",flexWrap:"wrap",gap:6},roleChips:{flexDirection:"row-reverse",flexWrap:"wrap",gap:6},chip:{borderWidth:1,borderColor:"#D9E0E8",borderRadius:10,paddingHorizontal:9,paddingVertical:7,backgroundColor:"#FFFFFF"},chipActive:{backgroundColor:"#163A63",borderColor:"#163A63"},roleChipActive:{backgroundColor:"#31577F",borderColor:"#31577F"},chipText:{color:"#667085",fontSize:9,fontWeight:"800"},chipTextActive:{color:"#FFFFFF"},
   bottomGrid:{flexDirection:"row-reverse",gap:12},bottomGridOne:{flexDirection:"column"},statusRow:{flexDirection:"row-reverse",justifyContent:"space-between",paddingVertical:10,borderBottomWidth:1,borderBottomColor:"#F7F9FC"},value:{color:"#163A63",fontSize:11,fontWeight:"900"},securityButton:{marginTop:8,backgroundColor:"#163A63",borderRadius:12,padding:12,flexDirection:"row-reverse",alignItems:"center",justifyContent:"center",gap:8},securityButtonText:{color:"#FFFFFF",fontSize:10,fontWeight:"800"},hint:{color:"#667085",fontSize:11,textAlign:"right"},denied:{flex:1,alignItems:"center",justifyContent:"center",gap:12},deniedTitle:{color:"#172033",fontSize:19,fontWeight:"800"}
 });
