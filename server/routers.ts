@@ -129,6 +129,11 @@ export const appRouter = router({
       if (access.target.role === "owner") {
         throw new Error("لا يمكن تعديل حساب مالك الشركة من شاشة الموظفين.");
       }
+      // HR can manage employee records, but must not deactivate, reset,
+      // or otherwise mutate higher-privilege accounts.
+      if (["manager", "hr", "accountant"].includes(access.target.role) && access.actor.role !== "owner" && access.actor.role !== "manager") {
+        throw new Error("غير مصرح بإدارة حسابات الإدارة العليا.");
+      }
       // Role changes are privileged operations. HR may manage employee data,
       // but only owner/manager can change a member's access level.
       if (changes.role && !["owner", "manager"].includes(access.actor.role)) {
