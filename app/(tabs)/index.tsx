@@ -34,6 +34,7 @@ export default function HomeScreen(){
   const router=useRouter();
   const { width } = useWindowDimensions();
   const isMobile = width < 700;
+  const isManagement = role === "owner" || role === "manager";
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30000);
@@ -74,7 +75,7 @@ export default function HomeScreen(){
     : role==="supervisor"
       ? [["الحضور","calendar","/attendance"],["الطلبات","doc.text.fill","/requests"],["الجدول","calendar","/schedule"],["الفريق","person.2.fill","/team"]]
       : [["الحضور","calendar","/attendance"],["الطلبات","doc.text.fill","/requests"],["الجدول","calendar","/schedule"],["الإشعارات","notifications","/notifications"]];
-  const workspaceItems = role==="manager"
+  const workspaceItems = isManagement
     ? [["حالة الفريق","مستقر","person.2.fill"],["الطلبات",unread+" جديدة","doc.text.fill"],["الرواتب","هذا الشهر","banknote"]]
     : role==="supervisor"
       ? [["حضور الفريق",presentDays+" سجل","person.2.fill"],["الطلبات",unread+" تحتاج مراجعة","doc.text.fill"],["تغطية الوردية","92%","calendar"]]
@@ -84,14 +85,14 @@ export default function HomeScreen(){
     <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
       <View style={[styles.header, isMobile && styles.headerMobile]}>
         <View style={styles.brand}><View style={styles.logo}><IconSymbol name="fingerprint" size={25} color="#FFFFFF" /></View><View><Text style={styles.kicker}>WORKSPACE</Text><Text style={styles.company}>نظام إدارة الموظفين</Text></View></View>
-        <View style={[styles.headerRight, isMobile && styles.headerRightMobile]}><View style={styles.dateBlock}><Text style={styles.date}>{dateLabel}</Text><Text style={styles.welcome}>{role==="manager"?"مساحة الإدارة":"أهلاً، "+employee.name.split(" ")[0]}</Text></View><Pressable style={styles.bell} onPress={()=>router.push("/notifications" as never)}><IconSymbol name="notifications" size={20} color="#163A63"/>{unread>0&&<View style={styles.dot}/>}</Pressable></View>
+        <View style={[styles.headerRight, isMobile && styles.headerRightMobile]}><View style={styles.dateBlock}><Text style={styles.date}>{dateLabel}</Text><Text style={styles.welcome}>{isManagement?"مساحة الإدارة":"أهلاً، "+employee.name.split(" ")[0]}</Text></View><Pressable style={styles.bell} onPress={()=>router.push("/notifications" as never)}><IconSymbol name="notifications" size={20} color="#163A63"/>{unread>0&&<View style={styles.dot}/>}</Pressable></View>
       </View>
 
       <View style={[styles.hero, isMobile && styles.heroMobile]}>
         <View style={styles.heroCopy}>
           <View style={styles.live}><View style={styles.liveDot}/><Text style={styles.liveText}>النظام يعمل · اليوم</Text></View>
-          <Text style={styles.heroTitle}>{role==="manager"?"نظرة واحدة على يوم فريقك.":"كل ما تحتاجه ليوم عمل مرتب."}</Text>
-          <Text style={styles.heroSub}>{role==="manager"?"الحضور، الرواتب، الطلبات وأداء الفريق في مكان واحد.":role==="supervisor"?"تابع حضور الفريق وطلبات الموظفين وجدول العمل من مكان واحد.":"سجل حضورك وتابع ورديتك وراتبك وطلباتك من لوحة واحدة بسيطة."}</Text>
+          <Text style={styles.heroTitle}>{isManagement?"نظرة واحدة على يوم فريقك.":"كل ما تحتاجه ليوم عمل مرتب."}</Text>
+          <Text style={styles.heroSub}>{isManagement?"الحضور، الرواتب، الطلبات وأداء الفريق في مكان واحد.":role==="supervisor"?"تابع حضور الفريق وطلبات الموظفين وجدول العمل من مكان واحد.":"سجل حضورك وتابع ورديتك وراتبك وطلباتك من لوحة واحدة بسيطة."}</Text>
           <View style={[styles.heroStats, isMobile && styles.heroStatsMobile]}><View><Text style={styles.heroLabel}>الفرع</Text><Text style={styles.heroValue}>الفرع الرئيسي</Text></View><View><Text style={styles.heroLabel}>الوردية</Text><Text style={styles.heroValue}>{isWeeklyOff?"إجازة":shift.start+" — "+shift.end}</Text></View><View><Text style={styles.heroLabel}>الالتزام</Text><Text style={styles.heroValue}>92%</Text></View></View>
         </View>
         <View style={styles.attendanceCard}>
@@ -104,7 +105,7 @@ export default function HomeScreen(){
         </View>
       </View>
 
-      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{role==="manager"?"لوحة الإدارة":role==="supervisor"?"لوحة الفريق":"يومك اليوم"}</Text><Text style={styles.sectionSub}>{role==="manager"?"ملخص سريع لأداء الفريق":role==="supervisor"?"متابعة سريعة لفريقك":"أهم معلومات يوم العمل في لمحة"}</Text></View><View style={styles.sectionBadge}><View style={styles.sectionBadgeDot}/><Text style={styles.sectionBadgeText}>محدث الآن</Text></View></View>
+      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{isManagement?"لوحة الإدارة":role==="supervisor"?"لوحة الفريق":"يومك اليوم"}</Text><Text style={styles.sectionSub}>{role==="manager"?"ملخص سريع لأداء الفريق":role==="supervisor"?"متابعة سريعة لفريقك":"أهم معلومات يوم العمل في لمحة"}</Text></View><View style={styles.sectionBadge}><View style={styles.sectionBadgeDot}/><Text style={styles.sectionBadgeText}>محدث الآن</Text></View></View>
       <View style={[styles.kpis, isMobile && styles.kpisMobile]}>
         {role==="manager" ? <>
           <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="person.2.fill" value={String(presentDays)} label="أيام الحضور" note="هذا الشهر"/></View>
