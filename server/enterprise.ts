@@ -887,8 +887,8 @@ export async function reviewLeaveRequest(actorId:number,id:number,status:"مقب
   if(existing.status!=="قيد المراجعة") throw new Error("هذا الطلب تمت معالجته بالفعل.");
   if(!["إجازة","إجازة مرضية","إجازة طارئة"].includes(existing.type)) throw new Error("نوع الطلب ليس إجازة.");
   await assertStaffInCompany(actorId,existing.staffAccountId);
-  await assertPayrollEditable(actorId,existing.fromDate.slice(0,7));
-  if(existing.toDate.slice(0,7)!==existing.fromDate.slice(0,7)) await assertPayrollEditable(actorId,existing.toDate.slice(0,7));
+  await assertPayrollEditable(actorId,existing.fromDate.slice(0,7),existing.staffAccountId);
+  if(existing.toDate.slice(0,7)!==existing.fromDate.slice(0,7)) await assertPayrollEditable(actorId,existing.toDate.slice(0,7),existing.staffAccountId);
 
   const kind=leaveKind(existing.type as "إجازة"|"إجازة مرضية"|"إجازة طارئة");
   let consumed=false;
@@ -967,7 +967,7 @@ export async function reviewAttendanceException(actorId:number,input:{staffAccou
   const m=await getCompanyForStaff(actorId);
   if(!m || !["owner","manager","hr","supervisor"].includes(m.role)) throw new Error("غير مصرح");
   await assertStaffInCompany(actorId,input.staffAccountId);
-  await assertPayrollEditable(actorId,input.date.slice(0,7));
+  await assertPayrollEditable(actorId,input.date.slice(0,7),input.staffAccountId);
   const row=(await db.select().from(attendanceRecords).where(and(eq(attendanceRecords.staffAccountId,input.staffAccountId),eq(attendanceRecords.date,input.date))).limit(1))[0];
   if(!row) throw new Error("سجل الحضور غير موجود.");
   if(input.kind==="late" && Number(row.lateMinutes||0)<=0) throw new Error("لا يوجد تأخير على هذا اليوم.");
