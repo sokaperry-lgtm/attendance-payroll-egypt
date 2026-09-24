@@ -705,10 +705,23 @@ export async function approvePayroll(staffAccountId:number, id:number) {
   }
 
   await db.update(payrollRecords).set({status:"approved",approvedAt:new Date(),updatedAt:new Date()}).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId)));
-  const advances=await db.select().from(salaryAdvances).where(and(eq(salaryAdvances.staffAccountId,current.staffAccountId),eq(salaryAdvances.companyId,m.companyId),eq(salaryAdvances.status,"active")));
-  for(const advance of advances){ if(advance.startMonth<=current.month && advance.remainingAmount>0){ const paid=Math.min(advance.installmentAmount,advance.remainingAmount); const remaining=advance.remainingAmount-paid; await db.update(salaryAdvances).set({remainingAmount:remaining,status:remaining===0?"completed":"active",updatedAt:new Date()}).where(eq(salaryAdvances.id,advance.id)); } }
+  const advances=await db.select().from(salaryAdvances)
+    .where(and(eq(salaryAdvances.staffAccountId,current.staffAccountId),eq(salaryAdvances.companyId,m.companyId),eq(salaryAdvances.status,"active")))
+    .orderBy(salaryAdvances.id);
+  const paidAdvanceAllocations:{id:number;amount:number}[]=[];
+  for(const advance of advances){
+    if(advance.startMonth<=current.month && advance.remainingAmount>0){
+      const paid=Math.min(advance.installmentAmount,advance.remainingAmount);
+      const remaining=advance.remainingAmount-paid;
+      paidAdvanceAllocations.push({id:advance.id,amount:paid});
+      await db.update(salaryAdvances).set({remainingAmount:remaining,status:remaining===0?"completed":"active",updatedAt:new Date()}).where(eq(salaryAdvances.id,advance.id));
+    }
+  }
   const row=(await db.select().from(payrollRecords).where(eq(payrollRecords.id,id)).limit(1))[0];
-  if(row){ await createNotification(row.staffAccountId,"payroll","تم اعتماد راتبك",`تم اعتماد راتب شهر ${row.month} بقيمة ${row.netSalary.toLocaleString()} جنيه.`); await writeAudit(staffAccountId,m.companyId,"payroll.approved","payroll",String(id),{month:row.month,netSalary:row.netSalary}); }
+  if(row){
+    await createNotification(row.staffAccountId,"payroll","تم اعتماد راتبك",`تم اعتماد راتب شهر ${row.month} بقيمة ${row.netSalary.toLocaleString()} جنيه.`);
+    await writeAudit(staffAccountId,m.companyId,"payroll.approved","payroll",String(id),{month:row.month,netSalary:row.netSalary,advanceAllocations:paidAdvanceAllocations});
+  }
   return row;
 }
 
@@ -734,20 +747,50 @@ export async function unapprovePayroll(staffAccountId:number, id:number) {
   if(!current) throw new Error("مسير الرواتب غير موجود.");
   if(current.status!=="approved") return current;
   if(Number(current.advances||0)>0){
-    const advances=await db.select().from(salaryAdvances).where(and(
-      eq(salaryAdvances.staffAccountId,current.staffAccountId),
-      eq(salaryAdvances.companyId,m.companyId)
-    )).orderBy(desc(salaryAdvances.createdAt));
-    let restore=Number(current.advances||0);
-    for(const advance of advances){
-      if(restore<=0) break;
-      const amount=Math.min(Number(current.advances||0),restore);
-      await db.update(salaryAdvances).set({
-        remainingAmount:Number(advance.remainingAmount)+amount,
-        status:"active",
-        updatedAt:new Date()
-      }).where(eq(salaryAdvances.id,advance.id));
-      restore-=amount;
+    const approvalAudit=(await db.select({metadata:auditLogs.metadata})
+      .from(auditLogs)
+      .where(and(
+        eq(auditLogs.companyId,m.companyId),
+        eq(auditLogs.action,"payroll.approved"),
+        eq(auditLogs.entity,"payroll"),
+        eq(auditLogs.entityId,String(id))
+      ))
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(1))[0];
+    let allocations:{id:number;amount:number}[]=[];
+    try {
+      const parsed=approvalAudit?.metadata ? JSON.parse(approvalAudit.metadata) : null;
+      allocations=Array.isArray(parsed?.advanceAllocations) ? parsed.advanceAllocations.filter((x:any)=>Number.isInteger(x?.id)&&Number(x?.amount)>0).map((x:any)=>({id:Number(x.id),amount:Number(x.amount)})) : [];
+    } catch {}
+    if(allocations.length){
+      for(const allocation of allocations){
+        const advance=(await db.select().from(salaryAdvances).where(and(
+          eq(salaryAdvances.id,allocation.id),
+          eq(salaryAdvances.staffAccountId,current.staffAccountId),
+          eq(salaryAdvances.companyId,m.companyId)
+        )).limit(1))[0];
+        if(!advance) continue;
+        const remaining=Number(advance.remainingAmount)+allocation.amount;
+        await db.update(salaryAdvances).set({remainingAmount:remaining,status:"active",updatedAt:new Date()}).where(eq(salaryAdvances.id,advance.id));
+      }
+    } else {
+      // Legacy approvals created before allocation tracking: keep the old
+      // aggregate fallback so unapprove remains backward compatible.
+      const advances=await db.select().from(salaryAdvances).where(and(
+        eq(salaryAdvances.staffAccountId,current.staffAccountId),
+        eq(salaryAdvances.companyId,m.companyId)
+      )).orderBy(salaryAdvances.id);
+      let restore=Number(current.advances||0);
+      for(const advance of advances){
+        if(restore<=0) break;
+        const amount=Math.min(Number(advance.installmentAmount),restore);
+        await db.update(salaryAdvances).set({
+          remainingAmount:Number(advance.remainingAmount)+amount,
+          status:"active",
+          updatedAt:new Date()
+        }).where(eq(salaryAdvances.id,advance.id));
+        restore-=amount;
+      }
     }
   }
   await db.update(payrollRecords).set({status:"draft",approvedAt:null,updatedAt:new Date()}).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId)));
