@@ -239,8 +239,8 @@ export async function setMemberRole(actorId: number, staffAccountId: number, rol
   if (!target || target.companyId !== actor.companyId || !target.active) {
     throw new Error("الموظف غير موجود في الشركة");
   }
-  if (target.role === "owner" && actor.role !== "owner") {
-    throw new Error("لا يمكن لمدير الشركة تغيير صلاحيات المالك.");
+  if (target.role === "owner") {
+    throw new Error("لا يمكن تغيير صلاحيات حساب المالك.");
   }
   if (role === "owner") throw new Error("لا يمكن تعيين دور المالك من شاشة الموظفين.");
   if (!target || target.companyId !== actor.companyId || !target.active) {
