@@ -340,7 +340,7 @@ export async function getSubscription(staffAccountId: number) {
 
 export async function updateSubscription(staffAccountId: number, plan: string) {
   const db = await getDb(); if (!db) throw new Error("Database not available");
-  const m = await getCompanyForStaff(staffAccountId); if (!m || m.role !== "owner") throw new Error("غير مصرح");
+  const m = await getCompanyForStaff(staffAccountId); if (!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   const plans: Record<string,{seats:number;price:number}> = { trial:{seats:10,price:0}, starter:{seats:25,price:999}, growth:{seats:75,price:2499}, scale:{seats:250,price:5999} };
   const p=plans[plan]; if (!p) throw new Error("الباقة غير صحيحة");
   const current = await getSubscription(staffAccountId);
@@ -710,7 +710,7 @@ export async function getPayrollPayslip(staffAccountId:number, payrollId:number)
 export async function unapprovePayroll(staffAccountId:number, id:number) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(staffAccountId);
-  if(!m || !["owner","hr","accountant"].includes(m.role)) throw new Error("غير مصرح");
+  if(!m || !["owner","manager","hr","accountant"].includes(m.role)) throw new Error("غير مصرح");
   const current=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
   if(!current) throw new Error("مسير الرواتب غير موجود.");
   if(current.status!=="approved") return current;
@@ -1097,7 +1097,7 @@ export async function listEmployeeDocuments(actorId:number,targetId:number) {
 export async function createEmployeeDocument(actorId:number,input:{staffAccountId:number;type:string;title:string;documentNumber?:string;expiryDate?:string;note?:string}) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId);
-  if(!m || m.role!=="owner") throw new Error("غير مصرح");
+  if(!m || !["owner","manager","hr"].includes(m.role)) throw new Error("غير مصرح");
   await assertStaffInCompany(actorId,input.staffAccountId);
   const result=await db.insert(employeeDocuments).values({...input,companyId:m.companyId,createdBy:actorId,status:"active"});
   await writeAudit(actorId,m.companyId,"employee_document.created","employee_document",String(result[0].insertId),input);
@@ -1106,7 +1106,7 @@ export async function createEmployeeDocument(actorId:number,input:{staffAccountI
 
 export async function deleteEmployeeDocument(actorId:number,documentId:number) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
-  const m=await getCompanyForStaff(actorId); if(!m || m.role!=="owner") throw new Error("غير مصرح");
+  const m=await getCompanyForStaff(actorId); if(!m || !["owner","manager","hr"].includes(m.role)) throw new Error("غير مصرح");
   const row=(await db.select().from(employeeDocuments).where(eq(employeeDocuments.id,documentId)).limit(1))[0];
   if(!row || row.companyId!==m.companyId) throw new Error("المستند غير موجود.");
   await db.delete(employeeDocuments).where(eq(employeeDocuments.id,documentId));
