@@ -156,7 +156,12 @@ export async function createBranch(staffAccountId: number, input: { name: string
   const m = await getCompanyForStaff(staffAccountId); if (!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   const name = input.name.trim();
   const address = input.address.trim();
+  const latitude = Number(input.latitude);
+  const longitude = Number(input.longitude);
   if (!name || !address) throw new Error("اسم الفرع والعنوان مطلوبان");
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    throw new Error("إحداثيات GPS غير صالحة.");
+  }
   const result = await db.insert(branches).values({ ...input, name, address, companyId: m.companyId });
   const branch = (await db.select().from(branches).where(eq(branches.id, Number(result[0].insertId))).limit(1))[0];
   await writeAudit(staffAccountId, m.companyId, "branch.created", "branch", String(branch?.id ?? result[0].insertId), input);
@@ -168,6 +173,11 @@ export async function updateBranch(staffAccountId: number, branchId: number, inp
   const m = await getCompanyForStaff(staffAccountId); if (!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   const branch = (await db.select().from(branches).where(and(eq(branches.id, branchId), eq(branches.companyId, m.companyId))).limit(1))[0];
   if (!branch) throw new Error("الفرع غير موجود");
+  const latitude = Number(input.latitude);
+  const longitude = Number(input.longitude);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    throw new Error("إحداثيات GPS غير صالحة.");
+  }
   await db.update(branches).set({ ...input, name: input.name.trim(), address: input.address.trim(), updatedAt: new Date() }).where(eq(branches.id, branchId));
   await writeAudit(staffAccountId, m.companyId, "branch.updated", "branch", String(branchId), input);
   return (await db.select().from(branches).where(eq(branches.id, branchId)).limit(1))[0];
