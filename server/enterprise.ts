@@ -373,7 +373,15 @@ export function overtimeAfterShiftEndMinutes(
   const scheduledEnd = minutesOf(shiftEnd) + (crossesMidnight || minutesOf(shiftEnd) <= startMinutes ? 24 * 60 : 0);
   let actualCheckout = minutesOf(checkOut);
   const actualCheckIn = minutesOf(checkIn);
-  if (actualCheckout < actualCheckIn) actualCheckout += 24 * 60;
+
+  // A checkout before check-in is only valid when the configured shift
+  // explicitly crosses midnight. Never turn an invalid same-day timestamp
+  // into a full-day overtime value.
+  if (actualCheckout < actualCheckIn) {
+    if (!crossesMidnight) return 0;
+    actualCheckout += 24 * 60;
+  }
+
   return Math.max(0, actualCheckout - scheduledEnd);
 }
 
@@ -488,7 +496,10 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
         const todayValues = Object.fromEntries(todayParts.map(part => [part.type, part.value]));
         const today = `${todayValues.year}-${todayValues.month}-${todayValues.day}`;
         if (date === today) {
-          const shiftEnd = shift?.endTime ?? employee.shiftEnd;
+          const shiftStart = minutesOf(shift?.startTime ?? employee.shiftStart);
+          const shiftEnd = minutesOf(shift?.endTime ?? employee.shiftEnd);
+          const crossesMidnight = shift?.crossesMidnight ?? false;
+
           const nowTimeParts = new Intl.DateTimeFormat("en-GB", {
             timeZone: "Africa/Cairo",
             hour: "2-digit",
@@ -497,14 +508,19 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
           }).formatToParts(new Date());
           const nowValues = Object.fromEntries(nowTimeParts.map(part => [part.type, part.value]));
           const nowMinutes = Number(nowValues.hour) * 60 + Number(nowValues.minute);
-          const endMinutes = minutesOf(shiftEnd) + (shift?.crossesMidnight ? 24 * 60 : 0);
-          // An overnight shift that starts today ends tomorrow, so it cannot be
-          // considered absent on its start date merely because checkout time passed.
-          const shiftStarted = minutesOf(shift?.startTime ?? employee.shiftStart);
-          const effectiveEnd = shift?.crossesMidnight && nowMinutes < shiftStarted
-            ? endMinutes - 24 * 60
-            : endMinutes;
-          if (nowMinutes < effectiveEnd) continue;
+
+          // For an overnight shift, today's row represents the shift that
+          // starts today and ends tomorrow. It must never become absent today.
+          // Tomorrow's sync will evaluate the previous date after the real
+          // shift end has passed.
+          if (crossesMidnight) continue;
+
+          // For a normal same-day shift, wait until the scheduled end before
+          // auto-creating an absence.
+          if (nowMinutes < shiftEnd) continue;
+
+          // Avoid creating an absence before the employee's shift starts.
+          if (nowMinutes < shiftStart) continue;
         }
         await dbQueries.upsertAttendance({
           staffAccountId: employee.id,
