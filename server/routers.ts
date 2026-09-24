@@ -338,9 +338,7 @@ export const appRouter = router({
     payrollAccess: staffProcedure.query(async ({ ctx }) => {
       const membership = await enterprise.getMembership(ctx.staffUser.id);
       const role = membership?.role ?? "employee";
-      const canManagePayroll =
-        ["owner", "manager", "hr", "accountant"].includes(role) ||
-        ["manager"].includes(ctx.staffUser.role);
+      const canManagePayroll = ["owner", "manager", "hr", "accountant"].includes(role);
       return { role, canManagePayroll };
     }),
   }),
