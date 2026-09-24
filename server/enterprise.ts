@@ -727,7 +727,7 @@ export async function waiveAttendanceException(actorId:number,input:{staffAccoun
   const m=await getCompanyForStaff(actorId);
   if(!m || !["owner","manager","hr","supervisor"].includes(m.role)) throw new Error("غير مصرح");
   await assertStaffInCompany(actorId,input.staffAccountId);
-  await assertPayrollEditable(actorId,input.date.slice(0,7));
+  await assertPayrollEditable(actorId,input.date.slice(0,7),input.staffAccountId);
   const row=(await db.select().from(attendanceRecords).where(and(eq(attendanceRecords.staffAccountId,input.staffAccountId),eq(attendanceRecords.date,input.date))).limit(1))[0];
   if(!row) throw new Error("سجل الحضور غير موجود.");
   if(input.kind==="late" && Number(row.lateMinutes||0)<=0) throw new Error("لا يوجد تأخير على هذا اليوم.");
@@ -749,7 +749,7 @@ export async function cancelSalaryAdjustment(actorId:number,id:number) {
   if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   const row=(await db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.id,id),eq(salaryAdjustments.companyId,m.companyId))).limit(1))[0];
   if(!row) throw new Error("الجزاء غير موجود.");
-  await assertPayrollEditable(actorId,row.month);
+  await assertPayrollEditable(actorId,row.month,row.staffAccountId);
   await db.delete(salaryAdjustments).where(and(eq(salaryAdjustments.id,id),eq(salaryAdjustments.companyId,m.companyId)));
   await writeAudit(actorId,m.companyId,"salary_adjustment.cancelled","salary_adjustment",String(id),{staffAccountId:row.staffAccountId,month:row.month,title:row.title,amount:row.amount});
   await createNotification(row.staffAccountId,"payroll","تم إلغاء الجزاء","تم إلغاء الجزاء \""+row.title+"\" بقيمة "+row.amount.toLocaleString()+" جنيه.");
@@ -1051,7 +1051,7 @@ export async function createSalaryAdjustment(actorId:number,input:{staffAccountI
   if (!/^\d{4}-\d{2}$/.test(input.month)) throw new Error("صيغة الشهر غير صحيحة. استخدم YYYY-MM.");
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("قيمة الإضافة أو الخصم يجب أن تكون أكبر من صفر.");
   await assertStaffInCompany(actorId,input.staffAccountId);
-  await assertPayrollEditable(actorId,input.month);
+  await assertPayrollEditable(actorId,input.month,input.staffAccountId);
   const result=await db.insert(salaryAdjustments).values({...input,companyId:m.companyId,createdBy:actorId});
   await writeAudit(actorId,m.companyId,"salary_adjustment.created","salary_adjustment",String(result[0].insertId),input);
   await createNotification(input.staffAccountId,"payroll","إضافة جديدة على راتبك",input.title+": "+input.amount.toLocaleString()+" جنيه.");
@@ -1061,7 +1061,7 @@ export async function createSalaryAdvance(actorId:number,input:{staffAccountId:n
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId); if(!m || m.role!=="owner") throw new Error("غير مصرح");
   await assertStaffInCompany(actorId,input.staffAccountId);
-  await assertPayrollEditable(actorId,input.startMonth);
+  await assertPayrollEditable(actorId,input.startMonth,input.staffAccountId);
   if(input.amount<=0 || input.installmentAmount<=0) throw new Error("قيمة السلفة والقسط يجب أن تكون أكبر من صفر.");
   const result=await db.insert(salaryAdvances).values({...input,remainingAmount:input.amount,companyId:m.companyId,createdBy:actorId});
   await writeAudit(actorId,m.companyId,"salary_advance.created","salary_advance",String(result[0].insertId),input);
