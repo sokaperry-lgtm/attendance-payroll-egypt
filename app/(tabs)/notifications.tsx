@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
@@ -14,8 +15,12 @@ const UI = {
 
 export default function NotificationsScreen() {
   const q = trpc.notifications.list.useQuery();
+  const unreadCount = trpc.notifications.unreadCount.useQuery();
+  const markAll = trpc.notifications.markAllRead.useMutation({ onSuccess: () => { q.refetch(); unreadCount.refetch(); } });
+  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const visible = useMemo(() => (q.data ?? []).filter((n) => filter === "all" || !n.readAt), [q.data, filter]);
   const read = trpc.notifications.read.useMutation({
-    onSuccess: () => q.refetch(),
+    onSuccess: () => { q.refetch(); unreadCount.refetch(); },
   });
 
   return (
@@ -24,7 +29,7 @@ export default function NotificationsScreen() {
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>WORKSPACE · ALERTS</Text>
-            <Text style={styles.title}>الإشعارات</Text>
+            <Text style={styles.title}>مركز الإشعارات</Text>
             <Text style={styles.sub}>كل تحديثات الطلبات والحضور والرواتب في مكان واحد.</Text>
           </View>
           <View style={styles.iconBox}>
@@ -32,13 +37,21 @@ export default function NotificationsScreen() {
           </View>
         </View>
 
+        <View style={styles.toolbar}>
+          <View style={styles.filters}>
+            <Pressable onPress={() => setFilter("all")} style={[styles.filter, filter === "all" && styles.filterActive]}><Text style={[styles.filterText, filter === "all" && styles.filterTextActive]}>الكل</Text></Pressable>
+            <Pressable onPress={() => setFilter("unread")} style={[styles.filter, filter === "unread" && styles.filterActive]}><Text style={[styles.filterText, filter === "unread" && styles.filterTextActive]}>غير مقروء ({unreadCount.data ?? 0})</Text></Pressable>
+          </View>
+          {(unreadCount.data ?? 0) > 0 && <Pressable disabled={markAll.isPending} onPress={() => markAll.mutate()} style={styles.markAll}><Text style={styles.markAllText}>{markAll.isPending ? "جاري..." : "تحديد الكل كمقروء"}</Text></Pressable>}
+        </View>
+
         {q.isLoading ? (
           <View style={styles.state}>
             <ActivityIndicator color={UI.navy} />
             <Text style={styles.stateText}>جاري تحميل الإشعارات...</Text>
           </View>
-        ) : q.data?.length ? (
-          q.data.map((n) => {
+        ) : visible.length ? (
+          visible.map((n) => {
             const unread = !n.readAt;
             return (
               <Pressable
@@ -108,4 +121,12 @@ const styles = StyleSheet.create({
   emptyIcon: { width: 54, height: 54, borderRadius: 18, backgroundColor: UI.navySoft, alignItems: "center", justifyContent: "center", marginBottom: 4 },
   emptyTitle: { color: UI.text, fontSize: 16, fontWeight: "900" },
   emptyText: { color: UI.muted, fontSize: 11 },
+  toolbar: { backgroundColor: UI.white, borderWidth: 1, borderColor: UI.border, borderRadius: 16, padding: 8, flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  filters: { flexDirection: "row-reverse", gap: 6, flex: 1 },
+  filter: { borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, backgroundColor: "#F8FAFC" },
+  filterActive: { backgroundColor: UI.navy },
+  filterText: { color: UI.muted, fontSize: 10, fontWeight: "800" },
+  filterTextActive: { color: UI.white },
+  markAll: { paddingHorizontal: 8, paddingVertical: 8 },
+  markAllText: { color: UI.navy, fontSize: 10, fontWeight: "900" },
 });
