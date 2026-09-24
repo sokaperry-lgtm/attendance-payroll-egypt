@@ -71,7 +71,7 @@ export default function LoginScreen() {
                 <Path d="M32 22c4.9 0 9 4.1 9 9 0 7.4-2.8 13.1-6.8 18.8" fill="none" stroke="url(#fingerprintBlue)" strokeWidth="5" strokeLinecap="round"/>
               </Svg>
             </View>
-            <View style={styles.brandCopy}><Text style={styles.brand}>حاضر</Text><Text style={styles.tagline}>HR · Attendance · Payroll</Text></View>
+            <View style={styles.brandCopy}><Text style={styles.brand}>اسكت</Text><Text style={styles.tagline}>HR · Attendance · Payroll</Text></View>
           </View>
           <Text style={styles.brandStatement}>كل عمليات فريقك في مكان واحد.</Text>
           <Text style={styles.brandDescription}>حضور وانصراف، جداول، طلبات، تقارير ورواتب — بتجربة SaaS بسيطة وواضحة.</Text>
@@ -96,7 +96,7 @@ export default function LoginScreen() {
           </Pressable>
           <Pressable onPress={() => setResetMode((v) => !v)} disabled={busy} style={{ marginTop: 14 }}><Text style={{ color: "#60A5FA", fontSize: 11, textAlign: "center", fontWeight: "700" }}>{resetMode ? "رجوع لتسجيل الدخول" : "إعادة تهيئة الحسابات من الصفر"}</Text></Pressable>\n          <Text style={styles.securityNote}>بيانات الدخول مشفرة ومخصصة لحسابات الشركة.</Text>
         </View>
-        <Text style={styles.footer}>حاضر · منصة إدارة الموارد البشرية للشركات</Text>
+        <Text style={styles.footer}>اسكت · منصة إدارة الموارد البشرية للشركات</Text>
       </KeyboardAvoidingView>
     </ScreenContainer>
   );
