@@ -124,6 +124,11 @@ export const appRouter = router({
       const { id, ...changes } = input;
       const access = await enterprise.assertStaffInCompany(ctx.staffUser.id, id);
       if (id === ctx.staffUser.id && (changes.active === false || changes.role === "employee" || changes.role === "supervisor")) throw new Error("لا يمكنك تعطيل حسابك أو خفض صلاحيتك من هنا.");
+      // The owner account is the tenant root. No non-owner actor may deactivate,
+      // rename, reset, or otherwise mutate the owner through the staff editor.
+      if (access.target.role === "owner" && access.actor.role !== "owner") {
+        throw new Error("لا يمكن تعديل حساب مالك الشركة من هذا الحساب.");
+      }
       // Role changes are privileged operations. HR may manage employee data,
       // but only owner/manager can change a member's access level.
       if (changes.role && !["owner", "manager"].includes(access.actor.role)) {
