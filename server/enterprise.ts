@@ -631,7 +631,8 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       const shift = schedule ? shifts.find(item => item.id === schedule.shiftTemplateId) : undefined;
       const shiftStart = shift?.startTime ?? s.shiftStart;
       const shiftEnd = shift?.endTime ?? s.shiftEnd;
-      const crossesMidnight = shift?.crossesMidnight ?? false;
+      // Support legacy shifts whose overnight flag was not persisted.
+      const crossesMidnight = (shift?.crossesMidnight ?? false) || minutesOf(shiftEnd) < minutesOf(shiftStart);
       const scheduledEnd = minutesOf(shiftEnd) + (crossesMidnight ? 24 * 60 : 0);
       let actualCheckout = minutesOf(record.checkOut);
       if (crossesMidnight && actualCheckout < minutesOf(shiftStart)) actualCheckout += 24 * 60;
@@ -1080,7 +1081,7 @@ export async function listCompanySalaryAdjustments(staffAccountId:number, month?
 }
 export async function createSalaryAdjustment(actorId:number,input:{staffAccountId:number;month:string;type:"allowance"|"bonus"|"incentive"|"penalty"|"deduction";title:string;amount:number;note?:string}) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
-  const m=await getCompanyForStaff(actorId); if(!m || m.role!=="owner") throw new Error("غير مصرح");
+  const m=await getCompanyForStaff(actorId); if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   if (!/^\d{4}-\d{2}$/.test(input.month)) throw new Error("صيغة الشهر غير صحيحة. استخدم YYYY-MM.");
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("قيمة الإضافة أو الخصم يجب أن تكون أكبر من صفر.");
   await assertStaffInCompany(actorId,input.staffAccountId);
@@ -1092,7 +1093,7 @@ export async function createSalaryAdjustment(actorId:number,input:{staffAccountI
 }
 export async function createSalaryAdvance(actorId:number,input:{staffAccountId:number;amount:number;installmentAmount:number;startMonth:string;note?:string}) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
-  const m=await getCompanyForStaff(actorId); if(!m || m.role!=="owner") throw new Error("غير مصرح");
+  const m=await getCompanyForStaff(actorId); if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   await assertStaffInCompany(actorId,input.staffAccountId);
   await assertPayrollEditable(actorId,input.startMonth,input.staffAccountId);
   if(input.amount<=0 || input.installmentAmount<=0) throw new Error("قيمة السلفة والقسط يجب أن تكون أكبر من صفر.");
