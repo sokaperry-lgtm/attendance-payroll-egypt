@@ -13,11 +13,11 @@ export default function HrToolsScreen(){
  const advances=trpc.hrTools.advances.useQuery(undefined,{enabled:role==="owner" || role==="manager"});
  const addAdjustment=trpc.hrTools.addAdjustment.useMutation({onSuccess:()=>adjustments.refetch()});
  const addAdvance=trpc.hrTools.addAdvance.useMutation({onSuccess:()=>advances.refetch()});
+ const [staffId,setStaffId]=useState("");
  const [document,setDocument]=useState({type:"بطاقة شخصية",title:"",documentNumber:"",expiryDate:"",note:""});
  const documentQuery=trpc.hrTools.documents.useQuery({staffAccountId:Number(staffId)},{enabled:canManage && Boolean(staffId)});
  const addDocument=trpc.hrTools.addDocument.useMutation({onSuccess:()=>documentQuery.refetch()});
- const deleteDocument=trpc.hrTools.deleteDocument.useMutation({onSuccess:()=>documentQuery.refetch()});
- const [staffId,setStaffId]=useState(""); const [amount,setAmount]=useState(""); const [title,setTitle]=useState(""); const [type,setType]=useState<"bonus"|"incentive"|"penalty"|"deduction">("incentive"); const [advance,setAdvance]=useState({amount:"",installment:"",staffId:""});
+ const deleteDocument=trpc.hrTools.deleteDocument.useMutation({onSuccess:()=>documentQuery.refetch()}); const [amount,setAmount]=useState(""); const [title,setTitle]=useState(""); const [type,setType]=useState<"bonus"|"incentive"|"penalty"|"deduction">("incentive"); const [advance,setAdvance]=useState({amount:"",installment:"",staffId:""});
  if(!canManage) return <ScreenContainer><View style={styles.denied}><IconSymbol name="lock" size={34} color="#163A63"/><Text style={styles.deniedTitle}>أدوات الموارد البشرية غير متاحة لهذا الحساب</Text></View></ScreenContainer>;
  const submitAdjustment=async()=>{if(!staffId||!amount||!title)return Alert.alert("بيانات ناقصة","اختار موظف واكتب المبلغ والوصف.");try{await addAdjustment.mutateAsync({staffAccountId:Number(staffId),month,type,title,amount:Number(amount)});setAmount("");setTitle("");Alert.alert("تم","تم تسجيل التعديل وربطه بالمسير.");}catch(e){Alert.alert("خطأ",e instanceof Error?e.message:"تعذر الحفظ.")}};
  const submitAdvance=async()=>{if(!advance.staffId||!advance.amount||!advance.installment)return Alert.alert("بيانات ناقصة","اكمل بيانات السلفة.");try{await addAdvance.mutateAsync({staffAccountId:Number(advance.staffId),amount:Number(advance.amount),installmentAmount:Number(advance.installment),startMonth:month});setAdvance({amount:"",installment:"",staffId:""});Alert.alert("تم","تم تسجيل السلفة.");}catch(e){Alert.alert("خطأ",e instanceof Error?e.message:"تعذر الحفظ.")}};
