@@ -16,6 +16,15 @@ function timeMinutes(value: string) {
 function cairoToday() {
   return new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 }
+function gpsDistanceMeters(lat1:number, lon1:number, lat2:number, lon2:number) {
+  const earthRadius = 6371000;
+  const toRad = (value:number) => value * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+const gpsCoordinate = z.number().finite();
 
 const loginInput = z.object({ phone: z.string().min(3).max(32), password: z.string().min(4).max(120) });
 const staffView = async (staff: Awaited<ReturnType<typeof db.getStaffAccountById>> | null) => {
@@ -149,7 +158,7 @@ export const appRouter = router({
     }),
   }),
   company: router({
-    settings: staffProcedure.query(async ({ctx}) => { const b = await enterprise.getBranchForStaff(ctx.staffUser.id); return b ?? { id: 0, name: "الفرع الرئيسي", address: "مدينة نصر، القاهرة", latitude: "30.0444", longitude: "31.2357", radiusMeters: 200 }; }),
+    settings: staffProcedure.query(async ({ctx}) => { const b = await enterprise.getBranchForStaff(ctx.staffUser.id); if (!b) throw new Error("لم يتم إعداد فرع للحساب. تواصل مع مدير الشركة لإعداد موقع GPS."); return b; }),
     updateSettings: managerProcedure.input(z.object({ name: z.string().min(2).max(160), address: z.string().min(2).max(255), latitude: z.string().max(32), longitude: z.string().max(32), radiusMeters: z.number().int().min(50).max(5000) })).mutation(({ ctx,input }) => enterprise.updateBranchForStaff(ctx.staffUser.id,input)),
   }),
   schedule: router({
@@ -178,12 +187,17 @@ export const appRouter = router({
       if (m) await enterprise.writeAudit(ctx.staffUser.id, m.companyId, "attendance.updated", "attendance", String(row?.id ?? ""), {staffAccountId:input.staffAccountId,date:input.date,status:input.status});
       return row;
     }),
-    checkIn: staffProcedure.input(z.object({ date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0) })).mutation(async ({ ctx, input }) => {
+    checkIn: staffProcedure.input(z.object({ date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), latitude: gpsCoordinate.min(-90).max(90), longitude: gpsCoordinate.min(-180).max(180) })).mutation(async ({ ctx, input }) => {
       timeMinutes(input.time);
       if (input.date > cairoToday()) throw new Error("لا يمكن تسجيل حضور بتاريخ مستقبلي.");
       await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7));
       const branch = await enterprise.getBranchForStaff(ctx.staffUser.id);
-      if (branch && input.distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الحضور المسموح (${branch.radiusMeters} متر).`);
+      if (!branch) throw new Error("لم يتم إعداد موقع GPS لهذا الفرع.");
+      const branchLatitude = Number(branch.latitude);
+      const branchLongitude = Number(branch.longitude);
+      if (!Number.isFinite(branchLatitude) || !Number.isFinite(branchLongitude)) throw new Error("إحداثيات الفرع غير صالحة.");
+      const distanceMeters = gpsDistanceMeters(branchLatitude, branchLongitude, input.latitude, input.longitude);
+      if (distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الحضور المسموح (${branch.radiusMeters} متر).`);
       const records = await db.listAttendance(ctx.staffUser.id);
       const existing = records.find(r => r.date === input.date);
       if (existing?.checkIn) throw new Error("تم تسجيل الحضور بالفعل لهذا اليوم.");
@@ -194,14 +208,19 @@ export const appRouter = router({
       const rawLate = Math.max(0, timeMinutes(input.time) - timeMinutes(shiftStart));
       const late = Math.max(0, rawLate - PAYROLL_RULES.graceMinutes);
       const status = late > 0 ? "متأخر" : "حاضر";
-      return db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status, lateMinutes: late, distanceMeters: input.distanceMeters, note: scheduled?.shift ? `حسب جدول: ${scheduled.shift.name}` : null });
+      return db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status, lateMinutes: late, distanceMeters, note: scheduled?.shift ? `حسب جدول: ${scheduled.shift.name}` : null });
     }),
-    checkOut: staffProcedure.input(z.object({ date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), time: z.string().max(8), distanceMeters: z.number().int().min(0) })).mutation(async ({ ctx, input }) => {
+    checkOut: staffProcedure.input(z.object({ date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), time: z.string().max(8), latitude: gpsCoordinate.min(-90).max(90), longitude: gpsCoordinate.min(-180).max(180) })).mutation(async ({ ctx, input }) => {
       timeMinutes(input.time);
       if (input.date > cairoToday()) throw new Error("لا يمكن تسجيل انصراف بتاريخ مستقبلي.");
       await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7));
       const branch = await enterprise.getBranchForStaff(ctx.staffUser.id);
-      if (branch && input.distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الانصراف المسموح (${branch.radiusMeters} متر).`);
+      if (!branch) throw new Error("لم يتم إعداد موقع GPS لهذا الفرع.");
+      const branchLatitude = Number(branch.latitude);
+      const branchLongitude = Number(branch.longitude);
+      if (!Number.isFinite(branchLatitude) || !Number.isFinite(branchLongitude)) throw new Error("إحداثيات الفرع غير صالحة.");
+      const distanceMeters = gpsDistanceMeters(branchLatitude, branchLongitude, input.latitude, input.longitude);
+      if (distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الانصراف المسموح (${branch.radiusMeters} متر).`);
       const records = await db.listAttendance(ctx.staffUser.id);
       const current = records.find((item) => item.date === input.date);
       if (!current) throw new Error("سجل الحضور غير موجود.");
