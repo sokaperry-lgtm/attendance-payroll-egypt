@@ -55,7 +55,7 @@ export default function HomeScreen(){
     try{const c=await getCurrentCoordinates(),d=distanceBetween(branch.latitude,branch.longitude,c.latitude,c.longitude);
       if(d>branch.radiusMeters)throw new Error(`أنت خارج نطاق الفرع بـ ${d} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`);
       const lateMinutes=calculateLateMinutes(new Date(),shift.start,PAYROLL_RULES.graceMinutes);
-      await checkIn({time:currentTime(now),distanceMeters:d,status:lateMinutes>0?"متأخر":"حاضر",lateMinutes});
+      await checkIn({time:currentTime(now),latitude:c.latitude,longitude:c.longitude,status:lateMinutes>0?"متأخر":"حاضر",lateMinutes});
       setGpsMessage(`تم التحقق من الموقع — ${d} متر من الفرع`);
       if(Platform.OS!=="web")await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }catch(e){const m=e instanceof Error?e.message:"تعذر التحقق من الموقع";setGpsMessage(m);showAlert("لم يتم تسجيل الحضور",m);}
@@ -65,7 +65,7 @@ export default function HomeScreen(){
     setWorking(true);
     try{const c=await getCurrentCoordinates(),d=distanceBetween(branch.latitude,branch.longitude,c.latitude,c.longitude);
       if(d>branch.radiusMeters)throw new Error(`أنت خارج نطاق الفرع بـ ${d} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`);
-      await checkOut({time:currentTime(now),distanceMeters:d});setGpsMessage(`تم تسجيل الانصراف — ${d} متر من الفرع`);
+      await checkOut({time:currentTime(now),latitude:c.latitude,longitude:c.longitude});setGpsMessage(`تم تسجيل الانصراف — ${d} متر من الفرع`);
     }catch(e){showAlert("تعذر تسجيل الانصراف",e instanceof Error?e.message:"حدث خطأ غير متوقع.");}
     finally{setWorking(false);}
   }
