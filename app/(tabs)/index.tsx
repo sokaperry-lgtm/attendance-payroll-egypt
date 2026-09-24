@@ -70,7 +70,7 @@ export default function HomeScreen(){
     finally{setWorking(false);}
   }
 
-  const quick=role==="manager"
+  const quick=isManagement
     ? [["الحضور","calendar","/attendance"],["الطلبات","doc.text.fill","/requests"],["التقارير","chart.bar.fill","/reports"],["الرواتب","banknote","/payroll"]]
     : role==="supervisor"
       ? [["الحضور","calendar","/attendance"],["الطلبات","doc.text.fill","/requests"],["الجدول","calendar","/schedule"],["الفريق","person.2.fill","/team"]]
@@ -105,9 +105,9 @@ export default function HomeScreen(){
         </View>
       </View>
 
-      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{isManagement?"لوحة الإدارة":role==="supervisor"?"لوحة الفريق":"يومك اليوم"}</Text><Text style={styles.sectionSub}>{role==="manager"?"ملخص سريع لأداء الفريق":role==="supervisor"?"متابعة سريعة لفريقك":"أهم معلومات يوم العمل في لمحة"}</Text></View><View style={styles.sectionBadge}><View style={styles.sectionBadgeDot}/><Text style={styles.sectionBadgeText}>محدث الآن</Text></View></View>
+      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{isManagement?"لوحة الإدارة":role==="supervisor"?"لوحة الفريق":"يومك اليوم"}</Text><Text style={styles.sectionSub}>{isManagement?"ملخص سريع لأداء الفريق":role==="supervisor"?"متابعة سريعة لفريقك":"أهم معلومات يوم العمل في لمحة"}</Text></View><View style={styles.sectionBadge}><View style={styles.sectionBadgeDot}/><Text style={styles.sectionBadgeText}>محدث الآن</Text></View></View>
       <View style={[styles.kpis, isMobile && styles.kpisMobile]}>
-        {role==="manager" ? <>
+        {isManagement ? <>
           <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="person.2.fill" value={String(presentDays)} label="أيام الحضور" note="هذا الشهر"/></View>
           <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="clock" value={String(payrollInputs.lateMinutes??0)} label="دقائق التأخير" note="إجمالي الشهر"/></View>
           <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="banknote" value={payroll.net.toLocaleString("ar-EG")} label="صافي الرواتب" note="جنيه مصري"/></View>
@@ -125,7 +125,7 @@ export default function HomeScreen(){
         </>}
       </View>
 
-      {role==="manager" ? <View style={styles.executiveGrid}>
+      {isManagement ? <View style={styles.executiveGrid}>
         <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>نبض الفريق</Text><Text style={styles.cardMeta}>اليوم</Text></View><View style={styles.pulseRow}><View style={styles.pulseRing}><Text style={styles.pulseValue}>{Math.min(100,Math.round((presentDays/Math.max(records.length,1))*100))}%</Text></View><View style={styles.pulseCopy}><Text style={styles.pulseTitle}>{presentDays > 0 ? "الحضور مستقر" : "بانتظار بيانات الحضور"}</Text><Text style={styles.pulseSub}>مؤشر مبني على سجلات الحضور الحالية</Text></View></View><View style={styles.miniMetric}><Text style={styles.miniValue}>{records.length}</Text><Text style={styles.miniLabel}>سجل حضور</Text></View></View>
         <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>ملخص الرواتب</Text><Text style={styles.cardMeta}>هذا الشهر</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>EGP</Text><Text style={styles.payrollValue}>{payroll.net.toLocaleString("ar-EG")}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>صافي المستحق</Text><Text style={styles.payrollStatus}>جاهز</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{payrollInputs.lateMinutes??0} دقيقة</Text></View></View>
       </View> : role==="supervisor" ? <View style={styles.executiveGrid}>
