@@ -725,7 +725,7 @@ export async function unapprovePayroll(staffAccountId:number, id:number) {
 export async function waiveAttendanceException(actorId:number,input:{staffAccountId:number;date:string;kind:"late"|"early"}) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId);
-  if(!m || !["owner","hr","accountant","manager","supervisor"].includes(m.role)) throw new Error("غير مصرح");
+  if(!m || !["owner","manager","hr","supervisor"].includes(m.role)) throw new Error("غير مصرح");
   await assertStaffInCompany(actorId,input.staffAccountId);
   await assertPayrollEditable(actorId,input.date.slice(0,7));
   const row=(await db.select().from(attendanceRecords).where(and(eq(attendanceRecords.staffAccountId,input.staffAccountId),eq(attendanceRecords.date,input.date))).limit(1))[0];
@@ -746,7 +746,7 @@ export async function waiveAttendanceException(actorId:number,input:{staffAccoun
 export async function cancelSalaryAdjustment(actorId:number,id:number) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId);
-  if(!m || !["owner","hr","accountant","manager"].includes(m.role)) throw new Error("غير مصرح");
+  if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   const row=(await db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.id,id),eq(salaryAdjustments.companyId,m.companyId))).limit(1))[0];
   if(!row) throw new Error("الجزاء غير موجود.");
   await assertPayrollEditable(actorId,row.month);
