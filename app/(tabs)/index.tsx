@@ -41,12 +41,22 @@ export default function HomeScreen(){
     return () => clearInterval(timer);
   }, []);
   const notificationsQuery=trpc.notifications.list.useQuery();
+  const currentMonth = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit" }).format(new Date());
+  const todayCairo = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const teamQuery = trpc.attendance.team.useQuery(undefined, { enabled: isManagement || role === "supervisor" });
+  const payrollQuery = trpc.payroll.list.useQuery({ month: currentMonth }, { enabled: isManagement });
   const [working,setWorking]=useState(false);
   const [gpsMessage,setGpsMessage]=useState("الموقع جاهز للتحقق");
   const isCheckedOut=Boolean(todayRecord?.checkOut);
   const isWeeklyOff=Boolean(shift?.kind==="weekly_off");
   const presentDays=records.filter(r=>r.status==="حاضر"||r.status==="متأخر").length;
   const unread=(notificationsQuery.data??[]).filter(n=>!n.readAt).length;
+  const teamToday = (teamQuery.data ?? []).filter((r:any) => r.date === todayCairo);
+  const teamPresent = teamToday.filter((r:any) => r.status === "حاضر" || r.status === "متأخر").length;
+  const teamLate = teamToday.reduce((sum:number,r:any) => sum + Number(r.lateMinutes || 0), 0);
+  const teamAbsent = teamToday.filter((r:any) => r.status === "غياب").length;
+  const teamCheckedOut = teamToday.filter((r:any) => Boolean(r.checkOut)).length;
+  const payrollTotal = (payrollQuery.data ?? []).reduce((sum:number,r:any) => sum + Number(r.netSalary || 0), 0);
   const attendanceActionLabel = working ? "جارٍ التحقق..." : checkedIn ? "تسجيل الانصراف" : "تسجيل الحضور";
   const dateLabel=useMemo(()=>new Intl.DateTimeFormat("ar-EG",{weekday:"long",day:"numeric",month:"long"}).format(new Date()),[]);
 
@@ -108,15 +118,15 @@ export default function HomeScreen(){
       <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{isManagement?"لوحة الإدارة":role==="supervisor"?"لوحة الفريق":"يومك اليوم"}</Text><Text style={styles.sectionSub}>{isManagement?"ملخص سريع لأداء الفريق":role==="supervisor"?"متابعة سريعة لفريقك":"أهم معلومات يوم العمل في لمحة"}</Text></View><View style={styles.sectionBadge}><View style={styles.sectionBadgeDot}/><Text style={styles.sectionBadgeText}>محدث الآن</Text></View></View>
       <View style={[styles.kpis, isMobile && styles.kpisMobile]}>
         {isManagement ? <>
-          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="person.2.fill" value={String(presentDays)} label="أيام الحضور" note="هذا الشهر"/></View>
-          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="clock" value={String(payrollInputs.lateMinutes??0)} label="دقائق التأخير" note="إجمالي الشهر"/></View>
-          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="banknote" value={payroll.net.toLocaleString("ar-EG")} label="صافي الرواتب" note="جنيه مصري"/></View>
-          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="notifications" value={String(unread)} label="طلبات وتنبيهات" note="تحتاج مراجعة"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="person.2.fill" value={String(teamPresent)} label="حضور الفريق" note="اليوم"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="clock" value={String(teamLate)} label="دقائق التأخير" note="اليوم"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="banknote" value={payrollTotal.toLocaleString("ar-EG")} label="إجمالي صافي الرواتب" note="هذا الشهر"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="notifications" value={String(unread)} label="تنبيهات" note="تحتاج مراجعة"/></View>
         </> : role==="supervisor" ? <>
-          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="person.2.fill" value={String(presentDays)} label="حضور الفريق" note="السجلات الحالية"/></View>
-          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="clock" value={String(payrollInputs.lateMinutes??0)} label="دقائق التأخير" note="للمتابعة"/></View>
-          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="doc.text.fill" value={String(unread)} label="طلبات جديدة" note="في انتظار المراجعة"/></View>
-          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="calendar" value="92%" label="تغطية الوردية" note="اليوم"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="person.2.fill" value={String(teamPresent)} label="حضور الفريق" note="اليوم"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="clock" value={String(teamLate)} label="دقائق التأخير" note="اليوم"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="doc.text.fill" value={String(unread)} label="طلبات وتنبيهات" note="تحتاج مراجعة"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="calendar" value={`${teamToday.length ? Math.round((teamPresent / teamToday.length) * 100) : 0}%`} label="نسبة الحضور" note="اليوم"/></View>
         </> : <>
           <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="calendar" value={isWeeklyOff?"إجازة":shift.start} label="وردية اليوم" note={isWeeklyOff?"راحة أسبوعية":"بداية الوردية"}/></View>
           <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="checkmark" value={checkedIn?"جاري":"بانتظارك"} label="حالة الحضور" note={checkedIn?"تم تسجيل الدخول":"سجل حضورك لبدء اليوم"}/></View>
@@ -126,8 +136,8 @@ export default function HomeScreen(){
       </View>
 
       {isManagement ? <View style={styles.executiveGrid}>
-        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>نبض الفريق</Text><Text style={styles.cardMeta}>اليوم</Text></View><View style={styles.pulseRow}><View style={styles.pulseRing}><Text style={styles.pulseValue}>{Math.min(100,Math.round((presentDays/Math.max(records.length,1))*100))}%</Text></View><View style={styles.pulseCopy}><Text style={styles.pulseTitle}>{presentDays > 0 ? "الحضور مستقر" : "بانتظار بيانات الحضور"}</Text><Text style={styles.pulseSub}>مؤشر مبني على سجلات الحضور الحالية</Text></View></View><View style={styles.miniMetric}><Text style={styles.miniValue}>{records.length}</Text><Text style={styles.miniLabel}>سجل حضور</Text></View></View>
-        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>ملخص الرواتب</Text><Text style={styles.cardMeta}>هذا الشهر</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>EGP</Text><Text style={styles.payrollValue}>{payroll.net.toLocaleString("ar-EG")}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>صافي المستحق</Text><Text style={styles.payrollStatus}>جاهز</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{payrollInputs.lateMinutes??0} دقيقة</Text></View></View>
+        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>نبض الفريق</Text><Text style={styles.cardMeta}>اليوم</Text></View><View style={styles.pulseRow}><View style={styles.pulseRing}><Text style={styles.pulseValue}>{teamToday.length ? Math.round((teamPresent / teamToday.length) * 100) : 0}%</Text></View><View style={styles.pulseCopy}><Text style={styles.pulseTitle}>{presentDays > 0 ? "الحضور مستقر" : "بانتظار بيانات الحضور"}</Text><Text style={styles.pulseSub}>مؤشر مبني على سجلات الحضور الحالية</Text></View></View><View style={styles.miniMetric}><Text style={styles.miniValue}>{teamToday.length}</Text><Text style={styles.miniLabel}>سجل اليوم</Text></View></View>
+        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>ملخص الرواتب</Text><Text style={styles.cardMeta}>هذا الشهر</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>EGP</Text><Text style={styles.payrollValue}>{payrollTotal.toLocaleString("ar-EG")}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>صافي المستحق</Text><Text style={styles.payrollStatus}>{payrollQuery.data?.length ? "محدث" : "لا توجد بيانات"}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{teamLate} دقيقة</Text></View></View>
       </View> : role==="supervisor" ? <View style={styles.executiveGrid}>
         <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>Team Operations</Text><Text style={styles.cardMeta}>اليوم</Text></View><View style={styles.pulseRow}><View style={styles.pulseRing}><Text style={styles.pulseValue}>{Math.min(100,Math.round((presentDays/Math.max(records.length,1))*100))}%</Text></View><View style={styles.pulseCopy}><Text style={styles.pulseTitle}>متابعة تشغيل الفريق</Text><Text style={styles.pulseSub}>راجع الحضور والتأخير والطلبات قبل نهاية الوردية.</Text></View></View><View style={styles.miniMetric}><Text style={styles.miniValue}>{unread}</Text><Text style={styles.miniLabel}>طلبات تحتاج مراجعة</Text></View></View>
         <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>تغطية الوردية</Text><Text style={styles.cardMeta}>مؤشر تشغيلي</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>%</Text><Text style={styles.payrollValue}>92</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>الحضور المسجل</Text><Text style={styles.payrollStatus}>{presentDays} سجل</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{payrollInputs.lateMinutes??0} دقيقة</Text></View></View>
