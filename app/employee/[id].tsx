@@ -42,6 +42,7 @@ export default function EmployeeProfileScreen() {
   const late = attendance.reduce((sum, r) => sum + Number(r.lateMinutes || 0), 0);
   const approvedRequests = requests.filter((r) => r.status === "مقبول").length;
   const latestPayroll = payroll[0];
+  const payrollSummary = latestPayroll ? { gross:Number(latestPayroll.grossSalary||0), overtime:Number(latestPayroll.overtime||0), absence:Number(latestPayroll.absenceDeduction||0), lateDeduction:Number(latestPayroll.lateDeduction||0), earlyDeduction:Number(latestPayroll.earlyDeduction||0), other:Number(latestPayroll.otherDeductions||0), advances:Number(latestPayroll.advances||0), insurance:Number(latestPayroll.employeeSocialInsurance||0), tax:Number(latestPayroll.employeeIncomeTax||0), net:Number(latestPayroll.netSalary||0) } : null;
   const trackedAttendanceDays = present + absent;
   const attendanceRate = trackedAttendanceDays ? Math.round((present / trackedAttendanceDays) * 100) : 0;
   const recentAttendance = useMemo(() => attendance.slice(0, 8), [attendance]);
@@ -61,7 +62,7 @@ export default function EmployeeProfileScreen() {
             <Text style={styles.kicker}>EMPLOYEE 360</Text>
             <Text style={styles.name}>{employee.name}</Text>
             <Text style={styles.role}>{employee.title || "موظف"} · {employee.department || "—"}</Text>
-            <Text style={styles.phone}>{employee.phone || "لا يوجد رقم هاتف"}</Text>            <View style={styles.heroBadges}><Text style={styles.heroBadge}>نشط</Text><Text style={styles.heroBadgeGhost}>{employee.role === "manager" ? "مدير" : employee.role === "supervisor" ? "مشرف" : "موظف"}</Text></View>
+            <Text style={styles.phone}>{employee.phone || "لا يوجد رقم هاتف"}</Text>            <View style={styles.heroBadges}><Text style={styles.heroBadge}>{employee.active ? "نشط" : "غير نشط"}</Text><Text style={styles.heroBadgeGhost}>{(data as any).staff?.membershipRole === "owner" ? "مالك" : (data as any).staff?.membershipRole === "manager" ? "مدير" : (data as any).staff?.membershipRole === "hr" ? "HR" : (data as any).staff?.membershipRole === "accountant" ? "محاسب" : (data as any).staff?.membershipRole === "supervisor" ? "مشرف" : "موظف"}</Text></View>
           </View>
         </View>
 
@@ -127,11 +128,11 @@ export default function EmployeeProfileScreen() {
           </>
         )}
 
-        {tab === "attendance" && <Card title="سجل الحضور">{attendance.length ? attendance.slice(0, 30).map((r) => <Row key={r.id} label={String(r.date)} value={r.checkIn && r.checkOut ? `${r.checkIn} → ${r.checkOut}` : String(r.status || "—")} />) : <Empty text="لا توجد سجلات حضور." />}</Card>}
+        {tab === "attendance" && <><View style={[styles.infoGrid, compact && styles.gridCompact]}><Card title="ملخص الحضور"><Row label="أيام الحضور" value={String(present)} /><Row label="أيام الغياب" value={String(absent)} /><Row label="معدل الحضور" value={`${attendanceRate}%`} /><Row label="إجمالي التأخير" value={`${late} دقيقة`} /></Card><Card title="الانضباط"><View style={styles.progressTrack}><View style={[styles.progressFill,{width:`${attendanceRate}%`}]}/></View><Text style={styles.progressText}>{attendanceRate}% حضور فعلي</Text></Card></View><Card title="سجل الحضور">{attendance.length ? attendance.slice(0, 30).map((r) => <Row key={r.id} label={String(r.date)} value={r.checkIn && r.checkOut ? `${r.checkIn} → ${r.checkOut}` : String(r.status || "—")} />) : <Empty text="لا توجد سجلات حضور." />}</Card></>}
         {tab === "requests" && <Card title="الطلبات">{requests.length ? requests.slice(0, 30).map((r) => <Row key={r.id} label={`${r.type} · ${r.fromDate}`} value={String(r.status || "—")} />) : <Empty text="لا توجد طلبات." />}</Card>}
         {tab === "payroll" && (
           <>
-            <Card title="بيانات الراتب"><Row label="الراتب الأساسي" value={formatMoney(employee.baseSalary)} /><Row label="تعديلات الراتب" value={String(adjustments.length)} /><Row label="السلف" value={String(advances.length)} /></Card>
+            <><View style={[styles.infoGrid, compact && styles.gridCompact]}><Card title="آخر مسير راتب"><Text style={styles.bigMoney}>{payrollSummary ? formatMoney(payrollSummary.net) : "—"}</Text><Text style={styles.mutedSmall}>{latestPayroll ? `شهر ${latestPayroll.month}` : "لا يوجد مسير"}</Text><Row label="الإجمالي قبل الخصم" value={payrollSummary ? formatMoney(payrollSummary.gross) : "—"} /><Row label="الإضافي" value={payrollSummary ? formatMoney(payrollSummary.overtime) : "—"} /></Card><Card title="تفاصيل الخصومات"><Row label="غياب" value={payrollSummary ? formatMoney(payrollSummary.absence) : "—"} /><Row label="تأخير" value={payrollSummary ? formatMoney(payrollSummary.lateDeduction) : "—"} /><Row label="انصراف مبكر" value={payrollSummary ? formatMoney(payrollSummary.earlyDeduction) : "—"} /><Row label="خصومات أخرى" value={payrollSummary ? formatMoney(payrollSummary.other) : "—"} /><Row label="سلف" value={payrollSummary ? formatMoney(payrollSummary.advances) : "—"} /><Row label="تأمينات" value={payrollSummary ? formatMoney(payrollSummary.insurance) : "—"} /><Row label="ضريبة" value={payrollSummary ? formatMoney(payrollSummary.tax) : "—"} /></Card></View><Card title="بيانات الراتب"><Row label="الراتب الأساسي" value={formatMoney(employee.baseSalary)} /><Row label="تعديلات الراتب" value={String(adjustments.length)} /><Row label="السلف" value={String(advances.length)} /></Card></>
             <Card title="سجل الرواتب">{payroll.length ? payroll.slice(0, 20).map((r) => <Row key={r.id} label={String(r.month)} value={formatMoney(Number(r.netSalary || 0))} />) : <Empty text="لا توجد مسيرات مسجلة." />}</Card>
           </>
         )}
