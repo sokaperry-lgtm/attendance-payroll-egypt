@@ -22,8 +22,8 @@ const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
 const schemeFromBundleId = `manus${timestamp}`;
 
 const env = {
-  appName: "اسكت",
-  appSlug: "eskat",
+  appName: "حاضر",
+  appSlug: "attendance-payroll-egypt",
   logoUrl: "",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
@@ -123,7 +123,7 @@ const config: ExpoConfig = {
     typedRoutes: true,
     reactCompiler: true,
     ...(process.env.GITHUB_PAGES === "true"
-      ? { baseUrl: "/eskat" }
+      ? { baseUrl: "/attendance-payroll-egypt" }
       : {}),
   },
 };
