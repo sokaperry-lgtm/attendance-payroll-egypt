@@ -16,11 +16,11 @@ type ReportEmployee = { id: number; name: string; department?: string | null; la
 
 type Tone = "blue" | "green" | "orange" | "red" | "purple";
 const toneMap: Record<Tone, { bg: string; color: string }> = {
-  blue: { bg: "#FFFFFF", color: "#668C7F" },
-  green: { bg: "#E6F1EC", color: "#2E7D68" },
-  orange: { bg: "#F7EBDD", color: "#FB923C" },
-  red: { bg: "#F7E7E7", color: "#B85C5C" },
-  purple: { bg: "#211A38", color: "#A78BFA" },
+  blue: { bg: "#EAF3FB", color: "#163A63" },
+  green: { bg: "#EEF5FA", color: "#245A86" },
+  orange: { bg: "#F7F1E7", color: "#8A6420" },
+  red: { bg: "#F7ECEC", color: "#8B3D3D" },
+  purple: { bg: "#EEF2F7", color: "#3E5872" },
 };
 
 export default function ReportsScreen() {
@@ -28,8 +28,9 @@ export default function ReportsScreen() {
   const { width } = useWindowDimensions();
   const compact = width < 700;
   const [month, setMonth] = useState(() => {
-    const now = new Date();
-    return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit" }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return values.year + "-" + values.month;
   });
   const payrollAccess = ["owner", "manager", "hr", "accountant"].includes(role);
   const adminPayrollView = ["owner", "manager", "hr", "accountant"].includes(role);
