@@ -566,7 +566,9 @@ export async function generatePayroll(staffAccountId: number, month: string) {
   const db = await getDb(); if (!db) throw new Error("Database not available");
   if (!/^\d{4}-\d{2}$/.test(month)) throw new Error("صيغة الشهر غير صحيحة. استخدم YYYY-MM.");
   const m = await getCompanyForStaff(staffAccountId);
-  if (!m || !["owner","hr","accountant","manager","supervisor"].includes(m.role)) throw new Error("غير مصرح");
+  // Keep the service-layer payroll permission aligned with the router.
+  // Supervisors must never gain payroll generation access through an internal call path.
+  if (!m || !["owner","hr","accountant","manager"].includes(m.role)) throw new Error("غير مصرح");
   await syncMonthlyAttendance(staffAccountId, month);
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
   const ids = new Set(members.map(x=>x.staffAccountId));
