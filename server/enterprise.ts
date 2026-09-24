@@ -41,7 +41,7 @@ export async function ensureCompanyForStaff(staffAccountId: number, companyName 
   if (!company) throw new Error("Company could not be created");
   let branch = (await db.select().from(branches).where(eq(branches.companyId, company.id)).limit(1))[0];
   if (!branch) {
-    const result = await db.insert(branches).values({ companyId: company.id, name: "الفرع الرئيسي", address: "القاهرة", latitude: "30.0444", longitude: "31.2357", radiusMeters: 200 });
+    const result = await db.insert(branches).values({ companyId: company.id, name: "الفرع الرئيسي", address: "القاهرة", latitude: "", longitude: "", radiusMeters: 200 });
     branch = (await db.select().from(branches).where(eq(branches.id, Number(result[0].insertId))).limit(1))[0];
   }
   const staff = (await db.select().from(staffAccounts).where(eq(staffAccounts.id, staffAccountId)).limit(1))[0];
@@ -72,20 +72,22 @@ export async function listCompanyStaff(staffAccountId: number) {
   const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
   const ids = new Set(members.map(x => x.staffAccountId));
-  const rows = await db.select({
-    id: staffAccounts.id,
-    phone: staffAccounts.phone,
-    name: staffAccounts.name,
-    title: staffAccounts.title,
-    department: staffAccounts.department,
-    role: staffAccounts.role,
-    baseSalary: staffAccounts.baseSalary,
-    shiftStart: staffAccounts.shiftStart,
-    shiftEnd: staffAccounts.shiftEnd,
-    active: staffAccounts.active,
-    createdAt: staffAccounts.createdAt,
-  }).from(staffAccounts).orderBy(desc(staffAccounts.createdAt));
-  return rows.filter(row => ids.has(row.id));
+  const rows = ids.size
+    ? await db.select({
+        id: staffAccounts.id,
+        phone: staffAccounts.phone,
+        name: staffAccounts.name,
+        title: staffAccounts.title,
+        department: staffAccounts.department,
+        role: staffAccounts.role,
+        baseSalary: staffAccounts.baseSalary,
+        shiftStart: staffAccounts.shiftStart,
+        shiftEnd: staffAccounts.shiftEnd,
+        active: staffAccounts.active,
+        createdAt: staffAccounts.createdAt,
+      }).from(staffAccounts).where(inArray(staffAccounts.id, Array.from(ids))).orderBy(desc(staffAccounts.createdAt))
+    : [];
+  return rows;
 }
 
 export async function getCompanyForStaff(staffAccountId: number) {
@@ -122,7 +124,10 @@ export async function listCompanyBranches(staffAccountId: number) {
   const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
   const rows = await db.select().from(branches).where(eq(branches.companyId, m.companyId)).orderBy(desc(branches.createdAt));
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
-  const staff = await db.select({ id: staffAccounts.id, name: staffAccounts.name }).from(staffAccounts);
+  const staffIds = members.map(member => member.staffAccountId);
+  const staff = staffIds.length
+    ? await db.select({ id: staffAccounts.id, name: staffAccounts.name }).from(staffAccounts).where(inArray(staffAccounts.id, staffIds))
+    : [];
   return rows.map(branch => {
     const branchMembers = members.filter(member => member.branchId === branch.id && member.active);
     const manager = branchMembers.find(member => member.role === "manager" || member.role === "owner");
@@ -138,10 +143,13 @@ export async function listCompanyMembers(staffAccountId: number) {
   const db = await getDb(); if (!db) return [];
   const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
   const members = await db.select().from(companyMembers).where(and(eq(companyMembers.companyId, m.companyId), eq(companyMembers.active, true)));
-  const staff = await db.select({
-    id: staffAccounts.id, name: staffAccounts.name, phone: staffAccounts.phone,
-    title: staffAccounts.title, department: staffAccounts.department, role: staffAccounts.role, active: staffAccounts.active,
-  }).from(staffAccounts);
+  const staffIds = members.map(member => member.staffAccountId);
+  const staff = staffIds.length
+    ? await db.select({
+        id: staffAccounts.id, name: staffAccounts.name, phone: staffAccounts.phone,
+        title: staffAccounts.title, department: staffAccounts.department, role: staffAccounts.role, active: staffAccounts.active,
+      }).from(staffAccounts).where(inArray(staffAccounts.id, staffIds))
+    : [];
   const branchRows = await db.select({ id: branches.id, name: branches.name, active: branches.active })
     .from(branches).where(eq(branches.companyId, m.companyId));
   return members.map(member => {
