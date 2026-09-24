@@ -156,7 +156,7 @@ export const appRouter = router({
     templates: staffProcedure.query(() => db.listShiftTemplates()),
     mine: staffProcedure.query(({ ctx }) => db.listSchedules(ctx.staffUser.id)),
     all: supervisorProcedure.query(({ ctx }) => enterprise.listCompanySchedules(ctx.staffUser.id)),
-    save: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), scheduleDate: z.string().length(10), shiftTemplateId: z.number().int(), note: z.string().max(255).optional() })).mutation(async ({ ctx, input }) => { await enterprise.assertStaffInCompany(ctx.staffUser.id, input.staffAccountId); return db.saveSchedule(input); }),
+    save: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), scheduleDate: z.string().length(10), shiftTemplateId: z.number().int(), note: z.string().max(255).optional() })).mutation(async ({ ctx, input }) => { await enterprise.assertStaffInCompany(ctx.staffUser.id, input.staffAccountId); await enterprise.assertPayrollEditable(ctx.staffUser.id, input.scheduleDate.slice(0,7), input.staffAccountId); return db.saveSchedule(input); }),
   }),
   attendance: router({
     list: staffProcedure.query(({ ctx }) => db.listAttendance(ctx.staffUser.id)),
@@ -172,7 +172,7 @@ export const appRouter = router({
       if (input.checkIn && input.checkOut && timeMinutes(input.checkOut) < timeMinutes(input.checkIn) && !String(input.note ?? "").includes("وردية ليلية")) {
         throw new Error("وقت الانصراف لا يمكن أن يسبق وقت الحضور.");
       }
-      await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7));
+      await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7), input.staffAccountId);
       const row = await db.updateAttendanceByManager(input);
       const m = await enterprise.getCompanyForStaff(ctx.staffUser.id);
       if (m) await enterprise.writeAudit(ctx.staffUser.id, m.companyId, "attendance.updated", "attendance", String(row?.id ?? ""), {staffAccountId:input.staffAccountId,date:input.date,status:input.status});
