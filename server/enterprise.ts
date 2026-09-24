@@ -648,11 +648,19 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const overtimeHours=approvedOvertimeHours;
     const overtimeRate=s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours;
     const overtimeValue=Math.round(overtimeHours*overtimeRate);
-    const adjustments=await db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.staffAccountId,s.id),eq(salaryAdjustments.month,month)));
+    const adjustments=await db.select().from(salaryAdjustments).where(and(
+      eq(salaryAdjustments.companyId,m.companyId),
+      eq(salaryAdjustments.staffAccountId,s.id),
+      eq(salaryAdjustments.month,month)
+    ));
     const allowances=adjustments.filter(a=>a.type==="allowance").reduce((sum,a)=>sum+a.amount,0);
     const bonuses=adjustments.filter(a=>a.type==="bonus"||a.type==="incentive").reduce((sum,a)=>sum+a.amount,0);
     const extraDeductions=adjustments.filter(a=>a.type==="penalty"||a.type==="deduction").reduce((sum,a)=>sum+a.amount,0);
-    const activeAdvances=await db.select().from(salaryAdvances).where(and(eq(salaryAdvances.staffAccountId,s.id),eq(salaryAdvances.status,"active")));
+    const activeAdvances=await db.select().from(salaryAdvances).where(and(
+      eq(salaryAdvances.companyId,m.companyId),
+      eq(salaryAdvances.staffAccountId,s.id),
+      eq(salaryAdvances.status,"active")
+    ));
     const advanceInstallment=activeAdvances.filter(a=>a.startMonth<=month && a.remainingAmount>0).reduce((sum,a)=>sum+Math.min(a.installmentAmount,a.remainingAmount),0);
     const gross=s.baseSalary+allowances+overtimeValue+bonuses;
     const egypt = calculateEgyptPayroll({
