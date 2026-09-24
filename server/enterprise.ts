@@ -717,7 +717,7 @@ export async function unapprovePayroll(staffAccountId:number, id:number) {
   await db.update(payrollRecords).set({status:"draft",approvedAt:null,updatedAt:new Date()}).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId)));
   await writeAudit(staffAccountId,m.companyId,"payroll.unapproved","payroll",String(id),{month:current.month});
   await createNotification(current.staffAccountId,"payroll","تم إلغاء اعتماد راتبك","تم فتح مسير راتب شهر "+current.month+" للمراجعة والتعديل.");
-  return (await db.select().from(payrollRecords).where(eq(payrollRecords.id,id)).limit(1))[0];
+  return (await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
 }
 
 export async function waiveAttendanceException(actorId:number,input:{staffAccountId:number;date:string;kind:"late"|"early"}) {
