@@ -680,7 +680,9 @@ export async function generatePayroll(staffAccountId: number, month: string) {
 
 export async function approvePayroll(staffAccountId:number, id:number) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
-  const m=await getCompanyForStaff(staffAccountId); if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
+  // Payroll approval is a payroll-admin action. Final unapproval remains
+  // restricted to owner/manager so reopening a closed payroll is more sensitive.
+  const m=await getCompanyForStaff(staffAccountId); if(!m || !["owner","manager","hr","accountant"].includes(m.role)) throw new Error("غير مصرح");
   const current=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
   if(!current) throw new Error("مسير الرواتب غير موجود.");
   if(current.status==="approved") return current;
@@ -698,7 +700,6 @@ export async function approvePayroll(staffAccountId:number, id:number) {
   // is still waiting for a manager decision.
   const members=await db.select({staffAccountId:companyMembers.staffAccountId})
     .from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
-  const memberIds=new Set(members.map(x=>x.staffAccountId));
   const monthAttendance=await db.select().from(attendanceRecords);
   const pending=monthAttendance.filter(r=>{
     if(r.staffAccountId !== current.staffAccountId || !r.date.startsWith(current.month)) return false;
