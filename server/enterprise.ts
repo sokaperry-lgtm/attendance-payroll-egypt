@@ -680,7 +680,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
 
 export async function approvePayroll(staffAccountId:number, id:number) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
-  const m=await getCompanyForStaff(staffAccountId); if(!m || !["owner","manager","hr","accountant"].includes(m.role)) throw new Error("غير مصرح");
+  const m=await getCompanyForStaff(staffAccountId); if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   const current=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
   if(!current) throw new Error("مسير الرواتب غير موجود.");
   if(current.status==="approved") return current;
@@ -1146,8 +1146,10 @@ export async function createSalaryAdvance(actorId:number,input:{staffAccountId:n
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId); if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   await assertStaffInCompany(actorId,input.staffAccountId);
+  if(!/^\d{4}-\d{2}$/.test(input.startMonth)) throw new Error("صيغة شهر بدء السلفة غير صحيحة. استخدم YYYY-MM.");
   await assertPayrollEditable(actorId,input.startMonth,input.staffAccountId);
   if(input.amount<=0 || input.installmentAmount<=0) throw new Error("قيمة السلفة والقسط يجب أن تكون أكبر من صفر.");
+  if(input.installmentAmount>input.amount) throw new Error("قيمة القسط لا يمكن أن تتجاوز قيمة السلفة.");
   const result=await db.insert(salaryAdvances).values({...input,remainingAmount:input.amount,companyId:m.companyId,createdBy:actorId});
   await writeAudit(actorId,m.companyId,"salary_advance.created","salary_advance",String(result[0].insertId),input);
   await createNotification(input.staffAccountId,"payroll","تم تسجيل سلفة جديدة","قيمة السلفة "+input.amount.toLocaleString()+" جنيه.");
