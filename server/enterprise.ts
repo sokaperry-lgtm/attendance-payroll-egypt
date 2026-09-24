@@ -370,15 +370,15 @@ export function overtimeAfterShiftEndMinutes(
   crossesMidnight = false,
 ) {
   const startMinutes = minutesOf(shiftStart);
-  const scheduledEnd = minutesOf(shiftEnd) + (crossesMidnight || minutesOf(shiftEnd) <= startMinutes ? 24 * 60 : 0);
+  const inferredCrossesMidnight = crossesMidnight || minutesOf(shiftEnd) < startMinutes;
+  const scheduledEnd = minutesOf(shiftEnd) + (inferredCrossesMidnight ? 24 * 60 : 0);
   let actualCheckout = minutesOf(checkOut);
   const actualCheckIn = minutesOf(checkIn);
 
-  // A checkout before check-in is only valid when the configured shift
-  // explicitly crosses midnight. Never turn an invalid same-day timestamp
-  // into a full-day overtime value.
+  // Treat an end time earlier than the start time as an overnight shift even
+  // when older data was saved without the explicit crossesMidnight flag.
   if (actualCheckout < actualCheckIn) {
-    if (!crossesMidnight) return 0;
+    if (!inferredCrossesMidnight) return 0;
     actualCheckout += 24 * 60;
   }
 
@@ -498,7 +498,9 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
         if (date === today) {
           const shiftStart = minutesOf(shift?.startTime ?? employee.shiftStart);
           const shiftEnd = minutesOf(shift?.endTime ?? employee.shiftEnd);
-          const crossesMidnight = shift?.crossesMidnight ?? false;
+          // Legacy schedules may omit the explicit overnight flag. Infer it
+          // safely from an end time earlier than the start time.
+          const crossesMidnight = (shift?.crossesMidnight ?? false) || shiftEnd < shiftStart;
 
           const nowTimeParts = new Intl.DateTimeFormat("en-GB", {
             timeZone: "Africa/Cairo",
