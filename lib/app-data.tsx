@@ -90,7 +90,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const activeShift = todaySchedule?.shift;
   const currentMonth = todayKey().slice(0, 7);
   const approvedOvertimeHours = requests.filter((request) => request.type === "أوفر تايم" && request.status === "مقبول" && request.from.startsWith(currentMonth)).reduce((sum, request) => sum + (request.hours ?? 0), 0);
-  const payrollInputs: PayrollInputs = useMemo(() => ({ baseSalary: employee.baseSalary, allowances: 0, bonuses: 0, overtimeHours: approvedOvertimeHours, absences: records.filter((record) => record.status === "غياب").length, lateMinutes: records.reduce((sum, record) => sum + record.lateMinutes, 0), deductions: 0, advances: 0 }), [employee.baseSalary, records, approvedOvertimeHours]);
+  const payrollInputs: PayrollInputs = useMemo(() => ({ baseSalary: employee.baseSalary, allowances: 0, bonuses: 0, overtimeHours: approvedOvertimeHours, absences: records.filter((record) => record.status === "غياب" && (record.note || "").includes("تم اعتماد الغياب")).length, lateMinutes: records.reduce((sum, record) => sum + record.lateMinutes, 0), deductions: 0, advances: 0 }), [employee.baseSalary, records, approvedOvertimeHours]);
   const payroll = useMemo(() => calculatePayroll(payrollInputs), [payrollInputs]);
 
   const invalidateAll = () => queryClient.invalidateQueries();
