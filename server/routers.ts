@@ -344,6 +344,7 @@ export const appRouter = router({
     list: staffProcedure.query(({ ctx }) => enterprise.listNotifications(ctx.staffUser.id)),
     unreadCount: staffProcedure.query(({ ctx }) => enterprise.getUnreadNotificationCount(ctx.staffUser.id)),
     read: staffProcedure.input(z.object({ id: z.number().int() })).mutation(({ ctx, input }) => enterprise.markNotificationRead(ctx.staffUser.id, input.id)),
+    markAllRead: staffProcedure.mutation(({ ctx }) => enterprise.markAllNotificationsRead(ctx.staffUser.id)),
   }),
   hrTools: router({
     documents: hrProcedure.input(z.object({staffAccountId:z.number().int()})).query(({ctx,input})=>enterprise.listEmployeeDocuments(ctx.staffUser.id,input.staffAccountId)),
