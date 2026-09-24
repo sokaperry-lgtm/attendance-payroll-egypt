@@ -362,6 +362,21 @@ function shiftMinutes(start: string, end: string, crossesMidnight = false) {
   return Math.max(0, b - a);
 }
 
+export function overtimeAfterShiftEndMinutes(
+  checkIn: string,
+  checkOut: string,
+  shiftStart: string,
+  shiftEnd: string,
+  crossesMidnight = false,
+) {
+  const startMinutes = minutesOf(shiftStart);
+  const scheduledEnd = minutesOf(shiftEnd) + (crossesMidnight || minutesOf(shiftEnd) <= startMinutes ? 24 * 60 : 0);
+  let actualCheckout = minutesOf(checkOut);
+  const actualCheckIn = minutesOf(checkIn);
+  if (actualCheckout < actualCheckIn) actualCheckout += 24 * 60;
+  return Math.max(0, actualCheckout - scheduledEnd);
+}
+
 function dateRange(month: string) {
   const [year, monthNumber] = month.split("-").map(Number);
   const days = new Date(year, monthNumber, 0).getDate();
