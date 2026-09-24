@@ -17,10 +17,10 @@ type ReportEmployee = { id: number; name: string; department?: string | null; la
 type Tone = "blue" | "green" | "orange" | "red" | "purple";
 const toneMap: Record<Tone, { bg: string; color: string }> = {
   blue: { bg: "#EAF3FB", color: "#163A63" },
-  green: { bg: "#EEF5FA", color: "#245A86" },
+  green: { bg: "#EEF4FA", color: "#245A86" },
   orange: { bg: "#F7F1E7", color: "#8A6420" },
   red: { bg: "#F7ECEC", color: "#8B3D3D" },
-  purple: { bg: "#EEF2F7", color: "#3E5872" },
+  purple: { bg: "#F1F4F7", color: "#3E5872" },
 };
 
 export default function ReportsScreen() {
