@@ -718,6 +718,7 @@ export async function approvePayroll(staffAccountId:number, id:number) {
   }
 
   await db.update(payrollRecords).set({status:"approved",approvedAt:new Date(),updatedAt:new Date()}).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId)));
+  await createNotification(current.staffAccountId,"payroll","تم اعتماد مسير راتبك","تم اعتماد راتب شهر "+current.month+" ويمكنك مراجعة التفاصيل من النظام.");
   const advances=await db.select().from(salaryAdvances)
     .where(and(eq(salaryAdvances.staffAccountId,current.staffAccountId),eq(salaryAdvances.companyId,m.companyId),eq(salaryAdvances.status,"active")))
     .orderBy(salaryAdvances.id);
