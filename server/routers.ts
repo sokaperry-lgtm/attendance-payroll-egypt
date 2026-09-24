@@ -372,7 +372,9 @@ export const appRouter = router({
     }),
     payrollCsv: payrollProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ ctx, input }) => {
       const rows = await enterprise.getPayroll(ctx.staffUser.id, input.month);
-      return enterprise.toCsv(rows.map((r:any) => ({ staffAccountId:r.staffAccountId, month:r.month, baseSalary:r.baseSalary, grossSalary:r.grossSalary, overtime:r.overtime, absenceDeduction:r.absenceDeduction, lateDeduction:r.lateDeduction, earlyDeduction:r.earlyDeduction, otherDeductions:r.otherDeductions, advances:r.advances, socialInsurance:r.employeeSocialInsurance, incomeTax:r.employeeIncomeTax, netSalary:r.netSalary, status:r.status })));
+      const staff = await enterprise.listCompanyStaff(ctx.staffUser.id);
+      const names = new Map(staff.map((member:any) => [Number(member.id), member.name]));
+      return enterprise.toCsv(rows.map((r:any) => ({ employee:names.get(Number(r.staffAccountId)) ?? `EMP-${r.staffAccountId}`, staffAccountId:r.staffAccountId, month:r.month, baseSalary:r.baseSalary, allowances:r.allowances, bonuses:r.bonuses, grossSalary:r.grossSalary, overtime:r.overtime, absenceDeduction:r.absenceDeduction, lateDeduction:r.lateDeduction, earlyDeduction:r.earlyDeduction, otherDeductions:r.otherDeductions, advances:r.advances, socialInsurance:r.employeeSocialInsurance, incomeTax:r.employeeIncomeTax, netSalary:r.netSalary, status:r.status })));
     }),
   }),
 });
