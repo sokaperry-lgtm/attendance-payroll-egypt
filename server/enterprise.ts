@@ -613,7 +613,11 @@ export async function generatePayroll(staffAccountId: number, month: string) {
   const result=[];
   let skippedApproved=0;
   for(const s of staff.filter(x=>ids.has(x.id))) {
-    const existing=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.staffAccountId,s.id),eq(payrollRecords.month,month))).limit(1))[0];
+    const existing=(await db.select().from(payrollRecords).where(and(
+      eq(payrollRecords.companyId,m.companyId),
+      eq(payrollRecords.staffAccountId,s.id),
+      eq(payrollRecords.month,month)
+    )).limit(1))[0];
     if(existing && existing.status==="approved") { result.push(existing); skippedApproved++; continue; }
     const records=attendance.filter(x=>x.staffAccountId===s.id && x.date.startsWith(month));
     // Auto-detected absences are not deducted until explicitly approved.
