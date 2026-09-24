@@ -44,7 +44,7 @@ export default function HomeScreen(){
   const [gpsMessage,setGpsMessage]=useState("الموقع جاهز للتحقق");
   const isCheckedOut=Boolean(todayRecord?.checkOut);
   const isWeeklyOff=Boolean(shift?.kind==="weekly_off");
-  const presentDays=records.filter(r=>r.status==="حاضر"||r.status==="متأخر").length;
+  const presentDays=records.filter(r=>r.status==="اسكت"||r.status==="متأخر").length;
   const unread=(notificationsQuery.data??[]).filter(n=>!n.readAt).length;
   const attendanceActionLabel = working ? "جارٍ التحقق..." : checkedIn ? "تسجيل الانصراف" : "تسجيل الحضور";
   const dateLabel=useMemo(()=>new Intl.DateTimeFormat("ar-EG",{weekday:"long",day:"numeric",month:"long"}).format(new Date()),[]);
@@ -54,7 +54,7 @@ export default function HomeScreen(){
     try{const c=await getCurrentCoordinates(),d=distanceBetween(branch.latitude,branch.longitude,c.latitude,c.longitude);
       if(d>branch.radiusMeters)throw new Error(`أنت خارج نطاق الفرع بـ ${d} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`);
       const lateMinutes=calculateLateMinutes(new Date(),shift.start,PAYROLL_RULES.graceMinutes);
-      await checkIn({time:currentTime(now),distanceMeters:d,status:lateMinutes>0?"متأخر":"حاضر",lateMinutes});
+      await checkIn({time:currentTime(now),distanceMeters:d,status:lateMinutes>0?"متأخر":"اسكت",lateMinutes});
       setGpsMessage(`تم التحقق من الموقع — ${d} متر من الفرع`);
       if(Platform.OS!=="web")await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }catch(e){const m=e instanceof Error?e.message:"تعذر التحقق من الموقع";setGpsMessage(m);showAlert("لم يتم تسجيل الحضور",m);}
