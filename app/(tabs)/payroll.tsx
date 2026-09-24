@@ -8,8 +8,9 @@ import { formatMoney } from "@/lib/payroll";
 import { trpc } from "@/lib/trpc";
 
 function currentMonth() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit" }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return values.year + "-" + values.month;
 }
 function monthLabel(value: string) {
   const [y, m] = value.split("-").map(Number);
@@ -28,7 +29,7 @@ function printPayslip(data: any, month: string) {
   const rows=[
     ["الراتب الأساسي",p.baseSalary],["البدلات",p.allowances],["الحوافز والمكافآت",p.bonuses],["الإضافي",p.overtime],
     ["إجمالي المستحقات",p.grossSalary],["التأمينات الاجتماعية",p.employeeSocialInsurance],["ضريبة الدخل",p.employeeIncomeTax],
-    ["خصم الغياب",p.absenceDeduction],["خصم التأخير",p.lateDeduction],["خصومات أخرى",p.otherDeductions],["السلف والأقساط",p.advances]
+    ["خصم الغياب",p.absenceDeduction],["خصم التأخير",p.lateDeduction],["خصم الانصراف المبكر",p.earlyDeduction],["خصومات أخرى",p.otherDeductions],["السلف والأقساط",p.advances]
   ];
   const money=(v:number)=>formatMoney(Number(v||0));
   const esc=(v:any)=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]!));
@@ -63,7 +64,7 @@ export default function PayrollScreen() {
   const payrollAccess = trpc.companyAdmin.payrollAccess.useQuery();
   // Fallback to the authenticated app role so a stale/missing company-membership row
   // cannot push a manager or supervisor into the employee self-service payroll screen.
-  const isAdmin = payrollAccess.data?.canManagePayroll === true || (role === "owner" || role === "manager") || role === "supervisor";
+  const isAdmin = payrollAccess.data?.canManagePayroll === true || (role === "owner" || role === "manager" || role === "hr" || role === "accountant");
   const [month, setMonth] = useState(currentMonth());
   const [filter, setFilter] = useState<"all" | "draft" | "approved">("all");
   const [selectedRowId, setSelectedRowId] = useState<number | string | null>(null);
@@ -136,6 +137,7 @@ export default function PayrollScreen() {
             <Row label="ضريبة الدخل" value={formatMoney(p?.employeeIncomeTax ?? 0)} />
             <Row label="خصم الغياب" value={formatMoney(p?.absenceDeduction ?? payroll.absenceDeduction)} />
             <Row label="خصم التأخير" value={formatMoney(p?.lateDeduction ?? payroll.lateDeduction)} />
+            <Row label="خصم الانصراف المبكر" value={formatMoney(p?.earlyDeduction ?? 0)} />
             <Row label="خصومات أخرى" value={formatMoney(p?.otherDeductions ?? 0)} />
             <Row label="السلف والأقساط" value={formatMoney(p?.advances ?? 0)} />
             <Row label="صافي الراتب" value={formatMoney(net)} strong />
