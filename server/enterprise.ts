@@ -345,6 +345,13 @@ export async function markNotificationRead(staffAccountId: number, id: number) {
   return { success: true };
 }
 
+export async function markAllNotificationsRead(staffAccountId: number) {
+  const db = await getDb(); if (!db) throw new Error("Database not available");
+  await db.update(notifications).set({ readAt: new Date() })
+    .where(and(eq(notifications.staffAccountId, staffAccountId), isNull(notifications.readAt)));
+  return { success: true };
+}
+
 export async function getSubscription(staffAccountId: number) {
   const db = await getDb(); if (!db) return undefined;
   const m = await getCompanyForStaff(staffAccountId); if (!m) return undefined;
