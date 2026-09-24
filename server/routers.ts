@@ -123,11 +123,11 @@ export const appRouter = router({
     update: hrProcedure.input(z.object({ id: z.number().int(), phone: z.string().min(3).max(32).optional(), password: z.string().min(6).max(120).optional(), name: z.string().min(2).max(160).optional(), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).optional(), role: z.enum(["manager","supervisor","employee"]).optional(), shiftStart: z.string().max(8).optional(), shiftEnd: z.string().max(8).optional(), active: z.boolean().optional() })).mutation(async ({ ctx, input }) => {
       const { id, ...changes } = input;
       const access = await enterprise.assertStaffInCompany(ctx.staffUser.id, id);
-      if (id === ctx.staffUser.id && (changes.active === false || changes.role === "employee" || changes.role === "supervisor")) throw new Error("لا يمكنك تعطيل حسابك أو خفض صلاحيتك من هنا.");
+      if (id === ctx.staffUser.id && (changes.active === false || changes.role)) throw new Error("لا يمكنك تعطيل حسابك أو تغيير صلاحيتك من هنا.");
       // The owner account is the tenant root. No non-owner actor may deactivate,
       // rename, reset, or otherwise mutate the owner through the staff editor.
-      if (access.target.role === "owner" && access.actor.role !== "owner") {
-        throw new Error("لا يمكن تعديل حساب مالك الشركة من هذا الحساب.");
+      if (access.target.role === "owner") {
+        throw new Error("لا يمكن تعديل حساب مالك الشركة من شاشة الموظفين.");
       }
       // Role changes are privileged operations. HR may manage employee data,
       // but only owner/manager can change a member's access level.
