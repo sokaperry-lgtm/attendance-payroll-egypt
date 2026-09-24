@@ -1243,6 +1243,28 @@ export async function listEmployee360(actorId:number,targetId:number) {
     []
   ) : [];
 
+  // Keep company-owned employee data explicitly tenant-scoped even though
+  // the target membership has already been validated. This protects the
+  // Employee 360 view if historical records remain after membership changes.
+  const companyAdjustments = m ? await safe(
+    db.select().from(salaryAdjustments)
+      .where(and(eq(salaryAdjustments.companyId,m.companyId),eq(salaryAdjustments.staffAccountId,targetId)))
+      .orderBy(desc(salaryAdjustments.createdAt)),
+    []
+  ) : [];
+  const companyAdvances = m ? await safe(
+    db.select().from(salaryAdvances)
+      .where(and(eq(salaryAdvances.companyId,m.companyId),eq(salaryAdvances.staffAccountId,targetId)))
+      .orderBy(desc(salaryAdvances.createdAt)),
+    []
+  ) : [];
+  const companyDocuments = m ? await safe(
+    db.select().from(employeeDocuments)
+      .where(and(eq(employeeDocuments.companyId,m.companyId),eq(employeeDocuments.staffAccountId,targetId)))
+      .orderBy(desc(employeeDocuments.createdAt)),
+    []
+  ) : [];
+
   const companyAudit = m ? await safe(
     db.select().from(auditLogs)
       .where(eq(auditLogs.companyId,m.companyId))
@@ -1257,5 +1279,5 @@ export async function listEmployee360(actorId:number,targetId:number) {
     return metadata.includes(`"staffAccountId":${targetId}`) || metadata.includes(`"staffAccountId": ${targetId}`);
   });
 
-  return {staff,attendance,requests,adjustments,advances,documents,payroll,schedules:employeeSchedules,audit:employeeAudit};
+  return {staff,attendance,requests,adjustments:companyAdjustments,advances:companyAdvances,documents:companyDocuments,payroll,schedules:employeeSchedules,audit:employeeAudit};
 }
