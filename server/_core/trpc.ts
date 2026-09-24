@@ -16,7 +16,11 @@ const requireUser = t.middleware(async (opts) => {
 
 const requireStaff = t.middleware(async (opts) => {
   if (!opts.ctx.staffUser) throw new TRPCError({ code: "UNAUTHORIZED", message: "يجب تسجيل الدخول بحساب الشركة." });
-  return opts.next({ ctx: { ...opts.ctx, staffUser: opts.ctx.staffUser } });
+  const membership = await getMembership(opts.ctx.staffUser.id);
+  if (!membership || !membership.active) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "حسابك غير نشط في الشركة." });
+  }
+  return opts.next({ ctx: { ...opts.ctx, staffUser: opts.ctx.staffUser, membership } });
 });
 
 const requireManager = t.middleware(async (opts) => {
