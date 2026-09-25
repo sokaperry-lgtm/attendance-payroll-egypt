@@ -92,7 +92,7 @@ export default function HomeScreen(){
       : [["وردية اليوم",isWeeklyOff?"إجازة":shift.start+" — "+shift.end,"calendar"],["الحضور",checkedIn?"مسجل الآن":"لم يُسجل بعد","checkmark"],["الراتب",payroll.net.toLocaleString("ar-EG")+" EGP","banknote"]];
 
   return <ScreenContainer edges={["top","left","right"]}>
-    <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={[styles.page, isMobile && styles.pageMobile]} showsVerticalScrollIndicator={false}>
       <View style={[styles.header, isMobile && styles.headerMobile]}>
         <View style={styles.brand}><View style={styles.logo}><IconSymbol name="fingerprint" size={25} color="#FFFFFF" /></View><View><Text style={styles.kicker}>WORKSPACE</Text><Text style={styles.company}>نظام إدارة الموظفين</Text></View></View>
         <View style={[styles.headerRight, isMobile && styles.headerRightMobile]}><View style={styles.dateBlock}><Text style={styles.date}>{dateLabel}</Text><Text style={styles.welcome}>{isManagement?"مساحة الإدارة":"أهلاً، "+employee.name.split(" ")[0]}</Text></View><Pressable style={styles.bell} onPress={()=>router.push("/notifications" as never)}><IconSymbol name="notifications" size={20} color="#163A63"/>{unread>0&&<View style={styles.dot}/>}</Pressable></View>
@@ -182,7 +182,7 @@ function Kpi({icon,value,label,note}:{icon:any;value:string;label:string;note:st
 function TimeRow({label,value}:{label:string;value:string}){return <View style={styles.timeRow}><Text style={styles.timeValue}>{value}</Text><Text style={styles.timeLabel}>{label}</Text></View>}
 
 const styles=StyleSheet.create({
-  page:{padding:30,paddingBottom:70,gap:22,maxWidth:1280,width:"100%",alignSelf:"center"},
+  page:{padding:30,paddingBottom:70,gap:22,maxWidth:1280,width:"100%",alignSelf:"center"},pageMobile:{padding:14,paddingBottom:34,gap:14},
   header:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},  headerMobile:{flexDirection:"column",alignItems:"stretch",gap:12},
   headerRightMobile:{justifyContent:"space-between",width:"100%",gap:10},
   heroMobile:{flexDirection:"column",padding:16,borderRadius:20,gap:14},
