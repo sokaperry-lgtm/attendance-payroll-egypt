@@ -258,8 +258,9 @@ export async function listCompanySchedules(staffAccountId: number) {
   const db = await getDb(); if (!db) return [];
   const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
   if (!["owner","manager","hr","supervisor"].includes(m.role)) throw new Error("غير مصرح");
-  const members = await db.select({ staffAccountId: companyMembers.staffAccountId }).from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
-  const ids = new Set(members.map(row => row.staffAccountId));
+  const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
+  const visibleMembers = m.role === "supervisor" ? members.filter(x => ["employee","supervisor"].includes(x.role)) : members;
+  const ids = new Set(visibleMembers.map(row => row.staffAccountId));
   const rows = await db.select().from(weeklySchedules).orderBy(desc(weeklySchedules.scheduleDate));
   const shifts = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
   return rows.filter(row => ids.has(row.staffAccountId)).map(row => ({ ...row, shift: shifts.find(item => item.id === row.shiftTemplateId) ?? null }));
@@ -600,7 +601,8 @@ export async function getAttendanceWorkSummary(staffAccountId: number, month: st
   if (!["owner","manager","hr","supervisor"].includes(m.role)) throw new Error("غير مصرح");
 
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
-  const ids = new Set(members.map(x => x.staffAccountId));
+  const visibleMembers = m.role === "supervisor" ? members.filter(x => ["employee","supervisor"].includes(x.role)) : members;
+  const ids = new Set(visibleMembers.map(x => x.staffAccountId));
   const staff = (await db.select().from(staffAccounts).where(eq(staffAccounts.active, true))).filter(x => ids.has(x.id));
   const attendance = (await db.select().from(attendanceRecords)).filter(x => x.date.startsWith(month) && ids.has(x.staffAccountId));
   const schedules = await db.select().from(weeklySchedules);
