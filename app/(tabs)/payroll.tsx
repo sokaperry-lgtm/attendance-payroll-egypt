@@ -114,7 +114,7 @@ export default function PayrollScreen() {
     const net = p?.netSalary ?? payroll.net;
     return (
       <ScreenContainer>
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={[styles.content, compact && styles.contentCompact]} showsVerticalScrollIndicator={false}>
           <Header title="راتبي" subtitle="قسيمة راتبك التفصيلية لهذا الشهر." icon="banknote" />
           <View style={styles.hero}>
             <View style={styles.heroCopy}><Text style={styles.heroKicker}>NET SALARY</Text><Text style={styles.heroValue}>{formatMoney(net)}</Text><Text style={styles.heroMeta}>{monthLabel(month)} · {p?.status === "approved" ? "راتب معتمد" : "قيد المراجعة"}</Text></View>
@@ -316,7 +316,7 @@ function Row({ label, value, strong = false }: { label: string; value: string; s
 }
 
 const styles = StyleSheet.create({
-  content:{padding:20,paddingBottom:60,gap:14,maxWidth:1200,width:"100%",alignSelf:"center"},
+  content:{padding:20,paddingBottom:60,gap:14,maxWidth:1200,width:"100%",alignSelf:"center"},contentCompact:{padding:14,paddingBottom:38,gap:10},
   header:{flexDirection:"row-reverse",alignItems:"center",gap:12},headerIcon:{width:52,height:52,borderRadius:17,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},headerCopy:{flex:1},eyebrow:{color:"#7B8798",fontSize:9,fontWeight:"900",textAlign:"right",letterSpacing:1},title:{color:"#172033",fontSize:29,fontWeight:"900",textAlign:"right",marginTop:3},subtitle:{color:"#667085",fontSize:11,lineHeight:18,textAlign:"right",marginTop:4},
   hero:{backgroundColor:"#102A47",borderRadius:24,padding:20,minHeight:142,flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},heroCopy:{flex:1},heroKicker:{color:"#8EA7BE",fontSize:9,fontWeight:"900",textAlign:"right",letterSpacing:1},heroValue:{color:"#FFFFFF",fontSize:32,fontWeight:"900",textAlign:"right",marginTop:5},heroMeta:{color:"#B8C9D8",fontSize:10,textAlign:"right",marginTop:4},heroIcon:{width:58,height:58,borderRadius:18,backgroundColor:"#1D4268",alignItems:"center",justifyContent:"center"},
   monthBar:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:17,padding:10,flexDirection:"row",alignItems:"center",justifyContent:"space-between"},monthCenter:{alignItems:"center"},monthKicker:{color:"#98A6B8",fontSize:8,fontWeight:"900"},monthTitle:{color:"#172033",fontSize:14,fontWeight:"900",marginTop:2},monthButton:{minWidth:78,height:40,borderRadius:11,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center",flexDirection:"row",gap:5,paddingHorizontal:9},monthArrow:{color:"#163A63",fontSize:18,fontWeight:"900"},monthButtonLabel:{color:"#163A63",fontSize:9,fontWeight:"900",textAlign:"center"},monthHint:{color:"#A1ACBA",fontSize:8,marginTop:3},
