@@ -315,6 +315,10 @@ export const appRouter = router({
       const existing = (await enterprise.listCompanyRequests(ctx.staffUser.id)).find(r => r.id === input.id);
       if (!existing) throw new Error("الطلب غير موجود.");
       if (existing.status !== "قيد المراجعة") throw new Error("هذا الطلب تمت معالجته بالفعل.");
+      // Keep request approvals inside the same operational target boundary
+      // used by attendance and schedules. Supervisors may review only
+      // employee/supervisor requests; management/HR keep broader access.
+      await enterprise.assertOperationalTarget(ctx.staffUser.id, existing.staffAccountId);
       if (input.status === "مقبول" && ["إجازة","إجازة مرضية","إجازة طارئة"].includes(existing.type)) {
         return enterprise.reviewLeaveRequest(ctx.staffUser.id, input.id, input.status);
       }
