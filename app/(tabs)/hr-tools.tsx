@@ -1,39 +1,54 @@
-import { useState, type ReactNode } from "react";
+import { Component, useState, type ReactNode } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
-import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/lib/payroll";
 
-type Role = "owner" | "manager" | "hr" | "supervisor" | "accountant" | "employee";
+type Props = { children?: ReactNode };
+
+class HrToolsBoundary extends Component<Props, { error: boolean }> {
+  state = { error: false };
+  static getDerivedStateFromError() { return { error: true }; }
+  componentDidCatch(error: unknown) { console.error("[HR Tools]", error); }
+  render() {
+    if (this.state.error) {
+      return <ScreenContainer><View style={styles.center}><Text style={styles.errorTitle}>تعذر فتح أدوات الموارد البشرية</Text><Text style={styles.muted}>حصل خطأ في تحميل الشاشة. جرّب إعادة المحاولة.</Text><Pressable style={styles.button} onPress={() => this.setState({ error: false })}><Text style={styles.buttonText}>إعادة المحاولة</Text></Pressable></View></ScreenContainer>;
+    }
+    return this.props.children;
+  }
+}
 
 export default function HrToolsScreen() {
+  return <HrToolsBoundary><HrToolsGate /></HrToolsBoundary>;
+}
+
+function HrToolsGate() {
   const me = trpc.auth.me.useQuery(undefined, { retry: false });
-  const role = (me.data?.membershipRole || me.data?.role || "employee") as Role;
+  if (me.isLoading) {
+    return <ScreenContainer><View style={styles.center}><ActivityIndicator color="#163A63" size="large" /><Text style={styles.muted}>جاري تحميل أدوات الموارد البشرية...</Text></View></ScreenContainer>;
+  }
+  const role = (me.data?.membershipRole || me.data?.role || "employee") as string;
   const canOpen = role === "owner" || role === "manager" || role === "hr";
-  const canManageMoney = role === "owner" || role === "manager";
-  const staff = trpc.staff.list.useQuery(undefined, { enabled: canOpen, retry: false });
+  if (!canOpen) {
+    return <ScreenContainer><View style={styles.center}><Text style={styles.errorTitle}>أدوات الموارد البشرية غير متاحة</Text><Text style={styles.muted}>تحتاج صلاحية مدير أو HR للوصول إلى هذه الصفحة.</Text></View></ScreenContainer>;
+  }
+  return <HrToolsContent role={role} />;
+}
+
+function HrToolsContent({ role }: { role: string }) {
+  const staff = trpc.staff.list.useQuery(undefined, { retry: false });
   const employees = Array.isArray(staff.data) ? staff.data : [];
+  const canManageMoney = role === "owner" || role === "manager";
+  const month = new Date().toISOString().slice(0, 7);
   const [selectedStaff, setSelectedStaff] = useState("");
   const selectedId = Number(selectedStaff);
   const hasSelected = Number.isInteger(selectedId) && selectedId > 0;
 
-  const docs = trpc.hrTools.documents.useQuery(
-    { staffAccountId: selectedId },
-    { enabled: canOpen && hasSelected, retry: false }
-  );
+  const docs = trpc.hrTools.documents.useQuery({ staffAccountId: selectedId }, { enabled: hasSelected, retry: false });
+  const adjustments = trpc.hrTools.adjustments.useQuery({ month }, { enabled: canManageMoney, retry: false });
+  const advances = trpc.hrTools.advances.useQuery(undefined, { enabled: canManageMoney, retry: false });
   const addDoc = trpc.hrTools.addDocument.useMutation({ onSuccess: () => docs.refetch() });
   const deleteDoc = trpc.hrTools.deleteDocument.useMutation({ onSuccess: () => docs.refetch() });
-
-  const month = new Date().toISOString().slice(0, 7);
-  const adjustments = trpc.hrTools.adjustments.useQuery(
-    { month },
-    { enabled: canManageMoney, retry: false }
-  );
-  const advances = trpc.hrTools.advances.useQuery(
-    undefined,
-    { enabled: canManageMoney, retry: false }
-  );
   const addAdjustment = trpc.hrTools.addAdjustment.useMutation({ onSuccess: () => adjustments.refetch() });
   const addAdvance = trpc.hrTools.addAdvance.useMutation({ onSuccess: () => advances.refetch() });
 
@@ -41,33 +56,22 @@ export default function HrToolsScreen() {
   const [money, setMoney] = useState({ type: "incentive" as "incentive" | "bonus" | "penalty" | "deduction", title: "", amount: "" });
   const [advance, setAdvance] = useState({ amount: "", installment: "" });
 
-  if (!canOpen) {
-    return <ScreenContainer><View style={styles.center}><Text style={styles.deniedTitle}>أدوات الموارد البشرية غير متاحة</Text><Text style={styles.muted}>تحتاج صلاحية مدير أو HR للوصول إلى هذه الصفحة.</Text></View></ScreenContainer>;
-  }
-
   const selectedName = employees.find((x: any) => Number(x.id) === selectedId)?.name || "الموظف المحدد";
   const docRows = Array.isArray(docs.data) ? docs.data : [];
   const adjustmentRows = Array.isArray(adjustments.data) ? adjustments.data : [];
   const advanceRows = Array.isArray(advances.data) ? advances.data : [];
 
   async function saveDocument() {
-    if (!doc.title.trim()) return Alert.alert("بيانات ناقصة", "اكتب اسم المستند.");
+    if (!hasSelected || !doc.title.trim()) return Alert.alert("بيانات ناقصة", "اختار موظف واكتب اسم المستند.");
     try {
-      await addDoc.mutateAsync({
-        staffAccountId: selectedId,
-        type: doc.type,
-        title: doc.title.trim(),
-        documentNumber: doc.number.trim() || undefined,
-        expiryDate: doc.expiry.trim() || undefined,
-        note: doc.note.trim() || undefined,
-      });
+      await addDoc.mutateAsync({ staffAccountId: selectedId, type: doc.type, title: doc.title.trim(), documentNumber: doc.number.trim() || undefined, expiryDate: doc.expiry.trim() || undefined, note: doc.note.trim() || undefined });
       setDoc({ type: "بطاقة شخصية", title: "", number: "", expiry: "", note: "" });
       Alert.alert("تم", "تم حفظ المستند.");
     } catch (e) { Alert.alert("خطأ", e instanceof Error ? e.message : "تعذر حفظ المستند."); }
   }
 
   async function saveAdjustment() {
-    if (!selectedId || !money.title.trim() || !money.amount) return Alert.alert("بيانات ناقصة", "اختار موظف واكتب المبلغ والوصف.");
+    if (!hasSelected || !money.title.trim() || !money.amount) return Alert.alert("بيانات ناقصة", "اختار موظف واكتب المبلغ والوصف.");
     try {
       await addAdjustment.mutateAsync({ staffAccountId: selectedId, month, type: money.type, title: money.title.trim(), amount: Number(money.amount) });
       setMoney(x => ({ ...x, title: "", amount: "" }));
@@ -76,7 +80,7 @@ export default function HrToolsScreen() {
   }
 
   async function saveAdvance() {
-    if (!selectedId || !advance.amount || !advance.installment) return Alert.alert("بيانات ناقصة", "اختار موظف واكمل بيانات السلفة.");
+    if (!hasSelected || !advance.amount || !advance.installment) return Alert.alert("بيانات ناقصة", "اختار موظف واكمل بيانات السلفة.");
     try {
       await addAdvance.mutateAsync({ staffAccountId: selectedId, amount: Number(advance.amount), installmentAmount: Number(advance.installment), startMonth: month });
       setAdvance({ amount: "", installment: "" });
@@ -88,21 +92,13 @@ export default function HrToolsScreen() {
     <ScreenContainer>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
-          <View style={styles.heroIcon}><IconSymbol name="banknote" size={25} color="#FFFFFF" /></View>
-          <View style={styles.heroCopy}>
-            <Text style={styles.eyebrow}>HR TOOLS</Text>
-            <Text style={styles.heroTitle}>إدارة الموارد البشرية</Text>
-            <Text style={styles.heroSub}>المستندات والتعديلات المالية والسلف في شاشة واحدة.</Text>
-          </View>
+          <View style={styles.heroCopy}><Text style={styles.eyebrow}>HR TOOLS</Text><Text style={styles.heroTitle}>إدارة الموارد البشرية</Text><Text style={styles.heroSub}>المستندات والتعديلات المالية والسلف في شاشة واحدة.</Text></View>
+          <View style={styles.heroIcon}><Text style={styles.heroIconText}>HR</Text></View>
         </View>
 
         <Section title="اختيار الموظف" hint="اختار الموظف أولاً، وبعدها هتظهر أدواته.">
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.staffRow}>
-            {employees.length ? employees.map((x: any) => (
-              <Pressable key={x.id} onPress={() => setSelectedStaff(String(x.id))} style={[styles.chip, selectedId === Number(x.id) && styles.chipActive]}>
-                <Text style={[styles.chipText, selectedId === Number(x.id) && styles.chipTextActive]}>{x.name}</Text>
-              </Pressable>
-            )) : <Text style={styles.muted}>لا توجد قائمة موظفين متاحة.</Text>}
+            {staff.isLoading ? <ActivityIndicator color="#163A63" /> : employees.length ? employees.map((x: any) => <Pressable key={x.id} onPress={() => setSelectedStaff(String(x.id))} style={[styles.chip, selectedId === Number(x.id) && styles.chipActive]}><Text style={[styles.chipText, selectedId === Number(x.id) && styles.chipTextActive]}>{x.name}</Text></Pressable>) : <Text style={styles.muted}>لا توجد قائمة موظفين متاحة.</Text>}
           </ScrollView>
         </Section>
 
@@ -145,25 +141,12 @@ function Empty({ text }: { text: string }) { return <View style={styles.empty}><
 const styles = StyleSheet.create({
   content: { padding: 22, paddingBottom: 60, gap: 14, maxWidth: 1100, width: "100%", alignSelf: "center" },
   hero: { backgroundColor: "#163A63", borderRadius: 24, padding: 22, flexDirection: "row-reverse", alignItems: "center", gap: 16 },
-  heroIcon: { width: 48, height: 48, borderRadius: 15, backgroundColor: "#2B5685", alignItems: "center", justifyContent: "center" },
-  heroCopy: { flex: 1 }, eyebrow: { color: "#BFD3EA", fontSize: 9, fontWeight: "900", textAlign: "right" },
-  heroTitle: { color: "#FFFFFF", fontSize: 25, fontWeight: "900", textAlign: "right", marginTop: 4 },
-  heroSub: { color: "#D8E5F2", fontSize: 11, lineHeight: 18, textAlign: "right", marginTop: 5 },
-  section: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E4EAF1", borderRadius: 20, padding: 18, gap: 10, elevation: 1 },
-  sectionTitle: { color: "#163A63", fontSize: 16, fontWeight: "900", textAlign: "right" },
-  hint: { color: "#728198", fontSize: 10, lineHeight: 16, textAlign: "right" },
-  staffRow: { gap: 8, flexDirection: "row-reverse", paddingVertical: 2 },
-  chip: { borderWidth: 1, borderColor: "#D5DEE9", borderRadius: 12, paddingHorizontal: 13, paddingVertical: 9, backgroundColor: "#F8FAFC" },
-  chipActive: { backgroundColor: "#163A63", borderColor: "#163A63" },
-  chipText: { color: "#42536A", fontSize: 10, fontWeight: "700" }, chipTextActive: { color: "#FFFFFF" },
-  types: { flexDirection: "row-reverse", gap: 8 }, type: { flex: 1, minHeight: 42, borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 10, alignItems: "center", justifyContent: "center" },
-  typeActive: { backgroundColor: "#163A63", borderColor: "#163A63" }, typeText: { color: "#42536A", fontSize: 10, fontWeight: "800" }, typeTextActive: { color: "#FFFFFF" },
-  input: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, color: "#163A63", fontSize: 12, fontWeight: "600" },
-  button: { backgroundColor: "#163A63", borderRadius: 12, paddingVertical: 13, alignItems: "center" }, buttonText: { color: "#FFFFFF", fontWeight: "900", fontSize: 12 },
-  item: { flexDirection: "row-reverse", alignItems: "center", gap: 12, borderTopWidth: 1, borderTopColor: "#EDF1F5", paddingVertical: 12 }, itemCopy: { flex: 1 },
-  itemTitle: { color: "#1E3148", fontWeight: "800", fontSize: 12, textAlign: "right" }, itemSub: { color: "#728198", fontSize: 10, textAlign: "right", marginTop: 3 },
-  amount: { minWidth: 88, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: "#EEF4FA", alignItems: "center" }, money: { color: "#163A63", fontWeight: "900", fontSize: 11 },
-  empty: { backgroundColor: "#F8FAFC", borderRadius: 12, padding: 14, alignItems: "center" }, muted: { color: "#728198", fontSize: 11, textAlign: "center" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 }, deniedTitle: { color: "#163A63", fontSize: 20, fontWeight: "900", textAlign: "center" },
-  delete: { color: "#163A63", fontSize: 10, fontWeight: "900" },
+  heroCopy: { flex: 1 }, heroIcon: { width: 48, height: 48, borderRadius: 15, backgroundColor: "#2B5685", alignItems: "center", justifyContent: "center" }, heroIconText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
+  eyebrow: { color: "#BFD3EA", fontSize: 9, fontWeight: "900", textAlign: "right" }, heroTitle: { color: "#FFFFFF", fontSize: 25, fontWeight: "900", textAlign: "right", marginTop: 4 }, heroSub: { color: "#D8E5F2", fontSize: 11, lineHeight: 18, textAlign: "right", marginTop: 5 },
+  section: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E4EAF1", borderRadius: 20, padding: 18, gap: 10 }, sectionTitle: { color: "#163A63", fontSize: 16, fontWeight: "900", textAlign: "right" }, hint: { color: "#728198", fontSize: 10, lineHeight: 16, textAlign: "right" },
+  staffRow: { gap: 8, flexDirection: "row-reverse", paddingVertical: 2 }, chip: { borderWidth: 1, borderColor: "#D5DEE9", borderRadius: 12, paddingHorizontal: 13, paddingVertical: 9, backgroundColor: "#F8FAFC" }, chipActive: { backgroundColor: "#163A63", borderColor: "#163A63" }, chipText: { color: "#42536A", fontSize: 10, fontWeight: "700" }, chipTextActive: { color: "#FFFFFF" },
+  types: { flexDirection: "row-reverse", gap: 8 }, type: { flex: 1, minHeight: 42, borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 10, alignItems: "center", justifyContent: "center" }, typeActive: { backgroundColor: "#163A63", borderColor: "#163A63" }, typeText: { color: "#42536A", fontSize: 10, fontWeight: "800" }, typeTextActive: { color: "#FFFFFF" },
+  input: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#CBD5E1", borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, color: "#163A63", fontSize: 12, fontWeight: "600" }, button: { backgroundColor: "#163A63", borderRadius: 12, paddingVertical: 13, alignItems: "center" }, buttonText: { color: "#FFFFFF", fontWeight: "900", fontSize: 12 },
+  item: { flexDirection: "row-reverse", alignItems: "center", gap: 12, borderTopWidth: 1, borderTopColor: "#EDF1F5", paddingVertical: 12 }, itemCopy: { flex: 1 }, itemTitle: { color: "#1E3148", fontWeight: "800", fontSize: 12, textAlign: "right" }, itemSub: { color: "#728198", fontSize: 10, textAlign: "right", marginTop: 3 }, amount: { minWidth: 88, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: "#EEF4FA", alignItems: "center" }, money: { color: "#163A63", fontWeight: "900", fontSize: 11 },
+  empty: { backgroundColor: "#F8FAFC", borderRadius: 12, padding: 14, alignItems: "center" }, muted: { color: "#728198", fontSize: 11, textAlign: "center" }, center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 }, errorTitle: { color: "#163A63", fontSize: 20, fontWeight: "900", textAlign: "center" }, delete: { color: "#163A63", fontSize: 10, fontWeight: "900" }
 });
