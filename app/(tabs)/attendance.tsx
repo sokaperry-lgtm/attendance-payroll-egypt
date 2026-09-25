@@ -37,6 +37,22 @@ export default function AttendanceScreen() {
   const absent = records.filter(r => r.status === "غياب").length;
   const totalLateMinutes = records.reduce((sum, r) => sum + (r.lateMinutes || 0), 0);
   const rate = records.length ? Math.round((present / records.length) * 100) : 0;
+  const recentRecords = records.slice(0, 7);
+  const previousRecords = records.slice(7, 14);
+  const recentRate = recentRecords.length ? Math.round((recentRecords.filter(r => r.status === "حاضر" || r.status === "متأخر").length / recentRecords.length) * 100) : rate;
+  const previousRate = previousRecords.length ? Math.round((previousRecords.filter(r => r.status === "حاضر" || r.status === "متأخر").length / previousRecords.length) * 100) : recentRate;
+  const attendanceTrend = recentRate - previousRate;
+  const recentLateMinutes = recentRecords.reduce((sum, r) => sum + (r.lateMinutes || 0), 0);
+  const previousLateMinutes = previousRecords.reduce((sum, r) => sum + (r.lateMinutes || 0), 0);
+  const smartAttendance = !records.length
+    ? { title: "في انتظار أول بيانات", text: "بمجرد تسجيل الحضور، هنبدأ نعرض اتجاه الالتزام والتأخير تلقائيًا." }
+    : attendanceTrend >= 5
+      ? { title: "الالتزام بيتحسن", text: `معدل الحضور في آخر 7 سجلات ${recentRate}% مقابل ${previousRate}% في الفترة السابقة.` }
+      : attendanceTrend <= -5
+        ? { title: "محتاج متابعة", text: `معدل الحضور نزل إلى ${recentRate}% مقارنةً بـ ${previousRate}% في الفترة السابقة.` }
+        : recentLateMinutes < previousLateMinutes
+          ? { title: "التأخير بيتحسن", text: `دقائق التأخير الأخيرة أقل من الفترة السابقة بـ ${previousLateMinutes - recentLateMinutes} دقيقة.` }
+          : { title: "الحضور مستقر", text: `معدل الحضور الحالي ${rate}% مع ${totalLateMinutes} دقيقة تأخير إجماليًا.` };
 
   return (
     <ScreenContainer>
@@ -137,7 +153,16 @@ export default function AttendanceScreen() {
   ))}
 </View>
 
-<View style={styles.insight}>
+<View style={styles.smartInsight}>
+              <View style={styles.smartInsightIcon}><Text style={styles.smartInsightIconText}>✦</Text></View>
+              <View style={styles.smartInsightCopy}>
+                <Text style={styles.smartInsightEyebrow}>SMART ATTENDANCE INSIGHT</Text>
+                <Text style={styles.smartInsightTitle}>{smartAttendance.title}</Text>
+                <Text style={styles.smartInsightText}>{smartAttendance.text}</Text>
+              </View>
+            </View>
+
+            <View style={styles.insight}>
               <View style={styles.insightIcon}>
                 <IconSymbol name={late > 0 ? "clock" : "checkmark"} size={18} color="#163A63" />
               </View>
@@ -291,6 +316,13 @@ const styles = StyleSheet.create({
   approveAbsenceText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
   cancelAbsence: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D9E6F2", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 11 },
   cancelAbsenceText: { color: "#31577F", fontSize: 10, fontWeight: "800" },
+  smartInsight:{backgroundColor:"#F7F9FC",borderRadius:18,padding:15,borderWidth:1,borderColor:"#D9E2EC",flexDirection:"row-reverse",alignItems:"center",gap:11},
+  smartInsightIcon:{width:40,height:40,borderRadius:13,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},
+  smartInsightIconText:{color:"#FFFFFF",fontSize:18,fontWeight:"900"},
+  smartInsightCopy:{flex:1},
+  smartInsightEyebrow:{color:"#667085",fontSize:9,fontWeight:"900",letterSpacing:1,textAlign:"right"},
+  smartInsightTitle:{color:"#163A63",fontSize:14,fontWeight:"900",textAlign:"right",marginTop:2},
+  smartInsightText:{color:"#667085",fontSize:10,fontWeight:"600",textAlign:"right",lineHeight:17,marginTop:2},
   insight: {
     backgroundColor: "#F2F5F8", borderRadius: 18, padding: 14,
     borderWidth: 1, borderColor: "#D9E6F2",
