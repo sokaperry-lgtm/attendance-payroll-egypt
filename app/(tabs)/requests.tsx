@@ -33,6 +33,16 @@ export default function RequestsScreen() {
     item.source === "attendance" && item.exceptionKind === "absence" && item.status === "قيد المراجعة"
   );
   const isLeaveType = type === "إجازة" || type === "إجازة مرضية" || type === "إجازة طارئة";
+  const pendingCount = requests.filter((r:any) => r.status === "قيد المراجعة").length;
+  const approvedCount = requests.filter((r:any) => r.status === "مقبول").length;
+  const annualRemaining = Math.max(0, (leaveBalance.data?.annualDays ?? 21) - (leaveBalance.data?.annualUsed ?? 0));
+  const smartRequestInsight = pendingCount > 0
+    ? { title: "عندك طلبات قيد المراجعة", text: `يوجد ${pendingCount} طلب يحتاج قرار أو متابعة.` }
+    : annualRemaining <= 3
+      ? { title: "رصيد الإجازات قرب يخلص", text: `المتبقي من الإجازة السنوية ${annualRemaining} أيام.` }
+      : approvedCount > 0
+        ? { title: "الطلبات ماشية بشكل طبيعي", text: `تم اعتماد ${approvedCount} طلب حتى الآن، ولا توجد طلبات معلقة.` }
+        : { title: "مركز الطلبات جاهز", text: "مفيش طلبات معلقة حاليًا. تقدر تنشئ طلب جديد من هنا." };
 
   async function saveRequest() {
     if (!reason.trim()) { showAlert("بيانات ناقصة", "اكتب سبب الطلب أولًا."); return; }
@@ -99,6 +109,14 @@ export default function RequestsScreen() {
         </View>
       ))}
     </View> : null}
+    <View style={styles.smartInsight}>
+      <View style={styles.smartInsightIcon}><Text style={styles.smartInsightIconText}>✦</Text></View>
+      <View style={styles.smartInsightCopy}>
+        <Text style={styles.smartInsightEyebrow}>SMART REQUEST INSIGHT</Text>
+        <Text style={styles.smartInsightTitle}>{smartRequestInsight.title}</Text>
+        <Text style={styles.smartInsightText}>{smartRequestInsight.text}</Text>
+      </View>
+    </View>
     <View style={styles.requestsHero}>
       <View style={styles.requestsHeroIcon}><IconSymbol name="doc.text" size={22} color="#FFFFFF" /></View>
       <View style={styles.requestsHeroCopy}><Text style={styles.requestsHeroTitle}>مركز الطلبات</Text><Text style={styles.requestsHeroText}>قدّم طلبك وتابع حالته من مكان واحد.</Text></View>
@@ -166,6 +184,13 @@ const styles = StyleSheet.create({
   absenceCancelText: { color: "#31577F", fontSize: 10, fontWeight: "900" },
 
   detailModal:{backgroundColor:"#FFFFFF",borderTopLeftRadius:26,borderTopRightRadius:26,padding:20,gap:10},detailHead:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},detailTitle:{color:"#172033",fontSize:20,fontWeight:"900"},closeText:{color:"#163A63",fontSize:11},detailType:{color:"#163A63",fontSize:18,fontWeight:"800",textAlign:"right"},detailDates:{color:"#667085",fontSize:12,textAlign:"right"},detailStatus:{alignSelf:"flex-end",backgroundColor:"#EEF4FB",borderRadius:99,paddingHorizontal:12,paddingVertical:6},detailStatusText:{color:"#31577F",fontSize:10,fontWeight:"800"},detailLabel:{color:"#667085",fontSize:10,fontWeight:"700",textAlign:"right",marginTop:10},detailReason:{color:"#172033",fontSize:13,lineHeight:20,textAlign:"right"},timeline:{backgroundColor:"#172033",borderRadius:14,padding:13,marginTop:8},timelineTitle:{color:"#FFFFFF",fontSize:12,fontWeight:"800",textAlign:"right"},timelineText:{color:"#D9E6F2",fontSize:11,lineHeight:18,textAlign:"right",marginTop:4},
+  smartInsight:{backgroundColor:"#F7F9FC",borderRadius:18,padding:15,borderWidth:1,borderColor:"#D9E2EC",flexDirection:"row-reverse",alignItems:"center",gap:11},
+  smartInsightIcon:{width:40,height:40,borderRadius:13,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},
+  smartInsightIconText:{color:"#FFFFFF",fontSize:18,fontWeight:"900"},
+  smartInsightCopy:{flex:1},
+  smartInsightEyebrow:{color:"#667085",fontSize:9,fontWeight:"900",letterSpacing:1,textAlign:"right"},
+  smartInsightTitle:{color:"#163A63",fontSize:14,fontWeight:"900",textAlign:"right",marginTop:2},
+  smartInsightText:{color:"#667085",fontSize:10,fontWeight:"600",textAlign:"right",lineHeight:17,marginTop:2},
   requestsHero: { backgroundColor: "#163A63", borderRadius: 23, padding: 18, flexDirection: "row-reverse", alignItems: "center", gap: 12 },
   requestsHeroIcon: { width: 45, height: 45, borderRadius: 14, backgroundColor: "#163A63", alignItems: "center", justifyContent: "center" },
   requestsHeroCopy: { flex: 1 },
