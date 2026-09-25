@@ -104,6 +104,19 @@ export default function ReportsScreen() {
 
         <View style={styles.quickActions}><View><Text style={styles.quickTitle}>مركز التقارير</Text><Text style={styles.quickHint}>تقارير الحضور والرواتب والفريق في مكان واحد</Text></View><View style={styles.quickActionButtons}><Pressable onPress={handleExport} disabled={exporting} style={({ pressed }) => [styles.pdfMiniButton, pressed && styles.pressed]}><Text style={styles.pdfMiniText}>{exporting ? "..." : "تصدير PDF"}</Text></Pressable></View></View>
 
+        {reportView === "overview" && <View style={styles.smartAlerts}>
+          <View style={styles.smartAlertsHeader}>
+            <View><Text style={styles.smartEyebrow}>SMART ALERTS</Text><Text style={styles.smartAlertsTitle}>مركز التنبيهات الذكية</Text><Text style={styles.smartAlertsSub}>أهم النقاط التي تستحق المتابعة من بيانات التقرير الحالي</Text></View>
+            <View style={styles.smartBadge}><IconSymbol name="sparkles" size={14} color={UI.primary} /><Text style={styles.smartBadgeText}>تحليل تلقائي</Text></View>
+          </View>
+          <View style={[styles.smartAlertGrid, compact && styles.smartAlertGridCompact]}>
+            <SmartAlert icon="clock" title={summary.lateMinutes > Math.max(summary.staffCount * 30, 30) ? "التأخير مرتفع" : "التأخير ضمن المعدل"} text={summary.lateMinutes > Math.max(summary.staffCount * 30, 30) ? `إجمالي ${summary.lateMinutes} دقيقة تأخير تحتاج مراجعة.` : `إجمالي التأخير ${summary.lateMinutes} دقيقة في النطاق الحالي.`} tone={summary.lateMinutes > Math.max(summary.staffCount * 30, 30) ? "warning" : "normal"} />
+            <SmartAlert icon="calendar.badge.exclamationmark" title={summary.absentDays > Math.max(summary.staffCount * 2, 2) ? "الغياب يحتاج متابعة" : "الغياب محدود"} text={summary.absentDays > Math.max(summary.staffCount * 2, 2) ? `${summary.absentDays} يوم غياب مسجل في التقرير.` : `${summary.absentDays} يوم غياب مسجل حتى الآن.`} tone={summary.absentDays > Math.max(summary.staffCount * 2, 2) ? "warning" : "normal"} />
+            <SmartAlert icon="doc.text.fill" title={summary.pendingRequests > 0 ? "طلبات معلقة" : "لا توجد طلبات معلقة"} text={summary.pendingRequests > 0 ? `${summary.pendingRequests} طلب يحتاج مراجعة أو متابعة.` : "لا توجد طلبات معلقة ضمن البيانات الحالية."} tone={summary.pendingRequests > 0 ? "info" : "normal"} />
+            {adminPayrollView && <SmartAlert icon="banknote.fill" title={payrollSummary.approvedPayroll < payrollSummary.totalPayrollRows ? "اعتماد الرواتب غير مكتمل" : "الرواتب معتمدة"} text={payrollSummary.approvedPayroll < payrollSummary.totalPayrollRows ? `${payrollSummary.totalPayrollRows - payrollSummary.approvedPayroll} مسير بانتظار الاعتماد.` : "كل المسيرات الظاهرة في التقرير معتمدة."} tone={payrollSummary.approvedPayroll < payrollSummary.totalPayrollRows ? "warning" : "normal"} />}
+          </View>
+        </View>}
+
         {reportView === "overview" && <View style={styles.insightGrid}><InsightCard label="طاقم التقرير" value={summary.staffCount} note="موظف داخل النطاق الحالي" icon="person.3.fill" /><InsightCard label="الغياب" value={summary.absentDays} note="يوم غياب مسجل" icon="calendar.badge.exclamationmark" /><InsightCard label="متوسط التأخير" value={`${summary.staffCount ? Math.round(summary.lateMinutes / Math.max(summary.staffCount, 1)) : 0} د`} note="تقريبًا لكل موظف" icon="clock" /><InsightCard label="الطلبات" value={summary.pendingRequests} note="طلبات تحتاج متابعة" icon="doc.text.fill" /></View>}
 
         {reportView === "attendance" && <><SectionTitle title="تقرير الحضور التفصيلي" subtitle="قراءة مباشرة لكل موظف في الشهر المحدد" /><SurfaceCard style={styles.tableCard}><View style={styles.tableHeader}><Text style={styles.tableHeaderText}>الموظف</Text><Text style={styles.tableHeaderText}>الحضور</Text><Text style={styles.tableHeaderText}>الغياب</Text><Text style={styles.tableHeaderText}>التأخير</Text><Text style={styles.tableHeaderText}>النسبة</Text></View>{attendanceByEmployee.slice(0, 12).map((employee) => <View key={employee.id} style={styles.tableRow}><View style={styles.tableEmployee}><View style={styles.tableAvatar}><Text style={styles.tableAvatarText}>{employee.name.slice(0, 1)}</Text></View><View><Text style={styles.tableName}>{employee.name}</Text><Text style={styles.tableMeta}>{employee.department || "عام"}</Text></View></View><Text style={styles.tableValue}>{employee.presentDays}</Text><Text style={styles.tableValue}>{employee.absentDays}</Text><Text style={styles.tableValue}>{employee.lateMinutes} د</Text><Text style={styles.tableRate}>{employee.rate}%</Text></View>)}{!attendanceByEmployee.length && <Text style={styles.empty}>لا توجد بيانات لهذا النطاق.</Text>}</SurfaceCard></>}
@@ -165,6 +178,11 @@ export default function ReportsScreen() {
       </Modal>
     </ScreenContainer>
   );
+}
+
+function SmartAlert({ icon, title, text, tone }: { icon: string; title: string; text: string; tone: "warning" | "info" | "normal" }) {
+  const palette = tone === "warning" ? { bg: "#FFF8EB", icon: "#8A6420" } : tone === "info" ? { bg: "#EEF4FA", icon: UI.primary } : { bg: "#F8FAFC", icon: "#667085" };
+  return <View style={styles.smartAlert}><View style={[styles.smartAlertIcon, { backgroundColor: palette.bg }]}><IconSymbol name={icon as never} size={15} color={palette.icon} /></View><View style={styles.smartAlertCopy}><Text style={styles.smartAlertTitle}>{title}</Text><Text style={styles.smartAlertText}>{text}</Text></View></View>;
 }
 
 function InsightCard({ label, value, note, icon }: { label: string; value: string | number; note: string; icon: string }) { return <View style={styles.insightCard}><View style={styles.insightIcon}><IconSymbol name={icon as never} size={15} color={UI.primary} /></View><Text style={styles.insightLabel}>{label}</Text><Text style={styles.insightValue}>{value}</Text><Text style={styles.insightNote}>{note}</Text></View>; }
