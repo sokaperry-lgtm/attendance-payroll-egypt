@@ -21,6 +21,14 @@ export default function NotificationsScreen() {
   const markAll = trpc.notifications.markAllRead.useMutation({ onSuccess: () => { q.refetch(); unreadCount.refetch(); } });
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const visible = useMemo(() => (q.data ?? []).filter((n) => filter === "all" || !n.readAt), [q.data, filter]);
+  const smart = useMemo(() => {
+    const items = q.data ?? [];
+    const unread = items.filter((n) => !n.readAt);
+    const urgent = unread.filter((n) => /طلب|غياب|تأخير|راتب|سلفة|اعتماد|مشكلة|رفض/i.test(`${n.title} ${n.body}`));
+    if (!unread.length) return { title: "أنت على اطلاع", text: "مفيش تحديثات غير مقروءة تحتاج متابعة دلوقتي.", count: 0 };
+    if (urgent.length) return { title: "في تحديثات محتاجة متابعة", text: `عندك ${urgent.length} إشعار مهم من إجمالي ${unread.length} غير مقروء.`, count: urgent.length };
+    return { title: "في إشعارات جديدة", text: `عندك ${unread.length} إشعار غير مقروء.`, count: unread.length };
+  }, [q.data]);
   const read = trpc.notifications.read.useMutation({
     onSuccess: () => { q.refetch(); unreadCount.refetch(); },
   });
@@ -37,6 +45,16 @@ export default function NotificationsScreen() {
           <View style={styles.iconBox}>
             <IconSymbol name="notifications" size={23} color={UI.navy} />
           </View>
+        </View>
+
+        <View style={styles.smartCard}>
+          <View style={styles.smartIcon}><Text style={styles.smartIconText}>✦</Text></View>
+          <View style={styles.smartCopy}>
+            <Text style={styles.smartEyebrow}>SMART ALERTS</Text>
+            <Text style={styles.smartTitle}>{smart.title}</Text>
+            <Text style={styles.smartText}>{smart.text}</Text>
+          </View>
+          {smart.count > 0 && <View style={styles.smartCount}><Text style={styles.smartCountText}>{smart.count}</Text></View>}
         </View>
 
         <View style={styles.toolbar}>
@@ -123,6 +141,15 @@ const styles = StyleSheet.create({
   emptyIcon: { width: 54, height: 54, borderRadius: 18, backgroundColor: UI.navySoft, alignItems: "center", justifyContent: "center", marginBottom: 4 },
   emptyTitle: { color: UI.text, fontSize: 16, fontWeight: "900" },
   emptyText: { color: UI.muted, fontSize: 11 },
+  smartCard:{backgroundColor:"#F7F9FC",borderWidth:1,borderColor:"#D9E2EC",borderRadius:18,padding:15,flexDirection:"row-reverse",alignItems:"center",gap:11},
+  smartIcon:{width:40,height:40,borderRadius:13,backgroundColor:UI.navy,alignItems:"center",justifyContent:"center"},
+  smartIconText:{color:UI.white,fontSize:18,fontWeight:"900"},
+  smartCopy:{flex:1},
+  smartEyebrow:{color:UI.muted,fontSize:9,fontWeight:"900",letterSpacing:1,textAlign:"right"},
+  smartTitle:{color:UI.navy,fontSize:14,fontWeight:"900",textAlign:"right",marginTop:2},
+  smartText:{color:UI.muted,fontSize:10,fontWeight:"600",textAlign:"right",lineHeight:17,marginTop:2},
+  smartCount:{minWidth:30,height:30,borderRadius:10,backgroundColor:UI.navySoft,alignItems:"center",justifyContent:"center"},
+  smartCountText:{color:UI.navy,fontSize:11,fontWeight:"900"},
   toolbar: { backgroundColor: UI.white, borderWidth: 1, borderColor: UI.border, borderRadius: 16, padding: 8, flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", gap: 8 },
   filters: { flexDirection: "row-reverse", gap: 6, flex: 1 },
   filter: { borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, backgroundColor: "#F8FAFC" },
