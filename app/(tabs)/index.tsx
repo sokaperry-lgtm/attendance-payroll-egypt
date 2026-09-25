@@ -153,6 +153,26 @@ export default function HomeScreen(){
         {isManagement ? <Insight icon="banknote" value={payrollTotal.toLocaleString("ar-EG")} label="صافي الرواتب" meta="هذا الشهر" /> : <Insight icon="notifications" value={String(unread)} label="التنبيهات" meta="تحتاج انتباهك" />}
       </View>
 
+      <View style={styles.smartCard}>
+        <View style={styles.smartHeader}>
+          <View><Text style={styles.smartEyebrow}>SMART INSIGHTS</Text><Text style={styles.smartTitle}>مؤشرات ذكية من بيانات اليوم</Text></View>
+          <View style={styles.smartBadge}><IconSymbol name="sparkles" size={14} color="#163A63" /><Text style={styles.smartBadgeText}>تحليل تلقائي</Text></View>
+        </View>
+        <View style={[styles.smartGrid, isMobile && styles.smartGridMobile]}>
+          {isManagement ? <>
+            <SmartInsight icon="clock" title={teamLate >= 60 ? "التأخير يحتاج متابعة" : "التأخير تحت السيطرة"} text={teamLate >= 60 ? `إجمالي التأخير وصل إلى ${teamLate} دقيقة اليوم.` : `إجمالي التأخير اليوم ${teamLate} دقيقة فقط.`} />
+            <SmartInsight icon="person.2.fill" title={teamAbsent > 0 ? "يوجد غياب اليوم" : "لا يوجد غياب مسجل"} text={teamAbsent > 0 ? `${teamAbsent} موظف مسجل كغياب اليوم.` : "كل السجلات الحالية لا تحتوي على غياب."} />
+            <SmartInsight icon="checkmark" title={teamCheckedOut < teamPresent && teamPresent > 0 ? "هناك ورديات مفتوحة" : "الانصرافات متابَعة"} text={teamCheckedOut < teamPresent && teamPresent > 0 ? `${teamPresent-teamCheckedOut} وردية ما زالت مفتوحة.` : "الانصرافات المسجلة متوافقة مع الحضور الحالي."} />
+          </> : role === "supervisor" ? <>
+            <SmartInsight icon="clock" title={teamLate > 30 ? "راجع التأخير" : "التأخير محدود"} text={`إجمالي التأخير المسجل لفريقك اليوم: ${teamLate} دقيقة.`} />
+            <SmartInsight icon="doc.text.fill" title={unread > 0 ? "طلبات تحتاج انتباه" : "لا توجد تنبيهات جديدة"} text={unread > 0 ? `${unread} تنبيه/طلب غير مقروء.` : "لا توجد تنبيهات غير مقروءة حالياً."} />
+          </> : <>
+            <SmartInsight icon="checkmark" title={checkedIn ? "يومك بدأ" : "ابدأ يومك"} text={checkedIn ? "تم تسجيل حضورك ويمكنك متابعة الوردية من النظام." : "سجل حضورك من زر الحضور لبدء متابعة يوم العمل."} />
+            <SmartInsight icon="notifications" title={unread > 0 ? "لديك تنبيهات" : "كل شيء هادئ"} text={unread > 0 ? `لديك ${unread} تنبيه غير مقروء.` : "لا توجد تنبيهات غير مقروءة حالياً."} />
+          </>}
+        </View>
+      </View>
+
       <View style={[styles.grid, isMobile && styles.gridMobile]}>
         <View style={[styles.card,styles.attendancePanel,isMobile&&styles.panelMobile]}>
           <View style={styles.cardHeader}><Text style={styles.cardTitle}>أداء الحضور</Text><Text style={styles.cardMeta}>آخر 7 أيام</Text></View>
@@ -178,11 +198,15 @@ function Insight({ icon, value, label, meta }: { icon: any; value: string; label
   </View>;
 }
 
+function SmartInsight({ icon, title, text }: { icon: any; title: string; text: string }) {
+  return <View style={styles.smartItem}><View style={styles.smartIcon}><IconSymbol name={icon} size={15} color="#163A63" /></View><View style={styles.smartCopy}><Text style={styles.smartItemTitle}>{title}</Text><Text style={styles.smartItemText}>{text}</Text></View></View>;
+}
+
 function Kpi({icon,value,label,note}:{icon:any;value:string;label:string;note:string}){return <View style={styles.kpi}><View style={styles.kpiTop}><View style={styles.kpiIcon}><IconSymbol name={icon} size={17} color="#163A63"/></View><View style={styles.kpiLine}/></View><Text style={styles.kpiValue}>{value}</Text><Text style={styles.kpiLabel}>{label}</Text><Text style={styles.kpiNote}>{note}</Text></View>}
 function TimeRow({label,value}:{label:string;value:string}){return <View style={styles.timeRow}><Text style={styles.timeValue}>{value}</Text><Text style={styles.timeLabel}>{label}</Text></View>}
 
 const styles=StyleSheet.create({
-  page:{padding:30,paddingBottom:70,gap:22,maxWidth:1280,width:"100%",alignSelf:"center"},pageMobile:{padding:14,paddingBottom:34,gap:14},
+  smartCard:{backgroundColor:"#F8FAFC",borderRadius:20,borderWidth:1,borderColor:"#E4E7EC",padding:18},smartHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",gap:12},smartEyebrow:{fontSize:9,fontWeight:"900",letterSpacing:1.2,color:"#98A2B3",textAlign:"right"},smartTitle:{fontSize:16,fontWeight:"900",color:"#172033",marginTop:3,textAlign:"right"},smartBadge:{flexDirection:"row",alignItems:"center",gap:5,paddingHorizontal:9,paddingVertical:6,borderRadius:999,backgroundColor:"#EEF3F8"},smartBadgeText:{fontSize:9,fontWeight:"800",color:"#163A63"},smartGrid:{flexDirection:"row-reverse",gap:10,marginTop:14,flexWrap:"wrap"},smartGridMobile:{flexDirection:"column"},smartItem:{flex:1,minWidth:220,flexDirection:"row-reverse",alignItems:"flex-start",gap:10,backgroundColor:"#FFFFFF",borderRadius:14,borderWidth:1,borderColor:"#E8ECF1",padding:13},smartIcon:{width:30,height:30,borderRadius:10,backgroundColor:"#EEF3F8",alignItems:"center",justifyContent:"center"},smartCopy:{flex:1},smartItemTitle:{fontSize:11,fontWeight:"900",color:"#172033",textAlign:"right"},smartItemText:{fontSize:9,color:"#667085",lineHeight:15,marginTop:3,textAlign:"right"},  page:{padding:30,paddingBottom:70,gap:22,maxWidth:1280,width:"100%",alignSelf:"center"},pageMobile:{padding:14,paddingBottom:34,gap:14},
   header:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},  headerMobile:{flexDirection:"column",alignItems:"stretch",gap:12},
   headerRightMobile:{justifyContent:"space-between",width:"100%",gap:10},
   heroMobile:{flexDirection:"column",padding:16,borderRadius:20,gap:14},
