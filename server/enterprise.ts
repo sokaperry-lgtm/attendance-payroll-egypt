@@ -261,11 +261,14 @@ export async function setMemberRole(actorId: number, staffAccountId: number, rol
     throw new Error("لا يمكن تغيير صلاحيات حساب المالك.");
   }
   if (role === "owner") throw new Error("لا يمكن تعيين دور المالك من شاشة الموظفين.");
-  if (!target || target.companyId !== actor.companyId || !target.active) {
-    throw new Error("الموظف غير موجود في الشركة");
-  }
   if (staffAccountId === actorId) {
     throw new Error("لا يمكن تغيير دور حسابك من هذه الشاشة.");
+  }
+
+  // Managers can manage operational roles, but only the owner can grant
+  // company-wide HR or accounting access.
+  if (actor.role === "manager" && ["hr", "accountant"].includes(role)) {
+    throw new Error("تعيين HR أو المحاسب متاح لمالك الشركة فقط.");
   }
 
   // Keep the legacy staff role aligned with the company role. Only the
