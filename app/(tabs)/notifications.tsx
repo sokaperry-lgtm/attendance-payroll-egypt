@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useMemo, useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -25,7 +25,7 @@ export default function NotificationsScreen() {
 
   return (
     <ScreenContainer>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, compact && styles.contentCompact]} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>WORKSPACE · ALERTS</Text>
@@ -88,7 +88,7 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 22, paddingBottom: 60, gap: 12, maxWidth: 900, width: "100%", alignSelf: "center" },
+  content: { padding: 22, paddingBottom: 60, gap: 12, maxWidth: 900, width: "100%", alignSelf: "center" }, contentCompact: { padding: 14, paddingBottom: 34, gap: 10 },
   header: {
     backgroundColor: UI.white,
     borderWidth: 1,
