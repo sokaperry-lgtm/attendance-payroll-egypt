@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, getStaffAccountById } from "./db";
 import * as dbQueries from "./db";
 import { calculateEgyptPayroll } from "./egypt-payroll";
@@ -10,6 +10,38 @@ import {
 } from "../drizzle/schema";
 
 export type CompanyRole = "owner" | "hr" | "manager" | "supervisor" | "accountant" | "employee";
+export const PERMISSION_KEYS = ["dashboard.view","employees.view","employees.manage","attendance.view","attendance.manage","requests.view","requests.review","payroll.view","payroll.manage","payroll.approve","reports.view","reports.export","branches.manage","company.manage","roles.manage","audit.view","documents.view","documents.manage","advances.manage","notifications.manage"] as const;
+export type PermissionKey = typeof PERMISSION_KEYS[number];
+export type PermissionMap = Record<PermissionKey, boolean>;
+const ROLE_DEFAULTS: Record<CompanyRole, PermissionMap> = {
+  owner: Object.fromEntries(PERMISSION_KEYS.map((k) => [k, true])) as PermissionMap,
+  manager: Object.fromEntries(PERMISSION_KEYS.map((k) => [k, !["company.manage"].includes(k)])) as PermissionMap,
+  hr: Object.fromEntries(PERMISSION_KEYS.map((k) => [k, ["dashboard.view","employees.view","employees.manage","attendance.view","attendance.manage","requests.view","requests.review","reports.view","reports.export","documents.view","documents.manage","notifications.manage"].includes(k)])) as PermissionMap,
+  accountant: Object.fromEntries(PERMISSION_KEYS.map((k) => [k, ["dashboard.view","payroll.view","payroll.manage","payroll.approve","reports.view","reports.export"].includes(k)])) as PermissionMap,
+  supervisor: Object.fromEntries(PERMISSION_KEYS.map((k) => [k, ["dashboard.view","attendance.view","attendance.manage","requests.view","requests.review","reports.view","reports.export"].includes(k)])) as PermissionMap,
+  employee: Object.fromEntries(PERMISSION_KEYS.map((k) => [k, ["dashboard.view","attendance.view","requests.view","reports.view","notifications.manage"].includes(k)])) as PermissionMap,
+};
+async function ensurePermissionStore() {
+  const db = await getDb(); if (!db) return;
+  await db.execute(sql.raw("CREATE TABLE IF NOT EXISTS member_permissions (id INT AUTO_INCREMENT PRIMARY KEY, companyId INT NOT NULL, staffAccountId INT NOT NULL UNIQUE, permissions TEXT NOT NULL, updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)"));
+}
+export async function getEffectivePermissions(staffAccountId: number): Promise<PermissionMap> {
+  const membership = await getMembership(staffAccountId); const role = (membership?.role ?? "employee") as CompanyRole; const defaults = { ...ROLE_DEFAULTS[role] };
+  if (role === "owner") return defaults; await ensurePermissionStore(); const db = await getDb(); if (!db || !membership) return defaults;
+  const rows = await db.execute(sql`SELECT permissions FROM member_permissions WHERE companyId = ${membership.companyId} AND staffAccountId = ${staffAccountId} LIMIT 1`);
+  const raw = (rows as any)[0]?.[0]?.permissions; if (!raw) return defaults;
+  try { return { ...defaults, ...(JSON.parse(raw) as Partial<PermissionMap>) }; } catch { return defaults; }
+}
+export async function assertPermission(staffAccountId: number, permission: PermissionKey) { const permissions = await getEffectivePermissions(staffAccountId); if (!permissions[permission]) throw new Error("غير مصرح لهذا الإجراء."); return permissions; }
+export async function listPermissionMembers(actorId: number) { const actor = await getCompanyForStaff(actorId); if (!actor || actor.role !== "owner") throw new Error("إدارة الصلاحيات متاحة لمالك الشركة فقط."); const members = await listCompanyMembers(actorId); return Promise.all(members.map(async (member:any) => ({ ...member, permissions: await getEffectivePermissions(Number(member.id)) }))); }
+export async function updateMemberPermissions(actorId: number, staffAccountId: number, permissions: Partial<PermissionMap>) {
+  const actor = await getCompanyForStaff(actorId); if (!actor || actor.role !== "owner") throw new Error("إدارة الصلاحيات متاحة لمالك الشركة فقط."); const access = await assertStaffInCompany(actorId, staffAccountId);
+  if (access.target.role === "owner") throw new Error("لا يمكن تعديل صلاحيات المالك."); await ensurePermissionStore(); const db = await getDb(); if (!db) throw new Error("Database not available");
+  const current = await getEffectivePermissions(staffAccountId); const next = { ...current, ...permissions };
+  await db.execute(sql`INSERT INTO member_permissions (companyId, staffAccountId, permissions) VALUES (${actor.companyId}, ${staffAccountId}, ${JSON.stringify(next)}) ON DUPLICATE KEY UPDATE permissions = VALUES(permissions)`);
+  await writeAudit(actorId, actor.companyId, "permissions.updated", "staff", String(staffAccountId), next); return next;
+}
+
 
 export async function getMembership(staffAccountId: number) {
   const db = await getDb(); if (!db) return undefined;
