@@ -91,6 +91,53 @@ export default function PayrollScreen() {
     () => rows.filter(r => filter === "all" || r.status === filter),
     [rows, filter]
   );
+  const smartPayrollInsight = useMemo(() => {
+    const pending = rows.filter((r) => r.status !== "approved").length;
+    const adjustmentRows = Array.isArray(adjustments.data) ? adjustments.data : [];
+    const advanceRows = Array.isArray(advances.data) ? advances.data : [];
+    const activeAdvances = advanceRows.filter((a: any) => a?.status !== "cancelled" && a?.status !== "closed").length;
+    const adjustmentCount = adjustmentRows.length;
+
+    if (pending > 0) {
+      return {
+        title: "المسير يحتاج مراجعة",
+        value: String(pending),
+        meta: `${pending} موظف ما زالوا بدون اعتماد في ${monthLabel(month)}.`,
+        tone: "warning" as const,
+      };
+    }
+    if (adjustmentCount > 0) {
+      return {
+        title: "حركات راتب تحتاج متابعة",
+        value: String(adjustmentCount),
+        meta: `تم تسجيل ${adjustmentCount} تعديل/حركة على مسير ${monthLabel(month)}.`,
+        tone: "info" as const,
+      };
+    }
+    if (activeAdvances > 0) {
+      return {
+        title: "السلف النشطة",
+        value: String(activeAdvances),
+        meta: "هناك سلف مفتوحة مرتبطة بالموظفين وتحتاج متابعة دورية.",
+        tone: "info" as const,
+      };
+    }
+    if (rows.length > 0) {
+      return {
+        title: "المسير جاهز",
+        value: "100%",
+        meta: `تم اعتماد كل سجلات ${monthLabel(month)} الموجودة حاليًا.`,
+        tone: "success" as const,
+      };
+    }
+    return {
+      title: "بانتظار بيانات المسير",
+      value: "—",
+      meta: "أنشئ المسير لهذا الشهر لبدء المراجعة الذكية.",
+      tone: "info" as const,
+    };
+  }, [rows, adjustments.data, advances.data, month]);
+
   const stats = useMemo(() => {
     const gross = rows.reduce((s, r) => s + r.grossSalary, 0);
     const deductions = rows.reduce((s, r) => s + r.employeeSocialInsurance + r.employeeIncomeTax + r.absenceDeduction + r.lateDeduction + (r.earlyDeduction ?? 0) + r.otherDeductions + r.advances, 0);
@@ -177,6 +224,15 @@ export default function PayrollScreen() {
           <Kpi label="الخصومات" value={formatMoney(stats.deductions)} />
           <Kpi label="صافي المسير" value={formatMoney(stats.net)} />
           <Kpi label="تم اعتمادهم" value={String(stats.approved)} />
+        </View>
+        <View style={styles.smartPayrollCard}>
+          <View style={styles.smartPayrollIcon}><IconSymbol name="sparkles" size={18} color="#1677D2" /></View>
+          <View style={styles.smartPayrollCopy}>
+            <Text style={styles.smartPayrollKicker}>SMART PAYROLL</Text>
+            <Text style={styles.smartPayrollTitle}>{smartPayrollInsight.title}</Text>
+            <Text style={styles.smartPayrollMeta}>{smartPayrollInsight.meta}</Text>
+          </View>
+          <View style={styles.smartPayrollValue}><Text style={styles.smartPayrollValueText}>{smartPayrollInsight.value}</Text><Text style={styles.smartPayrollValueLabel}>مؤشر</Text></View>
         </View>
 
         <View style={styles.approvalCard}><View style={styles.approvalTop}><View><Text style={styles.approvalTitle}>جاهزية المسير</Text><Text style={styles.approvalText}>{stats.approved} من {rows.length} موظف تم اعتمادهم</Text></View><Text style={styles.approvalPercent}>{rows.length ? Math.round((stats.approved / rows.length) * 100) : 0}%</Text></View><View style={styles.progressTrack}><View style={[styles.progressFill,{width:`${rows.length ? Math.round((stats.approved / rows.length) * 100) : 0}%`}]} /></View></View>
