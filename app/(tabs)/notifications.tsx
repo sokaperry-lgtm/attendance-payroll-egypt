@@ -14,6 +14,8 @@ const UI = {
 };
 
 export default function NotificationsScreen() {
+  const { width } = useWindowDimensions();
+  const compact = width < 520;
   const q = trpc.notifications.list.useQuery();
   const unreadCount = trpc.notifications.unreadCount.useQuery();
   const markAll = trpc.notifications.markAllRead.useMutation({ onSuccess: () => { q.refetch(); unreadCount.refetch(); } });
