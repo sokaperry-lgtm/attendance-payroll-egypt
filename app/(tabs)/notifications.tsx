@@ -21,6 +21,7 @@ export default function NotificationsScreen() {
   const markAll = trpc.notifications.markAllRead.useMutation({ onSuccess: () => { q.refetch(); unreadCount.refetch(); } });
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const visible = useMemo(() => (q.data ?? []).filter((n) => filter === "all" || !n.readAt), [q.data, filter]);
+  const smartNotifications = useMemo(() => { const items=q.data??[]; const unreadItems=items.filter((n)=>!n.readAt); const urgent=unreadItems.filter((n)=>/مهم|عاجل|تأخير|غياب|رفض|خطأ|راتب|اعتماد/.test(`${n.title} ${n.body}`)).length; const operational=unreadItems.filter((n)=>/حضور|طلب|وردية|إجازة|جدول/.test(`${n.title} ${n.body}`)).length; return {urgent,operational,unread:unreadItems.length}; }, [q.data]);
   const smart = useMemo(() => {
     const items = q.data ?? [];
     const unread = items.filter((n) => !n.readAt);
@@ -56,6 +57,17 @@ export default function NotificationsScreen() {
           </View>
           {smart.count > 0 && <View style={styles.smartCount}><Text style={styles.smartCountText}>{smart.count}</Text></View>}
         </View>
+
+        {(smartNotifications.unread > 0 || (q.data ?? []).length > 0) && (
+          <View style={styles.smartPanel}>
+            <View style={styles.smartPanelIcon}><Text style={styles.smartPanelIconText}>✦</Text></View>
+            <View style={styles.smartPanelCopy}>
+              <Text style={styles.smartEyebrow}>SMART ALERTS</Text>
+              <Text style={styles.smartTitle}>{smartNotifications.unread ? `${smartNotifications.unread} تنبيه غير مقروء` : "مركز التنبيهات جاهز"}</Text>
+              <Text style={styles.smartText}>{smartNotifications.urgent > 0 ? `${smartNotifications.urgent} تنبيه يحتاج انتباه سريع · ${smartNotifications.operational} تنبيه تشغيلي` : smartNotifications.operational > 0 ? `${smartNotifications.operational} تنبيه تشغيلي للمتابعة · لا يوجد تنبيه عالي الأولوية` : "لا توجد تنبيهات عالية الأولوية حاليًا."}</Text>
+            </View>
+          </View>
+        )}
 
         <View style={styles.toolbar}>
           <View style={styles.filters}>
@@ -150,6 +162,13 @@ const styles = StyleSheet.create({
   smartText:{color:UI.muted,fontSize:10,fontWeight:"600",textAlign:"right",lineHeight:17,marginTop:2},
   smartCount:{minWidth:30,height:30,borderRadius:10,backgroundColor:UI.navySoft,alignItems:"center",justifyContent:"center"},
   smartCountText:{color:UI.navy,fontSize:11,fontWeight:"900"},
+  smartPanel:{backgroundColor:"#F7F9FC",borderWidth:1,borderColor:"#D9E2EC",borderRadius:18,padding:15,flexDirection:"row-reverse",alignItems:"center",gap:12},
+  smartPanelIcon:{width:42,height:42,borderRadius:14,backgroundColor:UI.navy,alignItems:"center",justifyContent:"center"},
+  smartPanelIconText:{color:UI.white,fontSize:20,fontWeight:"900"},
+  smartPanelCopy:{flex:1},
+  smartEyebrow:{color:UI.muted,fontSize:9,fontWeight:"900",letterSpacing:1,textAlign:"right"},
+  smartTitle:{color:UI.navy,fontSize:15,fontWeight:"900",textAlign:"right",marginTop:3},
+  smartText:{color:UI.muted,fontSize:11,fontWeight:"600",textAlign:"right",lineHeight:18,marginTop:3},
   toolbar: { backgroundColor: UI.white, borderWidth: 1, borderColor: UI.border, borderRadius: 16, padding: 8, flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", gap: 8 },
   filters: { flexDirection: "row-reverse", gap: 6, flex: 1 },
   filter: { borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, backgroundColor: "#F8FAFC" },
