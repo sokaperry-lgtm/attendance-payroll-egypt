@@ -75,6 +75,7 @@ export async function assertOperationalTarget(actorStaffAccountId: number, targe
 export async function listCompanyAttendance(staffAccountId: number) {
   const db = await getDb(); if (!db) return [];
   const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
+  if (!["owner","manager","hr","supervisor"].includes(m.role)) throw new Error("غير مصرح");
   const members = await db.select({ staffAccountId: companyMembers.staffAccountId }).from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
   const ids = members.map(x => x.staffAccountId);
   if (!ids.length) return [];
@@ -84,6 +85,7 @@ export async function listCompanyAttendance(staffAccountId: number) {
 export async function listCompanyStaff(staffAccountId: number) {
   const db = await getDb(); if (!db) return [];
   const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
+  if (!["owner","manager","hr"].includes(m.role)) throw new Error("غير مصرح");
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
   const ids = new Set(members.map(x => x.staffAccountId));
   const rows = ids.size
@@ -222,8 +224,9 @@ export async function toggleBranch(staffAccountId: number, branchId: number, act
 export async function assignMemberToBranch(actorId: number, staffAccountId: number, branchId: number | null) {
   const db = await getDb(); if (!db) throw new Error("Database not available");
   const m = await getCompanyForStaff(actorId); if (!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
-  const target = await getMembership(staffAccountId);
-  if (!target || target.companyId !== m.companyId || !target.active) throw new Error("الموظف غير موجود في الشركة");
+  const access = await assertOperationalTarget(actorId, staffAccountId);
+  const target = access.target;
+  if (target.companyId !== m.companyId || !target.active) throw new Error("الموظف غير موجود في الشركة");
   if (branchId !== null) {
     const branch = (await db.select().from(branches).where(and(eq(branches.id, branchId), eq(branches.companyId, m.companyId), eq(branches.active, true))).limit(1))[0];
     if (!branch) throw new Error("الفرع غير موجود أو موقوف");
@@ -253,6 +256,7 @@ export async function updateCompanyProfile(staffAccountId: number, input: { name
 export async function listCompanySchedules(staffAccountId: number) {
   const db = await getDb(); if (!db) return [];
   const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
+  if (!["owner","manager","hr","supervisor"].includes(m.role)) throw new Error("غير مصرح");
   const members = await db.select({ staffAccountId: companyMembers.staffAccountId }).from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
   const ids = new Set(members.map(row => row.staffAccountId));
   const rows = await db.select().from(weeklySchedules).orderBy(desc(weeklySchedules.scheduleDate));
@@ -591,6 +595,7 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
 export async function getAttendanceWorkSummary(staffAccountId: number, month: string) {
   const db = await getDb(); if (!db) return { employees: [], totalWorkMinutes: 0, totalOvertimeMinutes: 0 };
   const m = await getCompanyForStaff(staffAccountId); if (!m) return { employees: [], totalWorkMinutes: 0, totalOvertimeMinutes: 0 };
+  if (!["owner","manager","hr","supervisor"].includes(m.role)) throw new Error("غير مصرح");
 
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
   const ids = new Set(members.map(x => x.staffAccountId));
@@ -862,7 +867,7 @@ export async function waiveAttendanceException(actorId:number,input:{staffAccoun
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId);
   if(!m || !["owner","manager","hr","supervisor"].includes(m.role)) throw new Error("غير مصرح");
-  await assertStaffInCompany(actorId,input.staffAccountId);
+  await assertOperationalTarget(actorId,input.staffAccountId);
   await assertPayrollEditable(actorId,input.date.slice(0,7),input.staffAccountId);
   const row=(await db.select().from(attendanceRecords).where(and(eq(attendanceRecords.staffAccountId,input.staffAccountId),eq(attendanceRecords.date,input.date))).limit(1))[0];
   if(!row) throw new Error("سجل الحضور غير موجود.");
@@ -1037,7 +1042,7 @@ export async function reviewLeaveRequest(actorId:number,id:number,status:"مقب
   if(!existing || existing.source!=="request") throw new Error("طلب الإجازة غير موجود.");
   if(existing.status!=="قيد المراجعة") throw new Error("هذا الطلب تمت معالجته بالفعل.");
   if(!["إجازة","إجازة مرضية","إجازة طارئة"].includes(existing.type)) throw new Error("نوع الطلب ليس إجازة.");
-  await assertStaffInCompany(actorId,existing.staffAccountId);
+  await assertOperationalTarget(actorId,existing.staffAccountId);
   await assertPayrollEditable(actorId,existing.fromDate.slice(0,7),existing.staffAccountId);
   if(existing.toDate.slice(0,7)!==existing.fromDate.slice(0,7)) await assertPayrollEditable(actorId,existing.toDate.slice(0,7),existing.staffAccountId);
 
@@ -1085,6 +1090,7 @@ export async function updateBranchForStaff(staffAccountId:number,input:{name:str
 export async function listCompanyRequests(staffAccountId:number) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
+  if (!["owner","manager","hr","supervisor"].includes(m.role)) throw new Error("غير مصرح");
   const members=await db.select({staffAccountId:companyMembers.staffAccountId}).from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
   const ids=members.map(x=>x.staffAccountId);
   if(!ids.length) return [];
@@ -1117,7 +1123,7 @@ export async function reviewAttendanceException(actorId:number,input:{staffAccou
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId);
   if(!m || !["owner","manager","hr","supervisor"].includes(m.role)) throw new Error("غير مصرح");
-  await assertStaffInCompany(actorId,input.staffAccountId);
+  await assertOperationalTarget(actorId,input.staffAccountId);
   await assertPayrollEditable(actorId,input.date.slice(0,7),input.staffAccountId);
   const row=(await db.select().from(attendanceRecords).where(and(eq(attendanceRecords.staffAccountId,input.staffAccountId),eq(attendanceRecords.date,input.date))).limit(1))[0];
   if(!row) throw new Error("سجل الحضور غير موجود.");
@@ -1150,6 +1156,7 @@ export async function reviewAttendanceException(actorId:number,input:{staffAccou
 export async function listAuditLogs(staffAccountId:number, limit=100) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
+  if (!["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   // Return the actor name with each event so the audit center is useful to
   // managers without exposing unrelated company records.
   return db.select({
@@ -1193,6 +1200,7 @@ export function toCsv(rows: Array<Record<string, unknown>>) {
 export async function listCompanySalaryAdjustments(staffAccountId:number, month?:string) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
+  if (!["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   return month ? db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.companyId,m.companyId),eq(salaryAdjustments.month,month))).orderBy(desc(salaryAdjustments.createdAt))
     : db.select().from(salaryAdjustments).where(eq(salaryAdjustments.companyId,m.companyId)).orderBy(desc(salaryAdjustments.createdAt));
 }
@@ -1201,7 +1209,7 @@ export async function createSalaryAdjustment(actorId:number,input:{staffAccountI
   const m=await getCompanyForStaff(actorId); if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   if (!/^\d{4}-\d{2}$/.test(input.month)) throw new Error("صيغة الشهر غير صحيحة. استخدم YYYY-MM.");
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("قيمة الإضافة أو الخصم يجب أن تكون أكبر من صفر.");
-  await assertStaffInCompany(actorId,input.staffAccountId);
+  await assertOperationalTarget(actorId,input.staffAccountId);
   await assertPayrollEditable(actorId,input.month,input.staffAccountId);
   const result=await db.insert(salaryAdjustments).values({...input,companyId:m.companyId,createdBy:actorId});
   await writeAudit(actorId,m.companyId,"salary_adjustment.created","salary_adjustment",String(result[0].insertId),input);
@@ -1211,7 +1219,7 @@ export async function createSalaryAdjustment(actorId:number,input:{staffAccountI
 export async function createSalaryAdvance(actorId:number,input:{staffAccountId:number;amount:number;installmentAmount:number;startMonth:string;note?:string}) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId); if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
-  await assertStaffInCompany(actorId,input.staffAccountId);
+  await assertOperationalTarget(actorId,input.staffAccountId);
   if(!/^\d{4}-\d{2}$/.test(input.startMonth)) throw new Error("صيغة شهر بدء السلفة غير صحيحة. استخدم YYYY-MM.");
   await assertPayrollEditable(actorId,input.startMonth,input.staffAccountId);
   if(input.amount<=0 || input.installmentAmount<=0) throw new Error("قيمة السلفة والقسط يجب أن تكون أكبر من صفر.");
@@ -1224,6 +1232,7 @@ export async function createSalaryAdvance(actorId:number,input:{staffAccountId:n
 export async function listCompanyAdvances(actorId:number) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(actorId); if(!m) return [];
+  if (!["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   return db.select().from(salaryAdvances).where(eq(salaryAdvances.companyId,m.companyId)).orderBy(desc(salaryAdvances.createdAt));
 }
 export async function listEmployeeDocuments(actorId:number,targetId:number) {
@@ -1253,6 +1262,8 @@ export async function deleteEmployeeDocument(actorId:number,documentId:number) {
 }
 
 export async function listEmployee360(actorId:number,targetId:number) {
+  const actor = await getCompanyForStaff(actorId);
+  if (!actor || !["owner","manager","hr"].includes(actor.role)) throw new Error("غير مصرح");
   await assertStaffInCompany(actorId,targetId);
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const staff=await getStaffAccountById(targetId);
