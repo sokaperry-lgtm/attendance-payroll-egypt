@@ -955,12 +955,20 @@ export async function getMonthlyStaffReports(staffAccountId: number, month: stri
   // Supervisors can review attendance/workload reports, but payroll-sensitive
   // salary data must not be exposed through the same report endpoint.
   if (m.role === "supervisor") {
-    const visibleMembers = await dbQueries.getCompanyMembersByRole?.(m.companyId, ["employee","supervisor"]);
-    const visibleIds = visibleMembers ? new Set(visibleMembers.map((member:any) => Number(member.staffAccountId))) : null;
+    const db = await getDb();
+    const visibleMembers = db
+      ? await db.select({ staffAccountId: companyMembers.staffAccountId })
+          .from(companyMembers)
+          .where(and(
+            eq(companyMembers.companyId, m.companyId),
+            inArray(companyMembers.role, ["employee", "supervisor"])
+          ))
+      : [];
+    const visibleIds = new Set(visibleMembers.map(member => Number(member.staffAccountId)));
     return {
       ...report,
       employees: report.employees
-        .filter((employee: any) => !visibleIds || visibleIds.has(Number(employee.id)))
+        .filter((employee: any) => visibleIds.has(Number(employee.id)))
         .map((employee: any) => ({ ...employee, baseSalary: null })),
     };
   }
