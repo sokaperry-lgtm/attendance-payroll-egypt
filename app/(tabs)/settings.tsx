@@ -10,6 +10,7 @@ import { useAppData } from "@/lib/app-data";
 export default function SettingsScreen() {
   const router = useRouter();
   const { role, branch } = useAppData();
+  const canAssignPrivilegedRoles = role === "owner";
   const { width } = useWindowDimensions();
   const compact = width < 760;
 
@@ -222,7 +223,7 @@ export default function SettingsScreen() {
                     <Pressable onPress={() => moveMember(member.id, null)} style={[styles.chip, !member.branchId && styles.chipActive]}><Text style={[styles.chipText, !member.branchId && styles.chipTextActive]}>بدون فرع</Text></Pressable>
                   </View>
                   <View style={styles.roleChips}>
-                    {(["hr","manager","supervisor","accountant","employee"] as CompanyRole[]).map(r => (
+                    {(["hr","manager","supervisor","accountant","employee"] as CompanyRole[]).filter(r => canAssignPrivilegedRoles || !["hr","accountant"].includes(r)).map(r => (
                       <Pressable key={r} onPress={() => changeRole(member.id, r)} style={[styles.chip, member.membershipRole === r && styles.roleChipActive]}>
                         <Text style={[styles.chipText, member.membershipRole === r && styles.chipTextActive]}>{roleLabel(r)}</Text>
                       </Pressable>
