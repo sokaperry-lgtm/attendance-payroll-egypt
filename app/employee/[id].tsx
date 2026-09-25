@@ -50,6 +50,29 @@ export default function EmployeeProfileScreen() {
   const currentMonthPayroll = latestPayroll ? Number(latestPayroll.netSalary || 0) : 0;
   const pendingRequests = requests.filter((r) => r.status === "قيد المراجعة").length;
   const approvedLeave = requests.filter((r) => r.status === "مقبول" && String(r.type || "").includes("إجاز")).length;
+  const recentEight = attendance.slice(0, 8);
+  const previousEight = attendance.slice(8, 16);
+  const recentTracked = recentEight.filter((r) => ["حاضر", "متأخر", "مأمورية", "غياب"].includes(String(r.status))).length;
+  const previousTracked = previousEight.filter((r) => ["حاضر", "متأخر", "مأمورية", "غياب"].includes(String(r.status))).length;
+  const recentPresent = recentEight.filter((r) => ["حاضر", "متأخر", "مأمورية"].includes(String(r.status))).length;
+  const previousPresent = previousEight.filter((r) => ["حاضر", "متأخر", "مأمورية"].includes(String(r.status))).length;
+  const recentRate = recentTracked ? Math.round((recentPresent / recentTracked) * 100) : attendanceRate;
+  const previousRate = previousTracked ? Math.round((previousPresent / previousTracked) * 100) : recentRate;
+  const recentLate = recentEight.reduce((sum, r) => sum + Number(r.lateMinutes || 0), 0);
+  const previousLate = previousEight.reduce((sum, r) => sum + Number(r.lateMinutes || 0), 0);
+  const attendanceTrend = recentRate - previousRate;
+  const lateTrend = recentLate - previousLate;
+  const smartInsight = !attendance.length
+    ? { tone: "neutral", title: "لسه مفيش بيانات كفاية", text: "أول ما يبدأ تسجيل الحضور والطلبات، الملف هيبدأ يطلع مؤشرات ذكية." }
+    : attendanceTrend >= 5
+      ? { tone: "positive", title: "الحضور بيتحسن", text: `معدل الحضور في آخر السجلات ${recentRate}% مقابل ${previousRate}% في الفترة السابقة.` }
+      : attendanceTrend <= -5
+        ? { tone: "attention", title: "محتاج متابعة الحضور", text: `معدل الحضور نزل إلى ${recentRate}% مقارنةً بـ ${previousRate}% في الفترة السابقة.` }
+        : lateTrend <= -15
+          ? { tone: "positive", title: "التأخير بيتحسن", text: `دقائق التأخير في آخر السجلات أقل بـ ${Math.abs(lateTrend)} دقيقة عن الفترة السابقة.` }
+          : pendingRequests > 0
+            ? { tone: "attention", title: "في طلبات محتاجة متابعة", text: `يوجد ${pendingRequests} طلب قيد المراجعة على ملف الموظف.` }
+            : { tone: "neutral", title: "الأداء مستقر", text: `معدل الحضور الحالي ${attendanceRate}% وإجمالي التأخير ${late} دقيقة.` };
 
   return (
     <Screen>
@@ -63,6 +86,15 @@ export default function EmployeeProfileScreen() {
             <Text style={styles.name}>{employee.name}</Text>
             <Text style={styles.role}>{employee.title || "موظف"} · {employee.department || "—"}</Text>
             <Text style={styles.phone}>{employee.phone || "لا يوجد رقم هاتف"}</Text>            <View style={styles.heroBadges}><Text style={styles.heroBadge}>{employee.active ? "نشط" : "غير نشط"}</Text><Text style={styles.heroBadgeGhost}>{(data as any).staff?.membershipRole === "owner" ? "مالك" : (data as any).staff?.membershipRole === "manager" ? "مدير" : (data as any).staff?.membershipRole === "hr" ? "HR" : (data as any).staff?.membershipRole === "accountant" ? "محاسب" : (data as any).staff?.membershipRole === "supervisor" ? "مشرف" : "موظف"}</Text></View>
+          </View>
+        </View>
+
+        <View style={styles.smartInsight}>
+          <View style={styles.smartInsightIcon}><Text style={styles.smartInsightIconText}>✦</Text></View>
+          <View style={styles.smartInsightBody}>
+            <Text style={styles.smartInsightEyebrow}>SMART EMPLOYEE INSIGHT</Text>
+            <Text style={styles.smartInsightTitle}>{smartInsight.title}</Text>
+            <Text style={styles.smartInsightText}>{smartInsight.text}</Text>
           </View>
         </View>
 
@@ -176,6 +208,13 @@ const styles = StyleSheet.create({
   role: { color: "#D9E6F2", fontSize: 12, textAlign: "right", marginTop: 4 },
   phone: { color: "#FFFFFF", opacity: 0.75, fontSize: 11, textAlign: "right", marginTop: 5 },
   heroBadges:{flexDirection:"row-reverse",gap:7,marginTop:10},heroBadge:{color:"#163A63",backgroundColor:"#FFFFFF",borderRadius:8,paddingHorizontal:9,paddingVertical:4,fontSize:9,fontWeight:"900"},heroBadgeGhost:{color:"#FFFFFF",backgroundColor:"rgba(255,255,255,0.12)",borderRadius:8,paddingHorizontal:9,paddingVertical:4,fontSize:9,fontWeight:"800"},
+  smartInsight:{backgroundColor:"#F7F9FC",borderWidth:1,borderColor:"#D9E2EC",borderRadius:18,padding:16,flexDirection:"row-reverse",alignItems:"center",gap:12},
+  smartInsightIcon:{width:42,height:42,borderRadius:14,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},
+  smartInsightIconText:{color:"#FFFFFF",fontSize:20,fontWeight:"900"},
+  smartInsightBody:{flex:1},
+  smartInsightEyebrow:{color:"#718096",fontSize:9,fontWeight:"900",letterSpacing:1,textAlign:"right"},
+  smartInsightTitle:{color:"#163A63",fontSize:15,fontWeight:"900",textAlign:"right",marginTop:3},
+  smartInsightText:{color:"#667085",fontSize:11,fontWeight:"600",textAlign:"right",lineHeight:18,marginTop:3},
   kpis: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 12 },
   kpisCompact: { flexDirection: "column" },
   kpi: { flexGrow: 1, flexBasis: 180, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E4E7EC", borderRadius: 18, padding: 16, minHeight: 88, justifyContent: "center" },
