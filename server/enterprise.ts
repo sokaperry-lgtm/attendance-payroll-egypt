@@ -37,7 +37,11 @@ export async function listPermissionMembers(actorId: number) { const actor = awa
 export async function updateMemberPermissions(actorId: number, staffAccountId: number, permissions: Partial<PermissionMap>) {
   const actor = await getCompanyForStaff(actorId); if (!actor || actor.role !== "owner") throw new Error("إدارة الصلاحيات متاحة لمالك الشركة فقط."); const access = await assertStaffInCompany(actorId, staffAccountId);
   if (access.target.role === "owner") throw new Error("لا يمكن تعديل صلاحيات المالك."); await ensurePermissionStore(); const db = await getDb(); if (!db) throw new Error("Database not available");
-  const current = await getEffectivePermissions(staffAccountId); const next = { ...current, ...permissions };
+  const current = await getEffectivePermissions(staffAccountId);
+  const next = { ...current } as PermissionMap;
+  for (const key of PERMISSION_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(permissions, key)) next[key] = Boolean(permissions[key]);
+  }
   await db.execute(sql`INSERT INTO member_permissions (companyId, staffAccountId, permissions) VALUES (${actor.companyId}, ${staffAccountId}, ${JSON.stringify(next)}) ON DUPLICATE KEY UPDATE permissions = VALUES(permissions)`);
   await writeAudit(actorId, actor.companyId, "permissions.updated", "staff", String(staffAccountId), next); return next;
 }
@@ -1244,7 +1248,7 @@ export function toCsv(rows: Array<Record<string, unknown>>) {
   if(!rows.length) return "";
   const headers=Object.keys(rows[0]);
   const escape=(value:unknown)=>`"${String(value??"").replace(/"/g,'""')}"`;
-  return [headers.map(escape).join(","),...rows.map(row=>headers.map(h=>escape(row[h])).join("\n"))].join("\n");
+  return [headers.map(escape).join(","),...rows.map(row=>headers.map(h=>escape(row[h])).join(","))].join("\r\n");
 }
 
 export async function listCompanySalaryAdjustments(staffAccountId:number, month?:string) {
