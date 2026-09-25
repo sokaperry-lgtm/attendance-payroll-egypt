@@ -124,6 +124,7 @@ export async function getBranchForStaff(staffAccountId: number) {
 export async function getCompanyAdminOverview(staffAccountId: number) {
   const db = await getDb(); if (!db) return null;
   const m = await getCompanyForStaff(staffAccountId); if (!m) return null;
+  if (!["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   const company = (await db.select().from(companies).where(eq(companies.id, m.companyId)).limit(1))[0];
   if (!company) return null;
   const branchRows = await db.select().from(branches).where(eq(branches.companyId, m.companyId)).orderBy(desc(branches.createdAt));
@@ -139,6 +140,7 @@ export async function getCompanyAdminOverview(staffAccountId: number) {
 export async function listCompanyBranches(staffAccountId: number) {
   const db = await getDb(); if (!db) return [];
   const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
+  if (!["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   const rows = await db.select().from(branches).where(eq(branches.companyId, m.companyId)).orderBy(desc(branches.createdAt));
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
   const staffIds = members.map(member => member.staffAccountId);
@@ -159,6 +161,7 @@ export async function listCompanyBranches(staffAccountId: number) {
 export async function listCompanyMembers(staffAccountId: number) {
   const db = await getDb(); if (!db) return [];
   const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
+  if (!["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   const members = await db.select().from(companyMembers).where(and(eq(companyMembers.companyId, m.companyId), eq(companyMembers.active, true)));
   const staffIds = members.map(member => member.staffAccountId);
   const staff = staffIds.length
