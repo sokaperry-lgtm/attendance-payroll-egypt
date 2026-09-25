@@ -76,8 +76,9 @@ export async function listCompanyAttendance(staffAccountId: number) {
   const db = await getDb(); if (!db) return [];
   const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
   if (!["owner","manager","hr","supervisor"].includes(m.role)) throw new Error("غير مصرح");
-  const members = await db.select({ staffAccountId: companyMembers.staffAccountId }).from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
-  const ids = members.map(x => x.staffAccountId);
+  const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
+  const visibleMembers = m.role === "supervisor" ? members.filter(x => ["employee","supervisor"].includes(x.role)) : members;
+  const ids = visibleMembers.map(x => x.staffAccountId);
   if (!ids.length) return [];
   return db.select().from(attendanceRecords).where(inArray(attendanceRecords.staffAccountId, ids)).orderBy(desc(attendanceRecords.date));
 }
@@ -453,7 +454,8 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
   if (!/^\d{4}-\d{2}$/.test(month)) throw new Error("صيغة الشهر غير صحيحة. استخدم YYYY-MM.");
 
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId, m.companyId));
-  const ids = new Set(members.map(x => x.staffAccountId));
+  const visibleMembers = m.role === "supervisor" ? members.filter(x => ["employee","supervisor"].includes(x.role)) : members;
+  const ids = new Set(visibleMembers.map(x => x.staffAccountId));
   const staff = (await db.select().from(staffAccounts).where(eq(staffAccounts.active, true))).filter(x => ids.has(x.id));
   const schedules = await db.select().from(weeklySchedules);
   const shifts = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
@@ -890,6 +892,7 @@ export async function cancelSalaryAdjustment(actorId:number,id:number) {
   if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   const row=(await db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.id,id),eq(salaryAdjustments.companyId,m.companyId))).limit(1))[0];
   if(!row) throw new Error("الجزاء غير موجود.");
+  await assertOperationalTarget(actorId,row.staffAccountId);
   await assertPayrollEditable(actorId,row.month,row.staffAccountId);
   await db.delete(salaryAdjustments).where(and(eq(salaryAdjustments.id,id),eq(salaryAdjustments.companyId,m.companyId)));
   await writeAudit(actorId,m.companyId,"salary_adjustment.cancelled","salary_adjustment",String(id),{staffAccountId:row.staffAccountId,month:row.month,title:row.title,amount:row.amount});
@@ -952,12 +955,13 @@ export async function getMonthlyStaffReports(staffAccountId: number, month: stri
   // Supervisors can review attendance/workload reports, but payroll-sensitive
   // salary data must not be exposed through the same report endpoint.
   if (m.role === "supervisor") {
+    const visibleMembers = await dbQueries.getCompanyMembersByRole?.(m.companyId, ["employee","supervisor"]);
+    const visibleIds = visibleMembers ? new Set(visibleMembers.map((member:any) => Number(member.staffAccountId))) : null;
     return {
       ...report,
-      employees: report.employees.map((employee: any) => ({
-        ...employee,
-        baseSalary: null,
-      })),
+      employees: report.employees
+        .filter((employee: any) => !visibleIds || visibleIds.has(Number(employee.id)))
+        .map((employee: any) => ({ ...employee, baseSalary: null })),
     };
   }
 
@@ -1091,8 +1095,9 @@ export async function listCompanyRequests(staffAccountId:number) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
   if (!["owner","manager","hr","supervisor"].includes(m.role)) throw new Error("غير مصرح");
-  const members=await db.select({staffAccountId:companyMembers.staffAccountId}).from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
-  const ids=members.map(x=>x.staffAccountId);
+  const members=await db.select().from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
+  const visibleMembers=m.role === "supervisor" ? members.filter(x=>["employee","supervisor"].includes(x.role)) : members;
+  const ids=visibleMembers.map(x=>x.staffAccountId);
   if(!ids.length) return [];
   const staff=await db.select({id:staffAccounts.id,name:staffAccounts.name}).from(staffAccounts);
   const rows=await db.select().from(staffRequests).orderBy(desc(staffRequests.createdAt));
@@ -1236,7 +1241,9 @@ export async function listCompanyAdvances(actorId:number) {
   return db.select().from(salaryAdvances).where(eq(salaryAdvances.companyId,m.companyId)).orderBy(desc(salaryAdvances.createdAt));
 }
 export async function listEmployeeDocuments(actorId:number,targetId:number) {
-  await assertStaffInCompany(actorId,targetId);
+  const actor=await getCompanyForStaff(actorId);
+  if(!actor || !["owner","manager","hr"].includes(actor.role)) throw new Error("غير مصرح");
+  await assertOperationalTarget(actorId,targetId);
   const db=await getDb(); if(!db) throw new Error("Database not available");
   return db.select().from(employeeDocuments).where(eq(employeeDocuments.staffAccountId,targetId)).orderBy(desc(employeeDocuments.createdAt));
 }
@@ -1245,7 +1252,7 @@ export async function createEmployeeDocument(actorId:number,input:{staffAccountI
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId);
   if(!m || !["owner","manager","hr"].includes(m.role)) throw new Error("غير مصرح");
-  await assertStaffInCompany(actorId,input.staffAccountId);
+  await assertOperationalTarget(actorId,input.staffAccountId);
   const result=await db.insert(employeeDocuments).values({...input,companyId:m.companyId,createdBy:actorId,status:"active"});
   await writeAudit(actorId,m.companyId,"employee_document.created","employee_document",String(result[0].insertId),input);
   return (await db.select().from(employeeDocuments).where(eq(employeeDocuments.id,Number(result[0].insertId))).limit(1))[0];
@@ -1256,6 +1263,7 @@ export async function deleteEmployeeDocument(actorId:number,documentId:number) {
   const m=await getCompanyForStaff(actorId); if(!m || !["owner","manager","hr"].includes(m.role)) throw new Error("غير مصرح");
   const row=(await db.select().from(employeeDocuments).where(eq(employeeDocuments.id,documentId)).limit(1))[0];
   if(!row || row.companyId!==m.companyId) throw new Error("المستند غير موجود.");
+  await assertOperationalTarget(actorId,row.staffAccountId);
   await db.delete(employeeDocuments).where(eq(employeeDocuments.id,documentId));
   await writeAudit(actorId,m.companyId,"employee_document.deleted","employee_document",String(documentId),{staffAccountId:row.staffAccountId,title:row.title});
   return {success:true};
@@ -1264,7 +1272,7 @@ export async function deleteEmployeeDocument(actorId:number,documentId:number) {
 export async function listEmployee360(actorId:number,targetId:number) {
   const actor = await getCompanyForStaff(actorId);
   if (!actor || !["owner","manager","hr"].includes(actor.role)) throw new Error("غير مصرح");
-  await assertStaffInCompany(actorId,targetId);
+  await assertOperationalTarget(actorId,targetId);
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const staff=await getStaffAccountById(targetId);
   if(!staff) throw new Error("الموظف غير موجود");
