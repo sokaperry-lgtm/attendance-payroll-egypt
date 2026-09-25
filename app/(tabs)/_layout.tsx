@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Platform, useWindowDimensions, View, Pressable, Text } from "react-native";
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useColors } from "@/hooks/use-colors";
 import { AppDataProvider, useAppData } from "@/lib/app-data";
 import { trpc } from "@/lib/trpc";
 
@@ -17,15 +16,14 @@ export default function TabLayout() {
 }
 
 function RoleAwareTabs() {
-    const insets = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { role } = useAppData();
   const notificationCount = trpc.notifications.unreadCount.useQuery(undefined, { refetchInterval: 30000 }).data ?? 0;
   const router = useRouter();
   const isDesktopWeb = Platform.OS === "web" && width >= 900;
-
-  const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
-  const tabBarHeight = 58 + bottomPadding;
+  const bottomPadding = Platform.OS === "web" ? 8 : Math.max(insets.bottom, 8);
+  const tabBarHeight = 62 + bottomPadding;
 
   useEffect(() => {
     if (Platform.OS === "web" && "serviceWorker" in navigator) {
@@ -37,15 +35,14 @@ function RoleAwareTabs() {
   }, []);
 
   const manager = role === "owner" || role === "manager";
-  const hr = role === "hr";
-  const teamAccess = ["owner","manager","hr","supervisor"].includes(role);
-  const payrollAccess = ["owner","manager","hr","accountant"].includes(role);
-  const employeeManagement = ["owner","manager","hr"].includes(role);
+  const teamAccess = ["owner", "manager", "hr", "supervisor"].includes(role);
+  const payrollAccess = ["owner", "manager", "hr", "accountant"].includes(role);
+  const employeeManagement = ["owner", "manager", "hr"].includes(role);
   const mobile = Platform.OS !== "web" || width < 900;
   const mobilePrimary = new Set(["index", "attendance", "requests", "notifications", "more"]);
 
   return (
-      <View style={{ flex: 1 }}>
+    <View style={{ flex: 1 }}>
       <Tabs
         screenOptions={{
           tabBarPosition: isDesktopWeb ? "right" : "bottom",
@@ -57,9 +54,9 @@ function RoleAwareTabs() {
           tabBarButton: HapticTab,
           tabBarLabelStyle: {
             fontFamily: "System",
-            fontSize: isDesktopWeb ? 13 : 11,
-            fontWeight: isDesktopWeb ? "700" : "500",
-            marginTop: 2,
+            fontSize: isDesktopWeb ? 13 : 10,
+            fontWeight: isDesktopWeb ? "700" : "700",
+            marginTop: isDesktopWeb ? 2 : 1,
           },
           tabBarItemStyle: isDesktopWeb
             ? {
@@ -69,8 +66,11 @@ function RoleAwareTabs() {
                 backgroundColor: "#FFFFFF",
               }
             : {
-                borderRadius: 14,
+                minHeight: 52,
+                borderRadius: 16,
                 marginHorizontal: 2,
+                marginVertical: 4,
+                paddingVertical: 2,
                 backgroundColor: "#FFFFFF",
               },
           tabBarIconStyle: {
@@ -88,12 +88,16 @@ function RoleAwareTabs() {
                 borderBottomWidth: 0,
               }
             : {
-                paddingTop: 7,
+                paddingTop: 5,
                 paddingBottom: bottomPadding,
                 height: tabBarHeight,
                 backgroundColor: "#FFFFFF",
-                borderTopColor: "#E4E7EC",
-                borderTopWidth: 0.5,
+                borderTopWidth: 0,
+                shadowColor: "#172033",
+                shadowOpacity: 0.08,
+                shadowRadius: 14,
+                shadowOffset: { width: 0, height: -4 },
+                elevation: 12,
               },
         }}
       >
@@ -106,45 +110,47 @@ function RoleAwareTabs() {
         <Tabs.Screen name="more" options={{ title: "المزيد", href: mobile ? "/more" : null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="ellipsis.circle" color={color} /> }} />
         <Tabs.Screen name="schedule" options={{ title: "الجدول", href: mobile ? null : (teamAccess ? "/schedule" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="calendar" color={color} /> }} />
         <Tabs.Screen name="reports" options={{ title: "التقارير", href: mobile ? null : (teamAccess ? "/reports" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="chart.bar.fill" color={color} /> }} />
-        <Tabs.Screen name="audit" options={{ title: "سجل العمليات", href: null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="lock.shield.fill" color={color} /> }} />
+        <Tabs.Screen name="audit" options={{ title: "سجل العمليات", href: null, tabBarIcon: ({ color }) => <IconSymbol name="lock.shield.fill" size={23} color={color} /> }} />
         <Tabs.Screen name="payroll" options={{ title: "الرواتب", href: mobile ? null : (payrollAccess ? "/payroll" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="banknote" color={color} /> }} />
         <Tabs.Screen name="employees" options={{ title: "الموظفون", href: mobile ? null : (employeeManagement ? "/employees" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="person.2.fill" color={color} /> }} />
         <Tabs.Screen name="settings" options={{ title: "الإعدادات", href: mobile ? null : (manager ? "/settings" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="settings" color={color} /> }} />
         <Tabs.Screen name="logout" options={{ title: "تسجيل الخروج", href: mobile ? null : "/logout", tabBarIcon: ({ color }) => <IconSymbol size={23} name="logout" color={color} /> }} />
       </Tabs>
-      {isDesktopWeb && <Pressable
-        onPress={() => router.replace("/")}
-        accessibilityLabel="العودة للرئيسية"
-        style={({ pressed }) => ({
-          position: "absolute",
-          top: 12,
-          left: 14,
-          zIndex: 100,
-          minWidth: 92,
-          height: 42,
-          paddingHorizontal: 12,
-          borderRadius: 14,
-          backgroundColor: "#FFFFFF",
-          borderWidth: 1,
-          borderColor: "#DCE5EE",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 7,
-          shadowColor: "#172033",
-          shadowOpacity: 0.09,
-          shadowRadius: 10,
-          shadowOffset: { width: 0, height: 4 },
-          elevation: 4,
-          opacity: pressed ? 0.72 : 1,
-          transform: [{ scale: pressed ? 0.98 : 1 }],
-        })}
-      >
-        <IconSymbol name="house.fill" size={17} color="#163A63" />
-        <View>
-          <Text style={{ color: "#163A63", fontSize: 10, fontWeight: "900" }}>الرئيسية</Text>
-        </View>
-      </Pressable>}
-      </View>
+      {isDesktopWeb && (
+        <Pressable
+          onPress={() => router.replace("/")}
+          accessibilityLabel="العودة للرئيسية"
+          style={({ pressed }) => ({
+            position: "absolute",
+            top: 12,
+            left: 14,
+            zIndex: 100,
+            minWidth: 92,
+            height: 42,
+            paddingHorizontal: 12,
+            borderRadius: 14,
+            backgroundColor: "#FFFFFF",
+            borderWidth: 1,
+            borderColor: "#DCE5EE",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 7,
+            shadowColor: "#172033",
+            shadowOpacity: 0.09,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 4,
+            opacity: pressed ? 0.72 : 1,
+            transform: [{ scale: pressed ? 0.98 : 1 }],
+          })}
+        >
+          <IconSymbol name="house.fill" size={17} color="#163A63" />
+          <View>
+            <Text style={{ color: "#163A63", fontSize: 10, fontWeight: "900" }}>الرئيسية</Text>
+          </View>
+        </Pressable>
+      )}
+    </View>
   );
 }
