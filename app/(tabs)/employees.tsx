@@ -67,7 +67,7 @@ export default function EmployeesScreen() {
 
   return (
     <ScreenContainer>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, compact && styles.contentCompact]} showsVerticalScrollIndicator={false}>
         <View style={[styles.header, compact && styles.headerCompact]}>
           <View style={styles.headerText}>
             <Text style={styles.eyebrow}>PEOPLE · TEAM DIRECTORY</Text>
@@ -120,7 +120,7 @@ export default function EmployeesScreen() {
         </View>
 
         {filteredStaff.map(p => (
-          <Pressable key={p.id} style={styles.person} onPress={() => router.push(("/employee/" + p.id) as never)}>
+          <Pressable key={p.id} style={[styles.person, compact && styles.personCompact]} onPress={() => router.push(("/employee/" + p.id) as never)}>
             <View style={styles.avatar}><Text style={styles.avatarText}>{p.initials}</Text></View>
             <View style={styles.main}>
               <Text style={styles.name}>{p.name}</Text>
@@ -195,19 +195,19 @@ function Stat({ label, value }: { label: string; value: string }) { return <View
 }
 
 const styles = StyleSheet.create({
-  content:{padding:22,paddingBottom:50,gap:14,maxWidth:1180,width:"100%",alignSelf:"center"},
+  content:{padding:22,paddingBottom:50,gap:14,maxWidth:1180,width:"100%",alignSelf:"center"},contentCompact:{padding:14,paddingBottom:34,gap:10},
   header:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",gap:14},headerCompact:{flexDirection:"column",alignItems:"stretch"},
   headerText:{flex:1},headerActions:{flexDirection:"row-reverse",alignItems:"center",gap:10},headerActionsCompact:{justifyContent:"space-between"},
   eyebrow:{color:"#667085",fontSize:11,fontWeight:"800",textAlign:"right"},title:{color:"#172033",fontSize:30,fontWeight:"900",textAlign:"right"},sub:{color:"#667085",fontSize:12,textAlign:"right",marginTop:5},
   count:{backgroundColor:"#EEF4FB",borderRadius:16,padding:12,alignItems:"center"},countValue:{color:"#163A63",fontSize:22,fontWeight:"900"},countLabel:{color:"#163A63",fontSize:9},
   addButton:{backgroundColor:"#163A63",borderRadius:14,paddingHorizontal:16,paddingVertical:12,flexDirection:"row-reverse",alignItems:"center",gap:7},addButtonText:{color:"#FFFFFF",fontWeight:"800",fontSize:12},
-  statsGrid:{flexDirection:"row-reverse",flexWrap:"wrap",gap:10},
+  statsGrid:{flexDirection:"row-reverse",flexWrap:"wrap",gap:10},statsGridCompact:{gap:8},
   stat:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E8EDF3",borderRadius:17,padding:15,flexGrow:1,flexBasis:170,minHeight:84,justifyContent:"center"},statValue:{color:"#163A63",fontSize:22,fontWeight:"900",textAlign:"right"},statLabel:{color:"#667085",fontSize:10,fontWeight:"700",textAlign:"right",marginTop:3},
   workspace:{backgroundColor:"#163A63",borderRadius:22,padding:19,flexDirection:"row-reverse",gap:12,alignItems:"center"},workspaceIcon:{width:46,height:46,borderRadius:14,backgroundColor:"rgba(255,255,255,0.14)",alignItems:"center",justifyContent:"center"},workspaceTitle:{color:"#FFFFFF",fontSize:16,fontWeight:"900",textAlign:"right"},workspaceText:{color:"#D9E6F2",fontSize:10,lineHeight:17,textAlign:"right",marginTop:4},
   toolbar:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E8EDF3",borderRadius:18,padding:12,gap:10},searchBox:{borderWidth:1,borderColor:"#E4E7EC",borderRadius:13,minHeight:46,flexDirection:"row-reverse",alignItems:"center",paddingHorizontal:12},searchIcon:{color:"#667085",fontSize:24,width:28,textAlign:"center"},searchInput:{flex:1,color:"#172033",fontSize:12,paddingVertical:10},filters:{flexDirection:"row-reverse",flexWrap:"wrap",gap:7},filter:{borderRadius:10,paddingHorizontal:12,paddingVertical:8,backgroundColor:"#F7F9FC"},filterActive:{backgroundColor:"#163A63"},filterText:{color:"#667085",fontSize:10,fontWeight:"800"},filterTextActive:{color:"#FFFFFF"},sectionHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",paddingTop:4},sectionTitle:{color:"#172033",fontSize:17,fontWeight:"900",textAlign:"right"},sectionHint:{color:"#98A6B8",fontSize:10,fontWeight:"700"},
 
   empty:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E8EDF3",borderRadius:18,padding:32,alignItems:"center",gap:6},emptyIcon:{fontSize:32,color:"#98A6B8"},emptyTitle:{color:"#172033",fontSize:16,fontWeight:"900"},emptyText:{color:"#667085",fontSize:11},  person:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#F2F5F8",borderRadius:18,padding:15,flexDirection:"row-reverse",alignItems:"center",gap:11},avatar:{width:48,height:48,borderRadius:15,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},avatarText:{color:"#FFFFFF",fontWeight:"900"},
-  personCompact:{alignItems:"flex-start"},main:{flex:1},name:{color:"#172033",fontSize:14,fontWeight:"800",textAlign:"right"},role:{color:"#667085",fontSize:11,textAlign:"right",marginTop:3},phone:{color:"#667085",fontSize:10,textAlign:"right"},right:{alignItems:"flex-end",gap:3},dot:{width:9,height:9,borderRadius:5},active:{color:"#667085",fontSize:9},salary:{color:"#163A63",fontSize:10,fontWeight:"800"},
+  personCompact:{alignItems:"flex-start",padding:12,gap:9},main:{flex:1,minWidth:0},name:{color:"#172033",fontSize:14,fontWeight:"800",textAlign:"right"},role:{color:"#667085",fontSize:11,textAlign:"right",marginTop:3},phone:{color:"#667085",fontSize:10,textAlign:"right"},right:{alignItems:"flex-end",gap:3},dot:{width:9,height:9,borderRadius:5},active:{color:"#667085",fontSize:9},salary:{color:"#163A63",fontSize:10,fontWeight:"800"},
   metaRow:{flexDirection:"row-reverse",alignItems:"center",gap:7,marginTop:5},roleBadge:{borderRadius:7,paddingHorizontal:7,paddingVertical:3},managerBadge:{backgroundColor:"#EEF4FB"},supervisorBadge:{backgroundColor:"#EEF4FB"},employeeBadge:{backgroundColor:"#F7F9FC"},roleBadgeText:{fontSize:9,fontWeight:"800",color:"#98A6B8"},
   modalBackdrop:{flex:1,backgroundColor:"rgba(2,6,23,0.58)",justifyContent:"flex-end"},modalCard:{backgroundColor:"#FFFFFF",borderTopLeftRadius:28,borderTopRightRadius:28,maxHeight:"92%",padding:20},modalHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",marginBottom:10},modalEyebrow:{color:"#98A6B8",fontSize:9,fontWeight:"900",textAlign:"right"},modalTitle:{color:"#172033",fontSize:23,fontWeight:"900",textAlign:"right",marginTop:2},close:{width:36,height:36,borderRadius:18,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},closeText:{color:"#98A6B8",fontSize:25,lineHeight:28},form:{paddingBottom:30,gap:8},label:{color:"#667085",fontSize:11,fontWeight:"800",textAlign:"right",marginTop:7},input:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#667085",borderRadius:12,paddingHorizontal:13,paddingVertical:12,fontSize:13,color:"#172033"},roleOptions:{gap:8},roleOption:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#667085",borderRadius:14,padding:12,flexDirection:"row-reverse",alignItems:"center",gap:9},roleOptionActive:{backgroundColor:"#163A63",borderColor:"#163A63"},roleOptionTitle:{color:"#172033",fontSize:13,fontWeight:"900",minWidth:78,textAlign:"right"},roleOptionTitleActive:{color:"#FFFFFF"},roleOptionSub:{color:"#667085",fontSize:9,flex:1,textAlign:"right"},roleOptionSubActive:{color:"#D9E6F2"},saveButton:{backgroundColor:"#163A63",borderRadius:14,padding:14,marginTop:12,flexDirection:"row-reverse",alignItems:"center",justifyContent:"center",gap:8},saveText:{color:"#FFFFFF",fontWeight:"900",fontSize:13},disabled:{opacity:0.6},
   state:{flex:1,alignItems:"center",justifyContent:"center",gap:10},stateText:{color:"#172033",fontSize:18,fontWeight:"800"}
