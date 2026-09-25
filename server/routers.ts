@@ -165,7 +165,7 @@ export const appRouter = router({
     templates: staffProcedure.query(() => db.listShiftTemplates()),
     mine: staffProcedure.query(({ ctx }) => db.listSchedules(ctx.staffUser.id)),
     all: supervisorProcedure.query(({ ctx }) => enterprise.listCompanySchedules(ctx.staffUser.id)),
-    save: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), scheduleDate: z.string().length(10), shiftTemplateId: z.number().int(), note: z.string().max(255).optional() })).mutation(async ({ ctx, input }) => { await enterprise.assertStaffInCompany(ctx.staffUser.id, input.staffAccountId); await enterprise.assertPayrollEditable(ctx.staffUser.id, input.scheduleDate.slice(0,7), input.staffAccountId); return db.saveSchedule(input); }),
+    save: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), scheduleDate: z.string().length(10), shiftTemplateId: z.number().int(), note: z.string().max(255).optional() })).mutation(async ({ ctx, input }) => { await enterprise.assertOperationalTarget(ctx.staffUser.id, input.staffAccountId); await enterprise.assertPayrollEditable(ctx.staffUser.id, input.scheduleDate.slice(0,7), input.staffAccountId); return db.saveSchedule(input); }),
   }),
   attendance: router({
     list: staffProcedure.query(({ ctx }) => db.listAttendance(ctx.staffUser.id)),
@@ -173,7 +173,7 @@ export const appRouter = router({
     sync: supervisorProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).mutation(({ ctx, input }) => enterprise.syncMonthlyAttendance(ctx.staffUser.id, input.month)),
     workSummary: supervisorProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).query(({ ctx, input }) => enterprise.getAttendanceWorkSummary(ctx.staffUser.id, input.month)),
     managerUpdate: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), checkIn: z.string().max(8).nullable().optional(), checkOut: z.string().max(8).nullable().optional(), status: z.enum(["حاضر", "متأخر", "غياب", "إجازة", "مأمورية"]), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0).nullable().optional(), note: z.string().max(1000).nullable().optional() })).mutation(async ({ ctx, input }) => {
-      const access = await enterprise.assertStaffInCompany(ctx.staffUser.id, input.staffAccountId);
+      const access = await enterprise.assertOperationalTarget(ctx.staffUser.id, input.staffAccountId);
       if (access.target.role === "owner" && access.actor.role !== "owner") throw new Error("لا يمكن تعديل حضور المالك من هذا الحساب.");
       if (input.date > cairoToday()) throw new Error("لا يمكن تسجيل حضور بتاريخ مستقبلي.");
       if (input.checkIn) timeMinutes(input.checkIn);
