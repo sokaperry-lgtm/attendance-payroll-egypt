@@ -146,6 +146,13 @@ export default function HomeScreen(){
         <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>ملخصك المالي</Text><Text style={styles.cardMeta}>هذا الشهر</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>EGP</Text><Text style={styles.payrollValue}>{payroll.net.toLocaleString("ar-EG")}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>صافي الراتب</Text><Text style={styles.payrollStatus}>محدث</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{payrollInputs.lateMinutes??0} دقيقة</Text></View></View>
       </View>}
 
+      <View style={[styles.insightStrip, isMobile && styles.insightStripMobile]}>
+        <Insight icon="person.2.fill" value={String(teamPresent)} label={isManagement || role === "supervisor" ? "حاضر اليوم" : "أيام حضورك"} meta={isManagement || role === "supervisor" ? `${teamToday.length} سجل اليوم` : `${presentDays} سجل`} />
+        <Insight icon="clock" value={String(teamLate)} label="التأخير" meta="دقائق مسجلة اليوم" />
+        <Insight icon="checkmark" value={String(teamCheckedOut)} label="أنهوا الوردية" meta="تسجيل انصراف" />
+        {isManagement ? <Insight icon="banknote" value={payrollTotal.toLocaleString("ar-EG")} label="صافي الرواتب" meta="هذا الشهر" /> : <Insight icon="notifications" value={String(unread)} label="التنبيهات" meta="تحتاج انتباهك" />}
+      </View>
+
       <View style={[styles.grid, isMobile && styles.gridMobile]}>
         <View style={[styles.card,styles.attendancePanel,isMobile&&styles.panelMobile]}>
           <View style={styles.cardHeader}><Text style={styles.cardTitle}>أداء الحضور</Text><Text style={styles.cardMeta}>آخر 7 أيام</Text></View>
@@ -162,6 +169,13 @@ export default function HomeScreen(){
       <View style={[styles.quickGrid, isMobile && styles.quickGridMobile]}>{quick.map(([label,icon,path])=><Pressable key={label} onPress={()=>router.push(path as never)} style={({pressed})=>[styles.quick,isMobile&&styles.quickMobile,pressed&&styles.pressed]}><View style={styles.quickIcon}><IconSymbol name={icon as any} size={18} color="#163A63"/></View><View style={styles.quickCopy}><Text style={styles.quickTitle}>{label}</Text><Text style={styles.quickSub}>فتح القسم</Text></View><Text style={styles.chevron}>‹</Text></Pressable>)}</View>
     </ScrollView>
   </ScreenContainer>;
+}
+
+function Insight({ icon, value, label, meta }: { icon: any; value: string; label: string; meta: string }) {
+  return <View style={styles.insightItem}>
+    <View style={styles.insightIcon}><IconSymbol name={icon} size={16} color="#163A63" /></View>
+    <View style={styles.insightCopy}><Text style={styles.insightValue}>{value}</Text><Text style={styles.insightLabel}>{label}</Text><Text style={styles.insightMeta}>{meta}</Text></View>
+  </View>;
 }
 
 function Kpi({icon,value,label,note}:{icon:any;value:string;label:string;note:string}){return <View style={styles.kpi}><View style={styles.kpiTop}><View style={styles.kpiIcon}><IconSymbol name={icon} size={17} color="#163A63"/></View><View style={styles.kpiLine}/></View><Text style={styles.kpiValue}>{value}</Text><Text style={styles.kpiLabel}>{label}</Text><Text style={styles.kpiNote}>{note}</Text></View>}
@@ -188,6 +202,14 @@ const styles=StyleSheet.create({
   hero:{backgroundColor:"#163A63",borderRadius:26,padding:24,flexDirection:"row-reverse",gap:22,shadowColor:"#163A63",shadowOpacity:.14,shadowRadius:20,shadowOffset:{width:0,height:8},elevation:4},heroCopy:{flex:1,paddingVertical:5},live:{flexDirection:"row-reverse",alignItems:"center",gap:7},liveDot:{width:7,height:7,borderRadius:4,backgroundColor:"#60A5FA"},liveText:{color:"#BFD7F5",fontSize:10,fontWeight:"800"},heroTitle:{color:"#fff",fontSize:29,fontWeight:"900",lineHeight:38,marginTop:13,textAlign:"right"},heroSub:{color:"#C8D5E6",fontSize:12,lineHeight:20,marginTop:7,maxWidth:650,textAlign:"right"},heroStats:{flexDirection:"row-reverse",gap:32,borderTopWidth:1,borderTopColor:"rgba(255,255,255,.12)",marginTop:24,paddingTop:15},heroLabel:{color:"#8FA9C7",fontSize:9,textAlign:"right"},heroValue:{color:"#fff",fontSize:12,fontWeight:"800",marginTop:3,textAlign:"right"},
   attendanceCard:{width:285,maxWidth:"100%",backgroundColor:"#fff",borderRadius:20,padding:18,justifyContent:"center"},attendanceLabel:{color:"#667085",fontSize:10,fontWeight:"800",textAlign:"right"},clock:{color:"#172033",fontSize:31,fontWeight:"900",textAlign:"right",marginTop:3},locationRow:{flexDirection:"row-reverse",alignItems:"center",gap:7,marginTop:7},locationIcon:{width:28,height:28,borderRadius:9,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},locationText:{color:"#667085",fontSize:9,flex:1,textAlign:"right"},attendanceButton:{height:47,borderRadius:12,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center",flexDirection:"row-reverse",gap:7,marginTop:13},attendanceButtonText:{color:"#fff",fontSize:11,fontWeight:"900"},disabled:{backgroundColor:"#AAB8C8"},pressed:{opacity:.82,transform:[{scale:.985}]},
   sectionHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"flex-end"},sectionTitle:{fontSize:18,color:"#172033",fontWeight:"900",textAlign:"right"},sectionSub:{fontSize:10,color:"#98A2B3",marginTop:3,textAlign:"right"},
+  insightStrip:{flexDirection:"row-reverse",gap:10},
+  insightStripMobile:{flexDirection:"column"},
+  insightItem:{flex:1,minHeight:78,backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E7ECF2",borderRadius:16,padding:12,flexDirection:"row-reverse",alignItems:"center",gap:9},
+  insightIcon:{width:34,height:34,borderRadius:11,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},
+  insightCopy:{flex:1},
+  insightValue:{color:"#163A63",fontSize:16,fontWeight:"900",textAlign:"right"},
+  insightLabel:{color:"#172033",fontSize:10,fontWeight:"800",textAlign:"right",marginTop:1},
+  insightMeta:{color:"#98A6B8",fontSize:8,textAlign:"right",marginTop:2},
   kpis:{flexDirection:"row-reverse",gap:13},kpi:{flex:1,minWidth:170,backgroundColor:"#fff",borderRadius:18,borderWidth:1,borderColor:"#E4E7EC",padding:16},kpiTop:{flexDirection:"row-reverse",alignItems:"center",gap:8},kpiIcon:{width:36,height:36,borderRadius:11,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},kpiLine:{height:1,backgroundColor:"#F0F2F5",flex:1},kpiValue:{fontSize:22,color:"#172033",fontWeight:"900",marginTop:14,textAlign:"right"},kpiLabel:{fontSize:11,color:"#475467",fontWeight:"800",marginTop:3,textAlign:"right"},kpiNote:{fontSize:9,color:"#98A2B3",marginTop:5,textAlign:"right"},
   grid:{flexDirection:"row-reverse",gap:14,flexWrap:"wrap"},card:{backgroundColor:"#fff",borderRadius:20,borderWidth:1,borderColor:"#E4E7EC",padding:18},attendancePanel:{flex:1,minWidth:420},todayPanel:{flex:1,minWidth:340},cardHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},cardTitle:{fontSize:14,color:"#172033",fontWeight:"900",textAlign:"right"},cardMeta:{fontSize:9,color:"#98A2B3"},chart:{height:205,marginTop:13,flexDirection:"row-reverse",alignItems:"flex-end",gap:9},barItem:{flex:1,height:"100%",alignItems:"center",justifyContent:"flex-end",gap:5},barValue:{fontSize:8,color:"#667085",fontWeight:"800"},barTrack:{width:24,height:140,backgroundColor:"#F2F4F7",borderRadius:8,justifyContent:"flex-end",overflow:"hidden"},barFill:{width:"100%",backgroundColor:"#163A63",borderRadius:8,minHeight:4},barDay:{fontSize:9,color:"#98A2B3"},
   todayStatus:{backgroundColor:"#F8FAFC",borderRadius:15,padding:13,marginTop:17,flexDirection:"row-reverse",alignItems:"center",gap:10},statusCircle:{width:43,height:43,borderRadius:13,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},statusCopy:{flex:1},statusTitle:{fontSize:12,color:"#172033",fontWeight:"900",textAlign:"right"},statusSub:{fontSize:9,color:"#667085",marginTop:3,lineHeight:15,textAlign:"right"},timeRows:{marginTop:13},timeRow:{flexDirection:"row-reverse",justifyContent:"space-between",borderTopWidth:1,borderTopColor:"#EAECF0",paddingTop:11,marginTop:11},timeLabel:{fontSize:10,color:"#98A2B3"},timeValue:{fontSize:11,color:"#172033",fontWeight:"900"},
