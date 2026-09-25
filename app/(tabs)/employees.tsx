@@ -91,6 +91,34 @@ export default function EmployeesScreen() {
           </View>
         </View>
 
+        <View style={styles.toolbar}>
+          <View style={styles.searchBox}>
+            <Text style={styles.searchIcon}>⌕</Text>
+            <TextInput
+              style={styles.searchInput}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="ابحث بالاسم أو الهاتف أو الوظيفة أو القسم"
+              placeholderTextColor="#98A6B8"
+              textAlign="right"
+            />
+          </View>
+          <View style={styles.filters}>
+            {([["all","الكل"],["manager","مدير"],["supervisor","مشرف"],["employee","موظف"]] as const).map(([key,label]) => (
+              <Pressable key={key} onPress={() => setFilter(key)} style={[styles.filter, filter === key && styles.filterActive]}>
+                <Text style={[styles.filterText, filter === key && styles.filterTextActive]}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>دليل الفريق</Text>
+            <Text style={styles.sectionHint}>{filteredStaff.length} موظف ظاهر · اضغط لفتح الملف الكامل</Text>
+          </View>
+        </View>
+
         {filteredStaff.map(p => (
           <Pressable key={p.id} style={styles.person} onPress={() => router.push(("/employee/" + p.id) as never)}>
             <View style={styles.avatar}><Text style={styles.avatarText}>{p.initials}</Text></View>
