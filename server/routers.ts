@@ -99,7 +99,7 @@ export const appRouter = router({
     }),
   }),
   staff: router({
-    list: hrProcedure.query(async ({ ctx }) => (await enterprise.listCompanyStaff(ctx.staffUser.id)).map((item) => ({ ...item }))),
+    list: hrProcedure.query(async ({ ctx }) => { await enterprise.assertPermission(ctx.staffUser.id, "employees.view"); return (await enterprise.listCompanyStaff(ctx.staffUser.id)).map((item) => ({ ...item })); }),
     create: hrProcedure.input(z.object({ phone: z.string().min(3).max(32), password: z.string().min(6).max(120), name: z.string().min(2).max(160), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).default(0), role: z.enum(["manager","supervisor","employee"]).default("employee"), shiftStart: z.string().max(8).default("09:00"), shiftEnd: z.string().max(8).default("18:00") })).mutation(async ({ ctx, input }) => {
       const actorMembership = await enterprise.getMembership(ctx.staffUser.id);
       if (input.role === "manager" && !["owner", "manager"].includes(actorMembership?.role ?? "")) {
@@ -130,6 +130,7 @@ export const appRouter = router({
       }
       return await staffView(staff); }),
     update: hrProcedure.input(z.object({ id: z.number().int(), phone: z.string().min(3).max(32).optional(), password: z.string().min(6).max(120).optional(), name: z.string().min(2).max(160).optional(), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).optional(), role: z.enum(["manager","supervisor","employee"]).optional(), shiftStart: z.string().max(8).optional(), shiftEnd: z.string().max(8).optional(), active: z.boolean().optional() })).mutation(async ({ ctx, input }) => {
+      await enterprise.assertPermission(ctx.staffUser.id, "employees.manage");
       const { id, ...changes } = input;
       const access = await enterprise.assertStaffInCompany(ctx.staffUser.id, id);
       if (id === ctx.staffUser.id && (changes.active === false || changes.role)) throw new Error("لا يمكنك تعطيل حسابك أو تغيير صلاحيتك من هنا.");
@@ -169,10 +170,11 @@ export const appRouter = router({
   }),
   attendance: router({
     list: staffProcedure.query(({ ctx }) => db.listAttendance(ctx.staffUser.id)),
-    team: supervisorProcedure.query(({ ctx }) => enterprise.listCompanyAttendance(ctx.staffUser.id)),
-    sync: supervisorProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).mutation(({ ctx, input }) => enterprise.syncMonthlyAttendance(ctx.staffUser.id, input.month)),
-    workSummary: supervisorProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).query(({ ctx, input }) => enterprise.getAttendanceWorkSummary(ctx.staffUser.id, input.month)),
+    team: supervisorProcedure.query(async ({ ctx }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.listCompanyAttendance(ctx.staffUser.id); }),
+    sync: supervisorProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).mutation(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage"); return enterprise.syncMonthlyAttendance(ctx.staffUser.id, input.month); }),
+    workSummary: supervisorProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).query(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.getAttendanceWorkSummary(ctx.staffUser.id, input.month); }),
     managerUpdate: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), checkIn: z.string().max(8).nullable().optional(), checkOut: z.string().max(8).nullable().optional(), status: z.enum(["حاضر", "متأخر", "غياب", "إجازة", "مأمورية"]), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0).nullable().optional(), note: z.string().max(1000).nullable().optional() })).mutation(async ({ ctx, input }) => {
+      await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage");
       const access = await enterprise.assertOperationalTarget(ctx.staffUser.id, input.staffAccountId);
       if (access.target.role === "owner" && access.actor.role !== "owner") throw new Error("لا يمكن تعديل حضور المالك من هذا الحساب.");
       if (input.date > cairoToday()) throw new Error("لا يمكن تسجيل حضور بتاريخ مستقبلي.");
@@ -369,7 +371,9 @@ export const appRouter = router({
     toggleBranch: companyAdminProcedure.input(z.object({ branchId:z.number().int(), active:z.boolean() })).mutation(({ ctx, input }) => enterprise.toggleBranch(ctx.staffUser.id,input.branchId,input.active)),
     assignBranch: companyAdminProcedure.input(z.object({ staffAccountId:z.number().int(), branchId:z.number().int().nullable() })).mutation(({ ctx, input }) => enterprise.assignMemberToBranch(ctx.staffUser.id,input.staffAccountId,input.branchId)),
     updateCompany: companyAdminProcedure.input(z.object({ name:z.string().min(2), legalName:z.string().max(200).optional(), email:z.string().max(320).optional(), phone:z.string().max(32).optional() })).mutation(({ ctx, input }) => enterprise.updateCompanyProfile(ctx.staffUser.id,input)),
-    role: managerProcedure.input(z.object({ staffAccountId:z.number().int(), role:z.enum(["owner","hr","manager","supervisor","accountant","employee"]) })).mutation(({ ctx,input }) => enterprise.setMemberRole(ctx.staffUser.id,input.staffAccountId,input.role)),
+    role: managerProcedure.input(z.object({ staffAccountId:z.number().int(), role:z.enum(["owner","hr","manager","supervisor","accountant","employee"]) })).mutation(async ({ ctx,input }) => { await enterprise.assertPermission(ctx.staffUser.id, "roles.manage"); return enterprise.setMemberRole(ctx.staffUser.id,input.staffAccountId,input.role); }),
+    permissions: companyAdminProcedure.query(({ ctx }) => enterprise.listPermissionMembers(ctx.staffUser.id)),
+    updatePermissions: companyAdminProcedure.input(z.object({ staffAccountId:z.number().int(), permissions:z.record(z.boolean()) })).mutation(({ ctx,input }) => enterprise.updateMemberPermissions(ctx.staffUser.id,input.staffAccountId,input.permissions as enterprise.PermissionMap)),
     subscription: staffProcedure.query(({ ctx }) => enterprise.getSubscription(ctx.staffUser.id)),
     changePlan: managerProcedure.input(z.object({ plan:z.enum(["trial","starter","growth","scale"]) })).mutation(({ ctx,input }) => enterprise.updateSubscription(ctx.staffUser.id,input.plan)),
     security: staffProcedure.query(({ ctx }) => enterprise.getSecuritySummary(ctx.staffUser.id)),
