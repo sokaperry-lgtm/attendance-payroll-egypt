@@ -58,6 +58,20 @@ export async function assertStaffInCompany(actorStaffAccountId: number, targetSt
   return { actor, target };
 }
 
+export async function assertOperationalTarget(actorStaffAccountId: number, targetStaffAccountId: number) {
+  const access = await assertStaffInCompany(actorStaffAccountId, targetStaffAccountId);
+  if (access.target.role === "owner") {
+    if (access.actor.role !== "owner") throw new Error("لا يمكن تعديل بيانات المالك من هذا الحساب.");
+    return access;
+  }
+  // Supervisors are limited to the operational team. HR and management
+  // retain broader operational access, while owner remains fully protected.
+  if (access.actor.role === "supervisor" && !["employee", "supervisor"].includes(access.target.role)) {
+    throw new Error("لا تملك صلاحية إدارة هذا الحساب.");
+  }
+  return access;
+}
+
 export async function listCompanyAttendance(staffAccountId: number) {
   const db = await getDb(); if (!db) return [];
   const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
