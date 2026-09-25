@@ -801,7 +801,7 @@ export async function getPayrollPayslip(staffAccountId:number, payrollId:number)
 export async function unapprovePayroll(staffAccountId:number, id:number) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(staffAccountId);
-  if(!m || !["owner","manager","hr","accountant"].includes(m.role)) throw new Error("غير مصرح");
+  if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   const current=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
   if(!current) throw new Error("مسير الرواتب غير موجود.");
   if(current.status!=="approved") return current;
@@ -894,7 +894,8 @@ export async function cancelSalaryAdjustment(actorId:number,id:number) {
 
 export async function getPayroll(staffAccountId:number, month:string) {
   const db=await getDb(); if(!db) return [];
-  const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
+  const m=await getCompanyForStaff(staffAccountId);
+  if(!m || !["owner","manager","hr","accountant"].includes(m.role)) throw new Error("غير مصرح");
   return db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.month,month))).orderBy(desc(payrollRecords.netSalary));
 }
 
