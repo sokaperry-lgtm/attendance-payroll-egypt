@@ -927,7 +927,21 @@ export async function writeAudit(staffAccountId:number, companyId:number, action
 export async function getMonthlyStaffReports(staffAccountId: number, month: string) {
   const m = await getCompanyForStaff(staffAccountId);
   if (!m) throw new Error("Company not found");
-  return dbQueries.getMonthlyStaffReports(month, m.companyId);
+  const report = await dbQueries.getMonthlyStaffReports(month, m.companyId);
+
+  // Supervisors can review attendance/workload reports, but payroll-sensitive
+  // salary data must not be exposed through the same report endpoint.
+  if (m.role === "supervisor") {
+    return {
+      ...report,
+      employees: report.employees.map((employee: any) => ({
+        ...employee,
+        baseSalary: null,
+      })),
+    };
+  }
+
+  return report;
 }
 
 export async function getSecuritySummary(staffAccountId:number) {
