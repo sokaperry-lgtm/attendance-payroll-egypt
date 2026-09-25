@@ -1,4 +1,4 @@
-import { FlatList, StyleSheet, Text, View, Pressable } from "react-native";
+import { FlatList, StyleSheet, Text, View, Pressable, useWindowDimensions } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { PageHeader, SectionTitle, StatusBadge } from "@/components/ui/design-system";
@@ -17,6 +17,8 @@ const statusTone: Record<string, "success" | "warning" | "danger" | "neutral"> =
 
 export default function AttendanceScreen() {
   const { records, employee, role, refresh } = useAppData();
+  const { width } = useWindowDimensions();
+  const compact = width < 520;
   const attendanceReview = trpc.requests.reviewAttendanceException.useMutation();
   const managerRequests = trpc.requests.list.useQuery(undefined, { enabled: (role === "owner" || role === "manager") || role === "supervisor", retry: false });
   const pendingAbsences = (managerRequests.data ?? []).filter((item: any) => item.source === "attendance" && item.exceptionKind === "absence" && item.status === "قيد المراجعة");
@@ -41,7 +43,7 @@ export default function AttendanceScreen() {
       <FlatList
         data={records}
         keyExtractor={item => item.id}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, compact && styles.contentCompact]}
         ListHeaderComponent={
           <>
             <PageHeader
@@ -51,7 +53,7 @@ export default function AttendanceScreen() {
               icon="calendar"
             />
 
-            <View style={styles.hero}>
+            <View style={[styles.hero, compact && styles.heroCompact]}>
               <View style={styles.heroTop}>
                 <View style={styles.heroIcon}>
                   <IconSymbol name="chart.bar.fill" size={22} color="#FFFFFF" />
@@ -71,7 +73,7 @@ export default function AttendanceScreen() {
               </View>
             </View>
 
-            <View style={styles.kpiGrid}>
+            <View style={[styles.kpiGrid, compact && styles.kpiGridCompact]}>
               <View style={styles.kpi}>
                 <Text style={styles.kpiValue}>{present}</Text>
                 <Text style={styles.kpiLabel}>أيام حضور</Text>
@@ -238,6 +240,9 @@ const styles = StyleSheet.create({
   inlineCancel: { flex: 1, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D9E6F2", borderRadius: 9, paddingVertical: 8, alignItems: "center" },
   inlineCancelText: { color: "#31577F", fontSize: 9, fontWeight: "900" },
   content: { padding: 20, paddingBottom: 40, gap: 14 },
+  contentCompact: { padding: 14, paddingBottom: 34, gap: 11 },
+  heroCompact: { padding: 16, borderRadius: 20 },
+  kpiGridCompact: { gap: 8 },
   hero: {
     backgroundColor: "#163A63",
     borderRadius: 24,
