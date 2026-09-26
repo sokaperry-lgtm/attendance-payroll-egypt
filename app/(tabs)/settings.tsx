@@ -30,6 +30,8 @@ export default function SettingsScreen() {
   const updatePermissions = trpc.companyAdmin.updatePermissions.useMutation();
   const resetStaffData = trpc.system.resetAndSetup.useMutation();
   const [permissionMemberId, setPermissionMemberId] = useState<number | null>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetConfirmation, setResetConfirmation] = useState("");
 
   const [companyName, setCompanyName] = useState("");
   const [legalName, setLegalName] = useState("");
@@ -129,38 +131,24 @@ export default function SettingsScreen() {
   }
 
   function confirmSystemReset() {
-    Alert.alert(
-      "تهيئة النظام لبدء أكتوبر",
-      "سيتم حذف كل بيانات التشغيل الحالية: الموظفين، الحضور، الطلبات، الجداول، الرواتب، السلف، الخصومات، المستندات، الإشعارات وسجل العمليات. حسابك كمالك وإعدادات الشركة والفرع ستظل محفوظة.",
-      [
-        { text: "إلغاء", style: "cancel" },
-        { text: "متابعة", style: "destructive", onPress: () => confirmSystemResetFinal() },
-      ],
-    );
+    setResetConfirmation("");
+    setShowResetModal(true);
   }
 
-  function confirmSystemResetFinal() {
-    Alert.prompt(
-      "تأكيد نهائي",
-      "اكتب RESET-STAFF لتأكيد الحذف والبدء من جديد.",
-      [
-        { text: "إلغاء", style: "cancel" },
-        { text: "تنفيذ الريسيت", style: "destructive", onPress: async (value) => {
-          if (value !== "RESET-STAFF") {
-            showAlert("لم يتم التنفيذ", "كلمة التأكيد غير صحيحة.");
-            return;
-          }
-          try {
-            await resetStaffData.mutateAsync({ confirm: "RESET-STAFF" });
-            await Promise.all([overview.refetch(), branches.refetch(), members.refetch(), permissions.refetch()]);
-            showAlert("تمت التهيئة", "تم تنظيف بيانات التشغيل بنجاح. حسابك كمالك محفوظ، والنظام جاهز لبدء أكتوبر.");
-          } catch (e: any) {
-            showAlert("تعذر تنفيذ الريسيت", e?.message ?? "حدث خطأ غير متوقع.");
-          }
-        }},
-      ],
-      "plain-text",
-    );
+  async function executeSystemReset() {
+    if (resetConfirmation.trim() !== "RESET-STAFF") {
+      showAlert("لم يتم التنفيذ", "اكتب RESET-STAFF كما هو بالضبط.");
+      return;
+    }
+    try {
+      await resetStaffData.mutateAsync({ confirm: "RESET-STAFF" });
+      setShowResetModal(false);
+      setResetConfirmation("");
+      await Promise.all([overview.refetch(), branches.refetch(), members.refetch(), permissions.refetch()]);
+      showAlert("تمت التهيئة", "تم تنظيف بيانات التشغيل بنجاح. حسابك كمالك محفوظ، والنظام جاهز لبدء أكتوبر.");
+    } catch (e: any) {
+      showAlert("تعذر تنفيذ الريسيت", e?.message ?? "حدث خطأ غير متوقع.");
+    }
   }
 
   async function changeRole(staffAccountId: number, nextRole: CompanyRole) {
@@ -280,6 +268,31 @@ export default function SettingsScreen() {
           {(() => { const selected = (permissions.data ?? []).find((m:any) => m.id === (permissionMemberId ?? permissions.data?.find((m:any) => m.membershipRole !== "owner")?.id)); if (!selected) return <Text style={styles.hint}>أضف موظفًا أولًا لإدارة صلاحياته.</Text>; const labels:Record<string,string> = {"dashboard.view":"لوحة التحكم","employees.view":"عرض الموظفين","employees.manage":"إدارة الموظفين","attendance.view":"عرض الحضور","attendance.manage":"تعديل الحضور","requests.view":"عرض الطلبات","requests.review":"مراجعة الطلبات","payroll.view":"عرض الرواتب","payroll.manage":"إدارة الرواتب","payroll.approve":"اعتماد الرواتب","reports.view":"عرض التقارير","reports.export":"تصدير التقارير","branches.manage":"إدارة الفروع","company.manage":"إدارة الشركة","roles.manage":"تغيير الأدوار","audit.view":"سجل العمليات","documents.view":"عرض المستندات","documents.manage":"إدارة المستندات","advances.manage":"السلف والتعديلات","notifications.manage":"الإشعارات"}; return <View style={styles.permissionGrid}>{Object.entries(selected.permissions ?? {}).map(([key, value]) => <Pressable key={key} onPress={async () => { try { await updatePermissions.mutateAsync({ staffAccountId: selected.id, permissions: { [key]: !value } }); await permissions.refetch(); } catch (e:any) { showAlert("تعذر تحديث الصلاحية", e?.message ?? "حدث خطأ."); } }} style={styles.permissionRow}><View style={[styles.permissionSwitch, value && styles.permissionSwitchOn]}><Text style={styles.permissionSwitchText}>{value ? "✓" : "—"}</Text></View><View style={styles.permissionCopy}><Text style={styles.permissionLabel}>{labels[key] ?? key}</Text><Text style={styles.permissionKey}>{key}</Text></View></Pressable>)}</View>; })()}
         </Section>}
 
+
+        {showResetModal && <View style={styles.modalOverlay}>
+          <View style={styles.resetModal}>
+            <Text style={styles.resetModalTitle}>تأكيد بدء دورة أكتوبر</Text>
+            <Text style={styles.resetModalText}>سيتم حذف بيانات التشغيل الحالية بالكامل مع الاحتفاظ بحساب المالك وإعدادات الشركة والفروع.</Text>
+            <Text style={styles.resetModalHint}>اكتب RESET-STAFF للتأكيد</Text>
+            <TextInput
+              value={resetConfirmation}
+              onChangeText={setResetConfirmation}
+              placeholder="RESET-STAFF"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              style={styles.resetModalInput}
+              textAlign="center"
+            />
+            <View style={styles.resetModalActions}>
+              <Pressable onPress={() => { setShowResetModal(false); setResetConfirmation(""); }} style={styles.secondaryButton}>
+                <Text style={styles.secondaryText}>إلغاء</Text>
+              </Pressable>
+              <Pressable onPress={executeSystemReset} disabled={resetStaffData.isPending} style={[styles.resetButton, resetStaffData.isPending && styles.resetButtonDisabled]}>
+                <Text style={styles.resetButtonText}>{resetStaffData.isPending ? "جاري التهيئة..." : "تنفيذ الريسيت"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>}
 
         {role === "owner" && <Section title="تهيئة دورة جديدة" subtitle="تنظيف بيانات التشغيل والبدء من جديد مع الحفاظ على حساب المالك وإعدادات الشركة.">
           <View style={styles.resetBox}>
