@@ -61,8 +61,7 @@ export const appRouter = router({
       if (!membership?.active || membership.role !== "owner") {
         throw new Error("إعادة ضبط حسابات الموظفين متاحة لمالك الشركة فقط.");
       }
-      const staff = await db.resetStaffAccountsAndCreateManager(input);
-      await enterprise.ensureCompanyForStaff(staff.id, "الشركة الرئيسية");
+      const staff = await db.resetStaffDataKeepOwner(ctx.staffUser.id);
       const token = await db.createStaffSession(staff.id);
       ctx.res.cookie(INTERNAL_SESSION_COOKIE, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
       return { token, staff: await staffView(staff) };
