@@ -76,13 +76,19 @@ function hashSessionToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export async function resetStaffAccountsAndCreateManager(input: { phone: string; password: string; name: string }) {
+export async function resetStaffDataKeepOwner(ownerStaffAccountId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Destructive reset: remove all staff-owned data, memberships, sessions,
-  // and per-member permission overrides, while keeping company/branch configuration intact.
-  // member_permissions is created dynamically by enterprise.ts, so use raw SQL here.
+  const owner = await getStaffAccountById(ownerStaffAccountId);
+  if (!owner) throw new Error("حساب المالك غير موجود.");
+
+  const ownerMemberships = await db.select().from(companyMembers).where(eq(companyMembers.staffAccountId, ownerStaffAccountId)).limit(10);
+  const ownerMembership = ownerMemberships.find((member) => member.active && member.role === "owner");
+  if (!ownerMembership) throw new Error("لا يمكن تنفيذ إعادة الضبط بدون عضوية Owner نشطة.");
+
+  // Destructive reset: clear staff operational data and permission overrides,
+  // but preserve the current owner, company, branch and company configuration.
   await db.execute(sql.raw("DELETE FROM member_permissions"));
   await db.delete(auditLogs);
   await db.delete(notifications);
@@ -95,19 +101,22 @@ export async function resetStaffAccountsAndCreateManager(input: { phone: string;
   await db.delete(staffRequests);
   await db.delete(attendanceRecords);
   await db.delete(staffSessions);
-  await db.delete(companyMembers);
-  await db.delete(staffAccounts);
 
-  const staff = await createStaffAccount({
-    phone: input.phone,
-    password: input.password,
-    name: input.name,
-    role: "manager",
-    title: "مدير الشركة",
-  });
-  if (!staff) throw new Error("تعذر إنشاء حساب المدير الجديد.");
+  const memberships = await db.select().from(companyMembers);
+  for (const member of memberships) {
+    if (member.id !== ownerMembership.id) {
+      await db.delete(companyMembers).where(eq(companyMembers.id, member.id));
+    }
+  }
 
-  return staff;
+  const staffAccountsRows = await db.select({ id: staffAccounts.id }).from(staffAccounts);
+  for (const staff of staffAccountsRows) {
+    if (staff.id !== ownerStaffAccountId) {
+      await db.delete(staffAccounts).where(eq(staffAccounts.id, staff.id));
+    }
+  }
+
+  return owner;
 }
 
 export async function countStaffAccounts() {
