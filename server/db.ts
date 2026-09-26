@@ -1,5 +1,5 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { and, desc, eq, gt } from "drizzle-orm";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   attendanceRecords,
@@ -80,8 +80,10 @@ export async function resetStaffAccountsAndCreateManager(input: { phone: string;
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Destructive reset: remove all staff-owned data, memberships and sessions,
-  // while keeping the company/branch configuration intact.
+  // Destructive reset: remove all staff-owned data, memberships, sessions,
+  // and per-member permission overrides, while keeping company/branch configuration intact.
+  // member_permissions is created dynamically by enterprise.ts, so use raw SQL here.
+  await db.execute(sql.raw("DELETE FROM member_permissions"));
   await db.delete(auditLogs);
   await db.delete(notifications);
   await db.delete(payrollRecords);
