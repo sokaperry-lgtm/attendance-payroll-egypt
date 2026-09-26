@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -28,6 +28,7 @@ export default function SettingsScreen() {
   const assignBranch = trpc.companyAdmin.assignBranch.useMutation();
   const updateRole = trpc.companyAdmin.role.useMutation();
   const updatePermissions = trpc.companyAdmin.updatePermissions.useMutation();
+  const resetStaffData = trpc.system.resetAndSetup.useMutation();
   const [permissionMemberId, setPermissionMemberId] = useState<number | null>(null);
 
   const [companyName, setCompanyName] = useState("");
@@ -125,6 +126,41 @@ export default function SettingsScreen() {
       await members.refetch();
       await branches.refetch();
     } catch (e: any) { showAlert("تعذر نقل الموظف", e?.message ?? "حدث خطأ غير متوقع."); }
+  }
+
+  function confirmSystemReset() {
+    Alert.alert(
+      "تهيئة النظام لبدء أكتوبر",
+      "سيتم حذف كل بيانات التشغيل الحالية: الموظفين، الحضور، الطلبات، الجداول، الرواتب، السلف، الخصومات، المستندات، الإشعارات وسجل العمليات. حسابك كمالك وإعدادات الشركة والفرع ستظل محفوظة.",
+      [
+        { text: "إلغاء", style: "cancel" },
+        { text: "متابعة", style: "destructive", onPress: () => confirmSystemResetFinal() },
+      ],
+    );
+  }
+
+  function confirmSystemResetFinal() {
+    Alert.prompt(
+      "تأكيد نهائي",
+      "اكتب RESET-STAFF لتأكيد الحذف والبدء من جديد.",
+      [
+        { text: "إلغاء", style: "cancel" },
+        { text: "تنفيذ الريسيت", style: "destructive", onPress: async (value) => {
+          if (value !== "RESET-STAFF") {
+            showAlert("لم يتم التنفيذ", "كلمة التأكيد غير صحيحة.");
+            return;
+          }
+          try {
+            await resetStaffData.mutateAsync({ confirm: "RESET-STAFF" });
+            await Promise.all([overview.refetch(), branches.refetch(), members.refetch(), permissions.refetch()]);
+            showAlert("تمت التهيئة", "تم تنظيف بيانات التشغيل بنجاح. حسابك كمالك محفوظ، والنظام جاهز لبدء أكتوبر.");
+          } catch (e: any) {
+            showAlert("تعذر تنفيذ الريسيت", e?.message ?? "حدث خطأ غير متوقع.");
+          }
+        }},
+      ],
+      "plain-text",
+    );
   }
 
   async function changeRole(staffAccountId: number, nextRole: CompanyRole) {
@@ -244,6 +280,19 @@ export default function SettingsScreen() {
           {(() => { const selected = (permissions.data ?? []).find((m:any) => m.id === (permissionMemberId ?? permissions.data?.find((m:any) => m.membershipRole !== "owner")?.id)); if (!selected) return <Text style={styles.hint}>أضف موظفًا أولًا لإدارة صلاحياته.</Text>; const labels:Record<string,string> = {"dashboard.view":"لوحة التحكم","employees.view":"عرض الموظفين","employees.manage":"إدارة الموظفين","attendance.view":"عرض الحضور","attendance.manage":"تعديل الحضور","requests.view":"عرض الطلبات","requests.review":"مراجعة الطلبات","payroll.view":"عرض الرواتب","payroll.manage":"إدارة الرواتب","payroll.approve":"اعتماد الرواتب","reports.view":"عرض التقارير","reports.export":"تصدير التقارير","branches.manage":"إدارة الفروع","company.manage":"إدارة الشركة","roles.manage":"تغيير الأدوار","audit.view":"سجل العمليات","documents.view":"عرض المستندات","documents.manage":"إدارة المستندات","advances.manage":"السلف والتعديلات","notifications.manage":"الإشعارات"}; return <View style={styles.permissionGrid}>{Object.entries(selected.permissions ?? {}).map(([key, value]) => <Pressable key={key} onPress={async () => { try { await updatePermissions.mutateAsync({ staffAccountId: selected.id, permissions: { [key]: !value } }); await permissions.refetch(); } catch (e:any) { showAlert("تعذر تحديث الصلاحية", e?.message ?? "حدث خطأ."); } }} style={styles.permissionRow}><View style={[styles.permissionSwitch, value && styles.permissionSwitchOn]}><Text style={styles.permissionSwitchText}>{value ? "✓" : "—"}</Text></View><View style={styles.permissionCopy}><Text style={styles.permissionLabel}>{labels[key] ?? key}</Text><Text style={styles.permissionKey}>{key}</Text></View></Pressable>)}</View>; })()}
         </Section>}
 
+
+        {role === "owner" && <Section title="تهيئة دورة جديدة" subtitle="تنظيف بيانات التشغيل والبدء من جديد مع الحفاظ على حساب المالك وإعدادات الشركة.">
+          <View style={styles.resetBox}>
+            <View style={styles.resetCopy}>
+              <Text style={styles.resetTitle}>بدء دورة أكتوبر 2026</Text>
+              <Text style={styles.resetText}>سيتم حذف بيانات التشغيل الحالية بالكامل. هذا الإجراء لا يحذف الشركة أو الفرع أو إعدادات GPS أو حساب المالك.</Text>
+            </View>
+            <Pressable onPress={confirmSystemReset} disabled={resetStaffData.isPending} style={[styles.resetButton, resetStaffData.isPending && styles.resetButtonDisabled]}>
+              <Text style={styles.resetButtonText}>{resetStaffData.isPending ? "جاري التهيئة..." : "تهيئة النظام والبدء من أكتوبر"}</Text>
+            </Pressable>
+          </View>
+        </Section>}
+
         <View style={[styles.bottomGrid, compact && styles.bottomGridOne]}>
           <Section title="SaaS & Security" subtitle="حالة الاشتراك والحماية.">
             <Row label="الباقة" value={subscription.data?.plan === "trial" ? "تجريبية" : subscription.data?.plan ?? "—"}/>
@@ -286,6 +335,7 @@ function roleLabel(role?: string) {
 
 const styles=StyleSheet.create({
   content:{padding:22,paddingBottom:60,gap:16,maxWidth:1200,width:"100%",alignSelf:"center"},
+  resetBox:{borderWidth:1,borderColor:"#F1D5D5",backgroundColor:"#FFF9F9",borderRadius:16,padding:14,gap:12},resetCopy:{gap:4},resetTitle:{color:"#8B2E2E",fontSize:13,fontWeight:"900",textAlign:"right"},resetText:{color:"#7A6A6A",fontSize:10,lineHeight:17,textAlign:"right"},resetButton:{backgroundColor:"#8B2E2E",borderRadius:12,padding:13,alignItems:"center",justifyContent:"center"},resetButtonDisabled:{opacity:.55},resetButtonText:{color:"#FFFFFF",fontSize:11,fontWeight:"900"},
   header:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",gap:16},
   headerCompact:{alignItems:"flex-end"},
   headerText:{flex:1},eyebrow:{color:"#667085",fontSize:11,fontWeight:"800",textAlign:"right"},title:{color:"#172033",fontSize:30,fontWeight:"900",textAlign:"right"},sub:{color:"#667085",fontSize:12,textAlign:"right",marginTop:5},icon:{width:52,height:52,borderRadius:17,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},
