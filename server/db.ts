@@ -83,40 +83,35 @@ export async function resetStaffDataKeepOwner(ownerStaffAccountId: number) {
   const owner = await getStaffAccountById(ownerStaffAccountId);
   if (!owner) throw new Error("حساب المالك غير موجود.");
 
-  const ownerMemberships = await db.select().from(companyMembers).where(eq(companyMembers.staffAccountId, ownerStaffAccountId)).limit(10);
-  const ownerMembership = ownerMemberships.find((member) => member.active && member.role === "owner");
+  const ownerMembershipRows = await db
+    .select()
+    .from(companyMembers)
+    .where(eq(companyMembers.staffAccountId, ownerStaffAccountId))
+    .limit(10);
+  const ownerMembership = ownerMembershipRows.find((member) => member.active && member.role === "owner");
   if (!ownerMembership) throw new Error("لا يمكن تنفيذ إعادة الضبط بدون عضوية Owner نشطة.");
 
-  // Destructive reset: clear staff operational data and permission overrides,
-  // but preserve the current owner, company, branch and company configuration.
+  // Delete operational data first, then non-owner memberships/accounts.
+  // The owner account, owner membership, company, branches and settings stay intact.
   await db.execute(sql.raw("DELETE FROM member_permissions"));
-  await db.delete(auditLogs);
-  await db.delete(notifications);
-  await db.delete(payrollRecords);
-  await db.delete(leaveBalances);
-  await db.delete(salaryAdjustments);
-  await db.delete(salaryAdvances);
-  await db.delete(employeeDocuments);
-  await db.delete(weeklySchedules);
-  await db.delete(staffRequests);
-  await db.delete(attendanceRecords);
-  await db.delete(staffSessions);
+  await db.execute(sql.raw("DELETE FROM audit_logs"));
+  await db.execute(sql.raw("DELETE FROM notifications"));
+  await db.execute(sql.raw("DELETE FROM payroll_records"));
+  await db.execute(sql.raw("DELETE FROM leave_balances"));
+  await db.execute(sql.raw("DELETE FROM salary_adjustments"));
+  await db.execute(sql.raw("DELETE FROM salary_advances"));
+  await db.execute(sql.raw("DELETE FROM employee_documents"));
+  await db.execute(sql.raw("DELETE FROM weekly_schedules"));
+  await db.execute(sql.raw("DELETE FROM staff_requests"));
+  await db.execute(sql.raw("DELETE FROM attendance_records"));
+  await db.execute(sql.raw("DELETE FROM staff_sessions"));
 
-  const memberships = await db.select().from(companyMembers);
-  for (const member of memberships) {
-    if (member.id !== ownerMembership.id) {
-      await db.delete(companyMembers).where(eq(companyMembers.id, member.id));
-    }
-  }
+  await db.execute(sql`DELETE FROM company_members WHERE staffAccountId <> ${ownerStaffAccountId}`);
+  await db.execute(sql`DELETE FROM staff_accounts WHERE id <> ${ownerStaffAccountId}`);
 
-  const staffAccountsRows = await db.select({ id: staffAccounts.id }).from(staffAccounts);
-  for (const staff of staffAccountsRows) {
-    if (staff.id !== ownerStaffAccountId) {
-      await db.delete(staffAccounts).where(eq(staffAccounts.id, staff.id));
-    }
-  }
-
-  return owner;
+  const freshOwner = await getStaffAccountById(ownerStaffAccountId);
+  if (!freshOwner) throw new Error("تعذر الحفاظ على حساب المالك بعد إعادة الضبط.");
+  return freshOwner;
 }
 
 export async function countStaffAccounts() {
