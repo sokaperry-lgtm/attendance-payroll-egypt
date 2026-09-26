@@ -51,12 +51,7 @@ export const appRouter = router({
       ctx.res.cookie(INTERNAL_SESSION_COOKIE, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
       return { token, staff: await staffView(staff) };
     }),
-    resetAndSetup: staffProcedure.input(z.object({
-      confirm: z.literal("RESET-STAFF"),
-      phone: z.string().min(3).max(32),
-      password: z.string().min(6).max(120),
-      name: z.string().min(2).max(160),
-    })).mutation(async ({ ctx, input }) => {
+    resetAndSetup: staffProcedure.input(z.object({ confirm: z.literal("RESET-STAFF") })).mutation(async ({ ctx }) => {
       const membership = await enterprise.getMembership(ctx.staffUser.id);
       if (!membership?.active || membership.role !== "owner") {
         throw new Error("إعادة ضبط حسابات الموظفين متاحة لمالك الشركة فقط.");
