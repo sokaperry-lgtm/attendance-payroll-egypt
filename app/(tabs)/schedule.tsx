@@ -63,6 +63,10 @@ export default function ScheduleScreen() {
   const [statusFilter, setStatusFilter] = useState<"all" | "حاضر" | "متأخر" | "غياب" | "إجازة" | "فارغ">("all");
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailSaving, setDetailSaving] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkShiftId, setBulkShiftId] = useState<number | null>(null);
+  const [bulkMode, setBulkMode] = useState<"all" | "fiveDays">("fiveDays");
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [detailForm, setDetailForm] = useState({ checkIn: "", checkOut: "", lateMinutes: "0", status: "حاضر" as "حاضر" | "متأخر" | "غياب" | "إجازة" | "مأمورية", note: "" });
   const weekRange = `${week[0]?.date ?? ""} — ${week[6]?.date ?? ""}`;
   const adminRole = role === "owner" || role === "manager";
@@ -155,6 +159,24 @@ export default function ScheduleScreen() {
     }
   }
 
+  async function applyBulkSchedule() {
+    if (!adminRole || !selectedEmployee || bulkShiftId === null) return;
+    const workShift = shiftTemplates.find(s => s.id === bulkShiftId);
+    const weeklyOff = shiftTemplates.find(s => s.kind === "weekly_off");
+    if (!workShift) return;
+    setBulkSaving(true);
+    try {
+      const requests = week.map((day, index) => {
+        const shift = bulkMode === "fiveDays" && (index === 5 || index === 6) && weeklyOff ? weeklyOff : workShift;
+        return saveSchedule({ staffAccountId: Number(selectedEmployee), scheduleDate: day.key, shiftTemplateId: shift.id });
+      });
+      await Promise.all(requests);
+      showAlert("تم تجهيز الجدول", member?.name ?? "الموظف");
+      setBulkOpen(false);
+    } catch (error) {
+      showAlert("تعذر تجهيز الجدول", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
+    } finally { setBulkSaving(false); }
+  }
   async function assignShift(shift: ShiftTemplate) {
     if (!adminRole || !selectedEmployee) return;
     setSaving(true);
@@ -319,6 +341,16 @@ export default function ScheduleScreen() {
         </View>
 
         {adminRole && member && (
+          <View style={styles.quickScheduleCard}>
+            <View style={styles.quickScheduleHeader}>
+              <View style={{flex:1}}><Text style={styles.sectionTitle}>تجهيز سريع</Text><Text style={styles.sectionHint}>اعمل أسبوع الموظف بالكامل بدل تعديل كل خلية.</Text></View>
+              <Pressable onPress={() => { setBulkShiftId(shiftTemplates.find(s => s.kind === "shift")?.id ?? null); setBulkOpen(true); }} style={styles.bulkButton}>
+                <IconSymbol name="calendar" size={17} color="#FFFFFF" /><Text style={styles.bulkButtonText}>تعبئة الأسبوع</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+        {adminRole && member && (
           <View style={styles.assignCard}>
             <View style={styles.assignHeader}>
               <View style={styles.selectedDayPill}><Text style={styles.selectedDayPillText}>{week.find(d => d.key === selectedDay)?.label} · {week.find(d => d.key === selectedDay)?.date}</Text></View>
@@ -341,6 +373,18 @@ export default function ScheduleScreen() {
         )}
 
         <View style={styles.note}><IconSymbol name="checkmark" size={16} color="#2F6DB3" /><Text style={styles.noteText}>الجدول هنا هو مصدر التشغيل للوردية؛ وأي وردية تتجاوز منتصف الليل تُحسب على يوم بدايتها.</Text></View>
+      {adminRole && member && (
+        <Modal visible={bulkOpen} animationType="slide" transparent onRequestClose={() => !bulkSaving && setBulkOpen(false)}>
+          <View style={styles.detailBackdrop}><View style={styles.bulkCard}>
+            <View style={styles.detailHeader}><View style={{flex:1}}><Text style={styles.detailEyebrow}>QUICK WEEK SETUP</Text><Text style={styles.detailTitle}>تجهيز جدول {member.name}</Text><Text style={styles.detailSub}>{weekRange}</Text></View><Pressable disabled={bulkSaving} onPress={() => setBulkOpen(false)} style={styles.detailClose}><Text style={styles.detailCloseText}>×</Text></Pressable></View>
+            <Text style={styles.bulkSectionTitle}>اختار الشيفت الأساسي</Text>
+            <View style={styles.bulkShiftGrid}>{shiftTemplates.filter(s => s.kind === "shift").map(s => { const active = bulkShiftId === s.id; return <Pressable key={s.id} onPress={() => setBulkShiftId(s.id)} style={[styles.bulkShiftOption, active && styles.bulkShiftOptionActive]}><Text style={[styles.bulkShiftName, active && styles.bulkShiftTextActive]}>{s.name}</Text><Text style={[styles.bulkShiftTime, active && styles.bulkShiftTextActive]}>{shiftLabel(s)}</Text></Pressable>; })}</View>
+            <Text style={styles.bulkSectionTitle}>نظام الأسبوع</Text>
+            <View style={styles.bulkModeRow}><Pressable onPress={() => setBulkMode("fiveDays")} style={[styles.bulkMode, bulkMode === "fiveDays" && styles.bulkModeActive]}><Text style={[styles.bulkModeTitle, bulkMode === "fiveDays" && styles.bulkModeTextActive]}>5 أيام عمل</Text><Text style={styles.bulkModeHint}>الأحد → الخميس + الجمعة والسبت إجازة</Text></Pressable><Pressable onPress={() => setBulkMode("all")} style={[styles.bulkMode, bulkMode === "all" && styles.bulkModeActive]}><Text style={[styles.bulkModeTitle, bulkMode === "all" && styles.bulkModeTextActive]}>كل الأيام</Text><Text style={styles.bulkModeHint}>نفس الشيفت طوال الأسبوع</Text></Pressable></View>
+            <Pressable disabled={bulkSaving || bulkShiftId === null} onPress={applyBulkSchedule} style={[styles.bulkSaveButton, bulkSaving && styles.disabled]}>{bulkSaving ? <ActivityIndicator color="#FFF" /> : <><IconSymbol name="checkmark" size={18} color="#FFF" /><Text style={styles.bulkSaveText}>تطبيق الجدول بالكامل</Text></>}</Pressable>
+          </View></View>
+        </Modal>
+      )}
       {adminRole && member && (
         <Modal visible={detailOpen} animationType="slide" transparent onRequestClose={() => !detailSaving && setDetailOpen(false)}>
           <View style={styles.detailBackdrop}>
@@ -396,7 +440,7 @@ export default function ScheduleScreen() {
 }
 
 const styles = StyleSheet.create({
-  content:{padding:20,paddingBottom:50,gap:14},
+  content:{padding:20,paddingBottom:50,gap:14},  quickScheduleCard:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,padding:14},quickScheduleHeader:{flexDirection:"row-reverse",alignItems:"center",gap:12},bulkButton:{backgroundColor:"#163A63",borderRadius:13,paddingHorizontal:14,paddingVertical:11,flexDirection:"row",alignItems:"center",gap:7},bulkButtonText:{color:"#FFF",fontSize:10,fontWeight:"900"},bulkCard:{backgroundColor:"#FFF",borderRadius:24,padding:18,width:"94%",maxWidth:620,alignSelf:"center"},bulkSectionTitle:{color:"#172033",fontSize:13,fontWeight:"900",textAlign:"right",marginTop:18,marginBottom:9},bulkShiftGrid:{flexDirection:"row-reverse",flexWrap:"wrap",gap:8},bulkShiftOption:{flex:1,minWidth:140,borderWidth:1,borderColor:"#E1E7EF",borderRadius:14,padding:12,backgroundColor:"#F7F9FC"},bulkShiftOptionActive:{backgroundColor:"#EEF5FB",borderColor:"#163A63"},bulkShiftName:{color:"#172033",fontSize:11,fontWeight:"900",textAlign:"right"},bulkShiftTime:{color:"#667085",fontSize:9,marginTop:3,textAlign:"right"},bulkShiftTextActive:{color:"#163A63"},bulkModeRow:{gap:8},bulkMode:{borderWidth:1,borderColor:"#E1E7EF",borderRadius:14,padding:12,backgroundColor:"#F7F9FC"},bulkModeActive:{backgroundColor:"#EEF5FB",borderColor:"#163A63"},bulkModeTitle:{color:"#172033",fontSize:12,fontWeight:"900",textAlign:"right"},bulkModeTextActive:{color:"#163A63"},bulkModeHint:{color:"#667085",fontSize:9,marginTop:3,textAlign:"right"},bulkSaveButton:{marginTop:18,minHeight:48,borderRadius:14,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center",flexDirection:"row",gap:8},bulkSaveText:{color:"#FFF",fontSize:11,fontWeight:"900"},
   weekNavigator:{flexDirection:"row",alignItems:"stretch",justifyContent:"space-between",gap:8},
   weekNavButton:{flex:1,minHeight:52,backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E1E7EF",borderRadius:15,paddingHorizontal:10,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:5},
   weekNavText:{color:"#163A63",fontSize:10,fontWeight:"800"},
