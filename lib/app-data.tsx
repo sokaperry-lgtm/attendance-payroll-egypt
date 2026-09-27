@@ -100,7 +100,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     checkOut: async (payload) => { await checkOutMutation.mutateAsync({ date: todayKey(), time: payload.time, latitude: payload.latitude, longitude: payload.longitude }); await invalidateAll(); },
     submitRequest: async (request) => { await requestMutation.mutateAsync({ type: request.type, fromDate: request.from, toDate: request.to, reason: request.reason, hours: request.hours ?? undefined }); await invalidateAll(); },
     approveRequest: async (id, status) => { await reviewMutation.mutateAsync({ id: Number(id), status: status as "مقبول" | "مرفوض" }); await invalidateAll(); },
-    createStaffAccount: async (input) => { await createStaffMutation.mutateAsync({ ...input, shiftStart: "09:00", shiftEnd: "18:00" }); await invalidateAll(); },
+    createStaffAccount: async (input) => { await createStaffMutation.mutateAsync({ ...input, shiftStart: "08:00", shiftEnd: "17:00" }); await invalidateAll(); },
     updateStaffAccount: async (input) => { await updateStaffMutation.mutateAsync(input); await invalidateAll(); },
     updateBranch: async (input) => { await updateCompanyMutation.mutateAsync(input); await invalidateAll(); },
     saveSchedule: async (input) => { await saveScheduleMutation.mutateAsync(input); await invalidateAll(); },
