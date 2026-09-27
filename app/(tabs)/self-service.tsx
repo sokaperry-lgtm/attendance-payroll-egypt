@@ -4,6 +4,8 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
 
 export default function EmployeeSelfServiceScreen() {
+  const { width } = useWindowDimensions();
+  const compact = width < 520;
   const month = new Date().toISOString().slice(0,7);
   const data = trpc.selfService.me.useQuery({ month }, { retry:false });
   const notifications = trpc.notifications.list.useQuery(undefined,{retry:false});
