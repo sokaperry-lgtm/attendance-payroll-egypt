@@ -16,7 +16,7 @@ function distanceBetween(lat1:number,lon1:number,lat2:number,lon2:number){
   const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
   return Math.round(r*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
 }
-function currentTime(date = new Date()){return new Intl.DateTimeFormat("ar-EG",{hour:"2-digit",minute:"2-digit",hour12:false}).format(date);}
+function currentTime(date = new Date()){return new Intl.DateTimeFormat("en-GB",{hour:"2-digit",minute:"2-digit",hour12:false}).format(date);}
 type Coordinates={latitude:number;longitude:number};
 function getBrowserLocation():Promise<Coordinates>{return new Promise((resolve,reject)=>{if(!navigator.geolocation){reject(new Error("المتصفح لا يدعم تحديد الموقع."));return;}navigator.geolocation.getCurrentPosition(p=>resolve({latitude:p.coords.latitude,longitude:p.coords.longitude}),e=>reject(new Error(e.code===e.PERMISSION_DENIED?"يجب السماح بالوصول إلى الموقع لتسجيل الحضور.":e.code===e.POSITION_UNAVAILABLE?"تعذر تحديد موقعك الحالي.":"انتهت مهلة تحديد الموقع.")),{enableHighAccuracy:true,timeout:15000,maximumAge:0});});}
 async function getCurrentCoordinates():Promise<Coordinates>{
