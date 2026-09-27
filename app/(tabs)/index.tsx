@@ -45,6 +45,7 @@ export default function HomeScreen(){
   const todayCairo = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const teamQuery = trpc.attendance.team.useQuery(undefined, { enabled: isManagement || role === "supervisor" });
   const payrollQuery = trpc.payroll.list.useQuery({ month: currentMonth }, { enabled: isManagement });
+  const managementDashboard = trpc.management.dashboard.useQuery({ month: currentMonth }, { enabled: isManagement, refetchInterval: 60000 });
   const [working,setWorking]=useState(false);
   const [gpsMessage,setGpsMessage]=useState("الموقع جاهز للتحقق");
   const isCheckedOut=Boolean(todayRecord?.checkOut);
@@ -153,6 +154,60 @@ export default function HomeScreen(){
         {isManagement ? <Insight icon="banknote" value={payrollTotal.toLocaleString("ar-EG")} label="صافي الرواتب" meta="هذا الشهر" /> : <Insight icon="notifications" value={String(unread)} label="التنبيهات" meta="تحتاج انتباهك" />}
       </View>
 
+      {isManagement && <View style={styles.managementPanel}>
+        <View style={styles.managementHeader}>
+          <View>
+            <Text style={styles.managementEyebrow}>MANAGEMENT COMMAND CENTER</Text>
+            <Text style={styles.managementTitle}>مركز قيادة الإدارة</Text>
+            <Text style={styles.managementSub}>صورة تشغيلية مباشرة للفريق والحضور والطلبات والرواتب.</Text>
+          </View>
+          <View style={styles.managementLive}><View style={styles.managementLiveDot}/><Text style={styles.managementLiveText}>مباشر</Text></View>
+        </View>
+
+        <View style={[styles.managementGrid, isMobile && styles.managementGridMobile]}>
+          <View style={styles.managementMainCard}>
+            <View style={styles.cardHeader}><Text style={styles.cardTitle}>حالة الفريق اليوم</Text><Text style={styles.cardMeta}>{managementDashboard.data?.date ?? todayCairo}</Text></View>
+            <View style={styles.managementStats}>
+              <DashStat value={String(managementDashboard.data?.team.present ?? teamPresent)} label="حاضر" />
+              <DashStat value={String(managementDashboard.data?.team.absent ?? teamAbsent)} label="غائب" />
+              <DashStat value={String(managementDashboard.data?.team.openShifts ?? Math.max(0, teamPresent-teamCheckedOut))} label="وردية مفتوحة" />
+              <DashStat value={String(managementDashboard.data?.team.lateMinutes ?? teamLate)} label="دقائق تأخير" />
+            </View>
+            <View style={styles.attendanceProgress}>
+              <View style={styles.attendanceProgressHead}><Text style={styles.managementPercent}>{managementDashboard.data?.team.attendanceRate ?? 0}%</Text><Text style={styles.managementSmallLabel}>نسبة حضور الفريق</Text></View>
+              <View style={styles.progressTrack}><View style={[styles.progressFill,{width: `${Math.min(100,Math.max(0,managementDashboard.data?.team.attendanceRate ?? 0))}%`} as any]}/></View>
+            </View>
+          </View>
+
+          <View style={styles.managementMainCard}>
+            <View style={styles.cardHeader}><Text style={styles.cardTitle}>طلبات تحتاج قرار</Text><Text style={styles.cardMeta}>الآن</Text></View>
+            <View style={styles.commandMetric}><Text style={styles.commandMetricValue}>{managementDashboard.data?.requests.pending ?? 0}</Text><Text style={styles.commandMetricLabel}>طلب قيد المراجعة</Text></View>
+            <Pressable style={styles.managementAction} onPress={()=>router.push("/requests" as never)}><Text style={styles.managementActionText}>فتح مركز الطلبات</Text><Text style={styles.managementArrow}>‹</Text></Pressable>
+          </View>
+
+          <View style={styles.managementMainCard}>
+            <View style={styles.cardHeader}><Text style={styles.cardTitle}>الرواتب</Text><Text style={styles.cardMeta}>هذا الشهر</Text></View>
+            <View style={styles.commandMetric}><Text style={styles.commandMetricValue}>{Number(managementDashboard.data?.payroll.total ?? payrollTotal).toLocaleString("ar-EG")}</Text><Text style={styles.commandMetricLabel}>إجمالي صافي الرواتب</Text></View>
+            <View style={styles.managementRows}>
+              <Text style={styles.managementRowLabel}>السجلات</Text><Text style={styles.managementRowValue}>{managementDashboard.data?.payroll.rows ?? payrollQuery.data?.length ?? 0}</Text>
+              <Text style={styles.managementRowLabel}>المعتمد</Text><Text style={styles.managementRowValue}>{managementDashboard.data?.payroll.approved ?? 0}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.managementLowerGrid,isMobile && styles.managementGridMobile]}>
+          <View style={styles.managementMainCard}>
+            <View style={styles.cardHeader}><Text style={styles.cardTitle}>أكثر الموظفين تأخيرًا</Text><Text style={styles.cardMeta}>اليوم</Text></View>
+            {(managementDashboard.data?.lateEmployees?.length ?? 0) > 0 ? managementDashboard.data!.lateEmployees.map((item:any)=><View key={String(item.id)} style={styles.lateRow}><View style={styles.lateBadge}><Text style={styles.lateBadgeText}>{item.minutes} د</Text></View><View style={styles.lateCopy}><Text style={styles.lateName}>{item.name}</Text><Text style={styles.lateMeta}>{item.status} · يحتاج متابعة</Text></View></View>) : <View style={styles.emptyCommand}><Text style={styles.emptyCommandTitle}>لا يوجد تأخير مسجل</Text><Text style={styles.emptyCommandText}>لا توجد حالات تأخير تحتاج متابعة حاليًا.</Text></View>}
+          </View>
+
+          <View style={styles.managementMainCard}>
+            <View style={styles.cardHeader}><Text style={styles.cardTitle}>توزيع الفريق</Text><Text style={styles.cardMeta}>حسب القسم</Text></View>
+            {(managementDashboard.data?.departments?.length ?? 0) > 0 ? managementDashboard.data!.departments.slice(0,5).map((item:any)=><View key={item.name} style={styles.departmentRow}><Text style={styles.departmentCount}>{item.count}</Text><View style={styles.departmentCopy}><Text style={styles.departmentName}>{item.name}</Text><View style={styles.departmentTrack}><View style={[styles.departmentFill,{width:`${Math.min(100,(item.count/Math.max(1,managementDashboard.data!.team.total))*100)}%`} as any]}/></View></View></View>) : <View style={styles.emptyCommand}><Text style={styles.emptyCommandTitle}>لا توجد أقسام مسجلة</Text><Text style={styles.emptyCommandText}>أضف الأقسام من بيانات الموظفين لعرض التوزيع.</Text></View>}
+          </View>
+        </View>
+      </View>}
+
       <View style={styles.smartCard}>
         <View style={styles.smartHeader}>
           <View><Text style={styles.smartEyebrow}>SMART INSIGHTS</Text><Text style={styles.smartTitle}>مؤشرات ذكية من بيانات اليوم</Text></View>
@@ -191,6 +246,8 @@ export default function HomeScreen(){
   </ScreenContainer>;
 }
 
+function DashStat({value,label}:{value:string;label:string}){return <View style={styles.dashStat}><Text style={styles.dashStatValue}>{value}</Text><Text style={styles.dashStatLabel}>{label}</Text></View>}
+
 function Insight({ icon, value, label, meta }: { icon: any; value: string; label: string; meta: string }) {
   return <View style={styles.insightItem}>
     <View style={styles.insightIcon}><IconSymbol name={icon} size={16} color="#163A63" /></View>
@@ -206,6 +263,52 @@ function Kpi({icon,value,label,note}:{icon:any;value:string;label:string;note:st
 function TimeRow({label,value}:{label:string;value:string}){return <View style={styles.timeRow}><Text style={styles.timeValue}>{value}</Text><Text style={styles.timeLabel}>{label}</Text></View>}
 
 const styles=StyleSheet.create({
+  managementPanel:{backgroundColor:"#F8FAFC",borderRadius:22,borderWidth:1,borderColor:"#E4E7EC",padding:18,gap:12},
+  managementHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"flex-start",gap:12},
+  managementEyebrow:{fontSize:9,fontWeight:"900",letterSpacing:1.1,color:"#98A2B3",textAlign:"right"},
+  managementTitle:{fontSize:19,fontWeight:"900",color:"#172033",marginTop:3,textAlign:"right"},
+  managementSub:{fontSize:9,color:"#667085",marginTop:4,textAlign:"right"},
+  managementLive:{flexDirection:"row-reverse",alignItems:"center",gap:6,paddingHorizontal:9,paddingVertical:6,borderRadius:999,backgroundColor:"#ECFDF3"},
+  managementLiveDot:{width:6,height:6,borderRadius:3,backgroundColor:"#16A34A"},
+  managementLiveText:{fontSize:9,fontWeight:"900",color:"#15803D"},
+  managementGrid:{flexDirection:"row-reverse",gap:10,flexWrap:"wrap"},
+  managementGridMobile:{flexDirection:"column"},
+  managementMainCard:{flex:1,minWidth:260,backgroundColor:"#FFFFFF",borderRadius:16,borderWidth:1,borderColor:"#E4E7EC",padding:14},
+  managementStats:{flexDirection:"row-reverse",gap:8,marginTop:14,flexWrap:"wrap"},
+  dashStat:{flex:1,minWidth:65,backgroundColor:"#F8FAFC",borderRadius:12,padding:10},
+  dashStatValue:{fontSize:17,fontWeight:"900",color:"#163A63",textAlign:"right"},
+  dashStatLabel:{fontSize:8,color:"#98A2B3",marginTop:2,textAlign:"right"},
+  attendanceProgress:{marginTop:14},
+  attendanceProgressHead:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},
+  managementPercent:{fontSize:13,fontWeight:"900",color:"#163A63"},
+  managementSmallLabel:{fontSize:9,color:"#98A2B3"},
+  progressTrack:{height:8,borderRadius:5,backgroundColor:"#E9EEF4",overflow:"hidden",marginTop:7},
+  progressFill:{height:"100%",borderRadius:5,backgroundColor:"#163A63"},
+  commandMetric:{marginTop:16},
+  commandMetricValue:{fontSize:24,fontWeight:"900",color:"#172033",textAlign:"right"},
+  commandMetricLabel:{fontSize:9,color:"#98A2B3",marginTop:3,textAlign:"right"},
+  managementAction:{marginTop:13,backgroundColor:"#EEF4FB",borderRadius:11,paddingVertical:10,paddingHorizontal:11,flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},
+  managementActionText:{fontSize:10,fontWeight:"900",color:"#163A63"},
+  managementArrow:{fontSize:18,color:"#98A2B3"},
+  managementRows:{marginTop:10,borderTopWidth:1,borderTopColor:"#EAECF0",paddingTop:8,flexDirection:"row-reverse",justifyContent:"space-between"},
+  managementRowLabel:{fontSize:8,color:"#98A2B3"},
+  managementRowValue:{fontSize:10,fontWeight:"900",color:"#475467"},
+  managementLowerGrid:{flexDirection:"row-reverse",gap:10,flexWrap:"wrap"},
+  lateRow:{flexDirection:"row-reverse",alignItems:"center",gap:10,borderTopWidth:1,borderTopColor:"#F2F4F7",paddingVertical:10},
+  lateBadge:{backgroundColor:"#F8FAFC",borderRadius:9,paddingHorizontal:8,paddingVertical:6},
+  lateBadgeText:{fontSize:9,fontWeight:"900",color:"#163A63"},
+  lateCopy:{flex:1},
+  lateName:{fontSize:11,fontWeight:"900",color:"#172033",textAlign:"right"},
+  lateMeta:{fontSize:8,color:"#98A2B3",marginTop:2,textAlign:"right"},
+  emptyCommand:{paddingVertical:18,alignItems:"center"},
+  emptyCommandTitle:{fontSize:11,fontWeight:"900",color:"#475467"},
+  emptyCommandText:{fontSize:9,color:"#98A2B3",marginTop:4,textAlign:"center"},
+  departmentRow:{flexDirection:"row-reverse",alignItems:"center",gap:9,borderTopWidth:1,borderTopColor:"#F2F4F7",paddingVertical:9},
+  departmentCount:{fontSize:10,fontWeight:"900",color:"#163A63",width:25,textAlign:"center"},
+  departmentCopy:{flex:1},
+  departmentName:{fontSize:10,fontWeight:"800",color:"#475467",textAlign:"right"},
+  departmentTrack:{height:6,borderRadius:4,backgroundColor:"#EEF2F6",overflow:"hidden",marginTop:5},
+  departmentFill:{height:"100%",borderRadius:4,backgroundColor:"#163A63"},
   smartCard:{backgroundColor:"#F8FAFC",borderRadius:20,borderWidth:1,borderColor:"#E4E7EC",padding:18},smartHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",gap:12},smartEyebrow:{fontSize:9,fontWeight:"900",letterSpacing:1.2,color:"#98A2B3",textAlign:"right"},smartTitle:{fontSize:16,fontWeight:"900",color:"#172033",marginTop:3,textAlign:"right"},smartBadge:{flexDirection:"row",alignItems:"center",gap:5,paddingHorizontal:9,paddingVertical:6,borderRadius:999,backgroundColor:"#EEF3F8"},smartBadgeText:{fontSize:9,fontWeight:"800",color:"#163A63"},smartGrid:{flexDirection:"row-reverse",gap:10,marginTop:14,flexWrap:"wrap"},smartGridMobile:{flexDirection:"column"},smartItem:{flex:1,minWidth:220,flexDirection:"row-reverse",alignItems:"flex-start",gap:10,backgroundColor:"#FFFFFF",borderRadius:14,borderWidth:1,borderColor:"#E8ECF1",padding:13},smartIcon:{width:30,height:30,borderRadius:10,backgroundColor:"#EEF3F8",alignItems:"center",justifyContent:"center"},smartCopy:{flex:1},smartItemTitle:{fontSize:11,fontWeight:"900",color:"#172033",textAlign:"right"},smartItemText:{fontSize:9,color:"#667085",lineHeight:15,marginTop:3,textAlign:"right"},  page:{padding:30,paddingBottom:70,gap:22,maxWidth:1280,width:"100%",alignSelf:"center"},pageMobile:{padding:14,paddingBottom:34,gap:14},
   header:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},  headerMobile:{flexDirection:"column",alignItems:"stretch",gap:12},
   headerRightMobile:{justifyContent:"space-between",width:"100%",gap:10},
