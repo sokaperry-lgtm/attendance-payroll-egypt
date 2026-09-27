@@ -23,7 +23,7 @@ export default function RequestsScreen() {
   const initialDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date());
   const [from, setFrom] = useState(initialDate);
   const [to, setTo] = useState(initialDate);
-  const [hours, setHours] = useState("2");
+  const [hours, setHours] = useState("1");
   const [reason, setReason] = useState("");
   const [selectedRequest, setSelectedRequest] = useState<(typeof requests)[number] | null>(null);
   const [activeFilter, setActiveFilter] = useState<"الكل" | "قيد المراجعة" | "مقبول" | "مرفوض">("الكل");
@@ -47,7 +47,7 @@ export default function RequestsScreen() {
   async function saveRequest() {
     if (!reason.trim()) { showAlert("بيانات ناقصة", "اكتب سبب الطلب أولًا."); return; }
     try {
-      await submitRequest({ type, from, to, reason });
+      await submitRequest({ type, from, to: type === "إذن" ? from : to, reason, hours: type === "إذن" ? Number(hours) : undefined });
     } catch (error) {
       showAlert("تعذر إرسال الطلب", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
       return;
@@ -57,7 +57,7 @@ export default function RequestsScreen() {
   }
 
   return <ScreenContainer><ScrollView contentContainerStyle={[styles.content, compact && styles.contentCompact]} showsVerticalScrollIndicator={false}>
-    <View style={[styles.header, compact && styles.headerCompact]}><View><Text style={styles.eyebrow}>طلباتك وموافقاتك</Text><Text style={styles.title}>الطلبات</Text><Text style={styles.subtitle}>إجازات، أذونات ومأموريات</Text></View><Pressable onPress={() => setModalOpen(true)} style={[styles.addButton, compact && styles.addButtonCompact]}><Text style={styles.addButtonText}>+ طلب جديد</Text></Pressable></View>
+    <View style={[styles.header, compact && styles.headerCompact]}><View><Text style={styles.eyebrow}>طلباتك وموافقاتك</Text><Text style={styles.title}>الطلبات</Text><Text style={styles.subtitle}>إجازات وأذونات</Text></View><Pressable onPress={() => setModalOpen(true)} style={[styles.addButton, compact && styles.addButtonCompact]}><Text style={styles.addButtonText}>+ طلب جديد</Text></Pressable></View>
     {role !== "employee" ? <View style={styles.absenceReviewPanel}>
       <View style={styles.absenceReviewHeader}>
         <View style={styles.absenceReviewBadge}><Text style={styles.absenceReviewBadgeText}>{pendingAbsenceReviews.length}</Text></View>
@@ -159,7 +159,7 @@ export default function RequestsScreen() {
     {filteredRequests.length === 0 && <Text style={styles.empty}>{requests.length === 0 ? "لم ترسل أي طلبات بعد." : `لا توجد طلبات بحالة ${activeFilter}.`}</Text>}
   </ScrollView>
   <Modal visible={Boolean(selectedRequest)} transparent animationType="slide" onRequestClose={() => setSelectedRequest(null)}><View style={styles.modalBackdrop}><View style={styles.detailModal}><View style={styles.detailHead}><Text style={styles.detailTitle}>تفاصيل الطلب</Text><Pressable onPress={() => setSelectedRequest(null)}><Text style={styles.closeText}>إغلاق</Text></Pressable></View>{selectedRequest && <><Text style={styles.detailType}>{selectedRequest.type}</Text><Text style={styles.detailDates}>{selectedRequest.type === "أوفر تايم" ? `${selectedRequest.from} · ${selectedRequest.hours ?? 0} ساعة` : `${selectedRequest.from} إلى ${selectedRequest.to}`}</Text><View style={styles.detailStatus}><Text style={styles.detailStatusText}>{selectedRequest.status}</Text></View><Text style={styles.detailLabel}>سبب الطلب</Text><Text style={styles.detailReason}>{selectedRequest.reason}</Text><View style={styles.timeline}><Text style={styles.timelineTitle}>حالة المعالجة</Text><Text style={styles.timelineText}>{selectedRequest.status === "قيد المراجعة" ? "الطلب في انتظار مراجعة المدير." : selectedRequest.status === "مقبول" ? "تمت مراجعة الطلب واعتماده." : "تمت مراجعة الطلب ورفضه."}</Text></View></>}</View></View></Modal>
-  <Modal visible={modalOpen} transparent animationType="slide" onRequestClose={() => setModalOpen(false)}><View style={styles.modalBackdrop}><View style={styles.modal}><View style={styles.modalHeader}><Pressable onPress={() => setModalOpen(false)}><Text style={styles.close}>إلغاء</Text></Pressable><Text style={styles.modalTitle}>طلب جديد</Text></View><Text style={styles.fieldLabel}>نوع الطلب</Text><View style={styles.typeRow}>{(["إجازة", "إجازة مرضية", "إجازة طارئة", "إذن", "مأمورية"] as RequestType[]).map((item) => <Pressable key={item} onPress={() => setType(item)} style={[styles.typeChip, type === item && styles.typeChipActive]}><Text style={[styles.typeChipText, type === item && styles.typeChipTextActive]}>{item}</Text></Pressable>)}</View><Text style={styles.fieldLabel}>من</Text><TextInput value={from} onChangeText={setFrom} placeholder="YYYY-MM-DD" style={styles.input} /><Text style={styles.fieldLabel}>إلى</Text><TextInput value={to} onChangeText={setTo} placeholder="YYYY-MM-DD" style={styles.input} /><Text style={styles.fieldLabel}>السبب</Text><TextInput value={reason} onChangeText={setReason} placeholder="اكتب سبب الطلب" multiline style={[styles.input, styles.textArea]} /><Pressable onPress={saveRequest} style={styles.submitButton}><Text style={styles.submitText}>إرسال للمراجعة</Text></Pressable></View></View></Modal>
+  <Modal visible={modalOpen} transparent animationType="slide" onRequestClose={() => setModalOpen(false)}><View style={styles.modalBackdrop}><View style={styles.modal}><View style={styles.modalHeader}><Pressable onPress={() => setModalOpen(false)}><Text style={styles.close}>إلغاء</Text></Pressable><Text style={styles.modalTitle}>طلب جديد</Text></View><Text style={styles.fieldLabel}>نوع الطلب</Text><View style={styles.typeRow}>{(["إجازة", "إجازة مرضية", "إجازة طارئة", "إذن"] as RequestType[]).map((item) => <Pressable key={item} onPress={() => setType(item)} style={[styles.typeChip, type === item && styles.typeChipActive]}><Text style={[styles.typeChipText, type === item && styles.typeChipTextActive]}>{item}</Text></Pressable>)}</View><Text style={styles.fieldLabel}>التاريخ</Text><TextInput value={from} onChangeText={(value) => { setFrom(value); if (type === "إذن") setTo(value); }} placeholder="YYYY-MM-DD" style={styles.input} />{type !== "إذن" ? <><Text style={styles.fieldLabel}>إلى</Text><TextInput value={to} onChangeText={setTo} placeholder="YYYY-MM-DD" style={styles.input} /></> : <><Text style={styles.fieldLabel}>مدة الإذن</Text><View style={styles.typeRow}>{["0.5", "1", "1.5", "2", "3"].map((item) => <Pressable key={item} onPress={() => setHours(item)} style={[styles.typeChip, hours === item && styles.typeChipActive]}><Text style={[styles.typeChipText, hours === item && styles.typeChipTextActive]}>{item === "0.5" ? "نصف ساعة" : `${item} ساعة`}</Text></Pressable>)}</View></>}<Text style={styles.fieldLabel}>السبب</Text><TextInput value={reason} onChangeText={setReason} placeholder="اكتب سبب الطلب" multiline style={[styles.input, styles.textArea]} /><Pressable onPress={saveRequest} style={styles.submitButton}><Text style={styles.submitText}>إرسال للمراجعة</Text></Pressable></View></View></Modal>
   </ScreenContainer>;
 }
 
