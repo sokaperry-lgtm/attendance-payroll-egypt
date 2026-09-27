@@ -3,7 +3,11 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
 
-export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {\n  return <ScreenContainer><View style={styles.state}><Text style={styles.error}>حصل خطأ في صفحة «ملفي»</Text><Text style={styles.stateText}>{error?.message || "خطأ غير معروف"}</Text><Pressable onPress={retry} style={styles.retry}><Text style={styles.retryText}>إعادة المحاولة</Text></Pressable></View></ScreenContainer>;\n}\n\nexport default function EmployeeSelfServiceScreen() {
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+  return <ScreenContainer><View style={styles.state}><Text style={styles.error}>حصل خطأ في صفحة «ملفي»</Text><Text style={styles.stateText}>{error?.message || "خطأ غير معروف"}</Text><Pressable onPress={retry} style={styles.retry}><Text style={styles.retryText}>إعادة المحاولة</Text></Pressable></View></ScreenContainer>;
+}
+
+export default function EmployeeSelfServiceScreen() {
   const { width } = useWindowDimensions();
   const compact = width < 520;
   const month = new Date().toISOString().slice(0,7);
