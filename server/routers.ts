@@ -282,7 +282,7 @@ export const appRouter = router({
       }
       return db.listRequests(ctx.staffUser.id);
     }),
-    create: staffProcedure.input(z.object({ type: z.enum(["إجازة","إجازة مرضية","إجازة طارئة","إذن","مأمورية"]), fromDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), toDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), reason: z.string().min(2).max(1000), hours: z.number().min(0.5).max(24).optional() })).mutation(async ({ ctx, input }) => {
+    create: staffProcedure.input(z.object({ type: z.enum(["إجازة","إجازة مرضية","إجازة طارئة","إذن","مأمورية"]), fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), reason: z.string().min(2).max(1000), hours: z.number().min(0.5).max(24).optional() })).mutation(async ({ ctx, input }) => {
       if (input.fromDate > input.toDate) throw new Error("تاريخ بداية الإجازة يجب أن يكون قبل أو مساويًا لتاريخ النهاية.");
       if (!input.fromDate || !input.toDate) throw new Error("تواريخ الإجازة غير صحيحة.");
       if (["إجازة","إجازة مرضية","إجازة طارئة"].includes(input.type)) {
