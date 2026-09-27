@@ -235,7 +235,17 @@ export default function PayrollScreen() {
           <View style={styles.smartPayrollValue}><Text style={styles.smartPayrollValueText}>{smartPayrollInsight.value}</Text><Text style={styles.smartPayrollValueLabel}>مؤشر</Text></View>
         </View>
 
-        <View style={styles.approvalCard}><View style={styles.approvalTop}><View><Text style={styles.approvalTitle}>جاهزية المسير</Text><Text style={styles.approvalText}>{stats.approved} من {rows.length} موظف تم اعتمادهم</Text></View><Text style={styles.approvalPercent}>{rows.length ? Math.round((stats.approved / rows.length) * 100) : 0}%</Text></View><View style={styles.progressTrack}><View style={[styles.progressFill,{width:`${rows.length ? Math.round((stats.approved / rows.length) * 100) : 0}%`}]} /></View></View>
+        <View style={styles.approvalCard}>
+          <View style={styles.approvalTop}><View><Text style={styles.approvalTitle}>جاهزية المسير</Text><Text style={styles.approvalText}>{stats.approved} من {rows.length} موظف تم اعتمادهم</Text></View><Text style={styles.approvalPercent}>{rows.length ? Math.round((stats.approved / rows.length) * 100) : 0}%</Text></View>
+          <View style={styles.progressTrack}><View style={[styles.progressFill,{width:`${rows.length ? Math.round((stats.approved / rows.length) * 100) : 0}%`}]} /></View>
+          <View style={styles.lockRow}>
+            <View style={styles.lockCopy}><Text style={styles.lockTitle}>{rows.length > 0 && stats.approved === rows.length ? "المسير مقفول" : "المسير مفتوح للمراجعة"}</Text><Text style={styles.lockText}>{rows.length > 0 && stats.approved === rows.length ? "كل سجلات الشهر معتمدة ولا تحتاج إلى إعادة حساب." : "بعد مراجعة الحضور والتعديلات يمكنك اعتماد المسير بالكامل."}</Text></View>
+            <Pressable disabled={approve.isPending || rows.length === 0 || stats.approved === rows.length} onPress={async () => { const pending = rows.filter((r) => r.status !== "approved"); for (const row of pending) { try { await approve.mutateAsync({ id: row.id }); } catch { break; } } await query.refetch(); }} style={[styles.lockButton, (rows.length === 0 || stats.approved === rows.length) && styles.lockButtonDisabled]}>
+              <Text style={styles.lockButtonText}>{stats.approved === rows.length && rows.length > 0 ? "مقفل" : approve.isPending ? "جارٍ الاعتماد..." : "اعتماد الشهر بالكامل"}</Text>
+            </Pressable>
+          </View>
+        </View>
+
         <View style={[styles.reviewLane, compact && styles.reviewLaneCompact]}>
           <ReviewItem label="بانتظار الاعتماد" value={String(Math.max(rows.length - stats.approved, 0))} />
           <ReviewItem label="تعديلات الشهر" value={String(adjustments.data?.length ?? 0)} />
