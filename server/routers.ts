@@ -167,7 +167,7 @@ export const appRouter = router({
     team: supervisorProcedure.query(async ({ ctx }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.listCompanyAttendance(ctx.staffUser.id); }),
     sync: supervisorProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).mutation(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage"); return enterprise.syncMonthlyAttendance(ctx.staffUser.id, input.month); }),
     workSummary: supervisorProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).query(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.getAttendanceWorkSummary(ctx.staffUser.id, input.month); }),
-    managerUpdate: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), checkIn: z.string().max(8).nullable().optional(), checkOut: z.string().max(8).nullable().optional(), status: z.enum(["حاضر", "متأخر", "غياب", "إجازة", "مأمورية"]), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0).nullable().optional(), note: z.string().max(1000).nullable().optional() })).mutation(async ({ ctx, input }) => {
+    managerUpdate: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), checkIn: z.string().max(8).nullable().optional(), checkOut: z.string().max(8).nullable().optional(), status: z.enum(["حاضر", "متأخر", "غياب", "إجازة", "مأمورية"]), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0).nullable().optional(), note: z.string().max(1000).nullable().optional() })).mutation(async ({ ctx, input }) => {
       await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage");
       const access = await enterprise.assertOperationalTarget(ctx.staffUser.id, input.staffAccountId);
       if (access.target.role === "owner" && access.actor.role !== "owner") throw new Error("لا يمكن تعديل حضور المالك من هذا الحساب.");
@@ -183,7 +183,7 @@ export const appRouter = router({
       if (m) await enterprise.writeAudit(ctx.staffUser.id, m.companyId, "attendance.updated", "attendance", String(row?.id ?? ""), {staffAccountId:input.staffAccountId,date:input.date,status:input.status});
       return row;
     }),
-    checkIn: staffProcedure.input(z.object({ date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), latitude: gpsCoordinate.min(-90).max(90), longitude: gpsCoordinate.min(-180).max(180) })).mutation(async ({ ctx, input }) => {
+    checkIn: staffProcedure.input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), latitude: gpsCoordinate.min(-90).max(90), longitude: gpsCoordinate.min(-180).max(180) })).mutation(async ({ ctx, input }) => {
       timeMinutes(input.time);
       if (input.date > cairoToday()) throw new Error("لا يمكن تسجيل حضور بتاريخ مستقبلي.");
       await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7));
@@ -206,7 +206,7 @@ export const appRouter = router({
       const status = late > 0 ? "متأخر" : "حاضر";
       return db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status, lateMinutes: late, distanceMeters, note: scheduled?.shift ? `حسب جدول: ${scheduled.shift.name}` : null });
     }),
-    checkOut: staffProcedure.input(z.object({ date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/), time: z.string().max(8), latitude: gpsCoordinate.min(-90).max(90), longitude: gpsCoordinate.min(-180).max(180) })).mutation(async ({ ctx, input }) => {
+    checkOut: staffProcedure.input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), time: z.string().max(8), latitude: gpsCoordinate.min(-90).max(90), longitude: gpsCoordinate.min(-180).max(180) })).mutation(async ({ ctx, input }) => {
       timeMinutes(input.time);
       if (input.date > cairoToday()) throw new Error("لا يمكن تسجيل انصراف بتاريخ مستقبلي.");
       await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7));
