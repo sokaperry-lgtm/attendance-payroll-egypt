@@ -130,7 +130,7 @@ export async function createStaffAccount(input: {
     role: input.role,
     baseSalary: input.baseSalary ?? 0,
     shiftStart: input.shiftStart ?? "08:00",
-    shiftEnd: input.shiftEnd ?? "18:00",
+    shiftEnd: input.shiftEnd ?? "17:00",
   });
   return getStaffAccountById(Number(result[0].insertId));
 }
@@ -138,6 +138,8 @@ export async function createStaffAccount(input: {
 export async function getStaffAccountById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
+  // Keep the legacy employee shift aligned with the company morning standard.
+  await db.update(staffAccounts).set({ shiftStart: "08:00", shiftEnd: "17:00" }).where(and(eq(staffAccounts.id, id), eq(staffAccounts.shiftStart, "09:00")));
   const result = await db.select().from(staffAccounts).where(eq(staffAccounts.id, id)).limit(1);
   return result[0];
 }
@@ -145,6 +147,7 @@ export async function getStaffAccountById(id: number) {
 export async function listStaffAccounts() {
   const db = await getDb();
   if (!db) return [];
+  await db.update(staffAccounts).set({ shiftStart: "08:00", shiftEnd: "17:00" }).where(eq(staffAccounts.shiftStart, "09:00"));
   return db.select({
     id: staffAccounts.id,
     phone: staffAccounts.phone,
