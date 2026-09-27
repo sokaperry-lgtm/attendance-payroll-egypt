@@ -7,7 +7,7 @@ import { useAppData } from "@/lib/app-data";
 const items = [
   { key: "self-service", title: "ملفي", hint: "بياناتك ورصيدك", icon: "person.fill", roles: ["employee"] },
   { key: "hr-tools", title: "HR Tools", hint: "إدارة الموارد البشرية", icon: "banknote", roles: ["owner", "manager", "hr"] },
-  { key: "schedule", title: "الجدول", hint: "الورديات والتغطية", icon: "calendar", roles: ["owner", "manager", "hr", "supervisor"] },
+  { key: "schedule", title: "الجدول", hint: "جدولك الأسبوعي", icon: "calendar", roles: ["owner", "manager", "hr", "supervisor", "employee"] },
   { key: "reports", title: "التقارير", hint: "الحضور والأداء", icon: "chart.bar.fill", roles: ["owner", "manager", "hr", "accountant", "supervisor"] },
   { key: "payroll", title: "الرواتب", hint: "المراجعة والاعتماد", icon: "banknote", roles: ["owner", "manager", "hr", "accountant"] },
   { key: "employees", title: "الموظفون", hint: "دليل الفريق", icon: "person.2.fill", roles: ["owner", "manager", "hr"] },
