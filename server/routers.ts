@@ -8,7 +8,7 @@ import * as db from "./db";
 import { PAYROLL_RULES } from "../lib/payroll";
 
 function timeMinutes(value: string) {
-  const match = /^(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$/.test(value);
+  const match = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value);
   if (!match) throw new Error("صيغة الوقت غير صحيحة.");
   const [h,m]=value.split(":").map(Number);
   return h*60+m;
@@ -94,7 +94,7 @@ export const appRouter = router({
   }),
   staff: router({
     list: hrProcedure.query(async ({ ctx }) => { await enterprise.assertPermission(ctx.staffUser.id, "employees.view"); return (await enterprise.listCompanyStaff(ctx.staffUser.id)).map((item) => ({ ...item })); }),
-    create: hrProcedure.input(z.object({ phone: z.string().min(3).max(32), password: z.string().min(6).max(120), name: z.string().min(2).max(160), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).default(0), role: z.enum(["manager","supervisor","employee"]).default("employee"), shiftStart: z.string().max(8).default("09:00"), shiftEnd: z.string().max(8).default("18:00") })).mutation(async ({ ctx, input }) => {
+    create: hrProcedure.input(z.object({ phone: z.string().min(3).max(32), password: z.string().min(6).max(120), name: z.string().min(2).max(160), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).default(0), role: z.enum(["manager","supervisor","employee"]).default("employee"), shiftStart: z.string().max(8).default("08:00"), shiftEnd: z.string().max(8).default("17:00") })).mutation(async ({ ctx, input }) => {
       const actorMembership = await enterprise.getMembership(ctx.staffUser.id);
       if (input.role === "manager" && !["owner", "manager"].includes(actorMembership?.role ?? "")) {
         throw new Error("إنشاء حساب مدير متاح للمالك أو مدير الشركة فقط.");
