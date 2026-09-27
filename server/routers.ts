@@ -81,6 +81,12 @@ export const appRouter = router({
       ctx.res.cookie(INTERNAL_SESSION_COOKIE, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
       return { token, staff: await staffView(staff) };
     }),
+    changePassword: staffProcedure.input(z.object({ currentPassword: z.string().min(1).max(120), newPassword: z.string().min(6).max(120) })).mutation(async ({ ctx, input }) => {
+      await db.changeStaffPassword(ctx.staffUser.id, input.currentPassword, input.newPassword);
+      const membership = await enterprise.getCompanyForStaff(ctx.staffUser.id);
+      if (membership) await enterprise.writeAudit(ctx.staffUser.id, membership.companyId, "auth.password_changed", "staff", String(ctx.staffUser.id));
+      return { success: true };
+    }),
     logout: staffProcedure.mutation(async ({ ctx }) => {
       const authHeader = ctx.req.headers.authorization || ctx.req.headers.Authorization;
       const bearer = typeof authHeader === "string" && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
