@@ -108,7 +108,7 @@ function RoleAwareTabs() {
         <Tabs.Screen name="attendance" options={{ title: "الحضور", href: mobile && !mobilePrimary.has("attendance") ? null : "/attendance", tabBarIcon: ({ color }) => <IconSymbol size={23} name="calendar" color={color} /> }} />
         <Tabs.Screen name="requests" options={{ title: "الطلبات", href: mobile && !mobilePrimary.has("requests") ? null : "/requests", tabBarIcon: ({ color }) => <IconSymbol size={23} name="doc.text.fill" color={color} /> }} />
         <Tabs.Screen name="more" options={{ title: "المزيد", href: mobile ? "/more" : null, tabBarIcon: ({ color }) => <IconSymbol size={23} name="ellipsis.circle" color={color} /> }} />
-        <Tabs.Screen name="schedule" options={{ title: "الجدول", href: mobile ? null : (teamAccess ? "/schedule" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="calendar" color={color} /> }} />
+        <Tabs.Screen name="schedule" options={{ title: "الجدول", href: mobile ? null : (teamAccess || role === "employee" ? "/schedule" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="calendar" color={color} /> }} />
         <Tabs.Screen name="reports" options={{ title: "التقارير", href: mobile ? null : (teamAccess ? "/reports" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="chart.bar.fill" color={color} /> }} />
         <Tabs.Screen name="audit" options={{ title: "سجل العمليات", href: null, tabBarIcon: ({ color }) => <IconSymbol name="lock.shield.fill" size={23} color={color} /> }} />
         <Tabs.Screen name="payroll" options={{ title: "الرواتب", href: mobile ? null : (payrollAccess ? "/payroll" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="banknote" color={color} /> }} />
