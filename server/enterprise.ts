@@ -1039,7 +1039,7 @@ export async function validateLeaveRequest(
   type:"إجازة"|"إجازة مرضية"|"إجازة طارئة"
 ) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
-  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(fromDate) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(toDate)) throw new Error("صيغة تاريخ الإجازة غير صحيحة.");
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate)) throw new Error("صيغة تاريخ الإجازة غير صحيحة.");
   if(fromDate>toDate) throw new Error("تاريخ بداية الإجازة يجب أن يكون قبل أو مساويًا لتاريخ النهاية.");
   if(fromDate.slice(0,4)!==toDate.slice(0,4)) throw new Error("لا يمكن أن تمتد الإجازة بين سنتين. قدم طلبين منفصلين.");
   const days=leaveDays(fromDate,toDate);
