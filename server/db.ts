@@ -129,7 +129,7 @@ export async function createStaffAccount(input: {
     department: input.department?.trim() || null,
     role: input.role,
     baseSalary: input.baseSalary ?? 0,
-    shiftStart: input.shiftStart ?? "09:00",
+    shiftStart: input.shiftStart ?? "08:00",
     shiftEnd: input.shiftEnd ?? "18:00",
   });
   return getStaffAccountById(Number(result[0].insertId));
@@ -203,6 +203,14 @@ export async function listShiftTemplates() {
   const db = await getDb();
   if (!db) return [];
   const existing = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
+  // The morning shift is fixed to 08:00–17:00 as the company standard.
+  for (const item of existing) {
+    if (item.kind === "shift" && item.name === "الشيفت الصباحي" && (item.startTime !== "08:00" || item.endTime !== "17:00")) {
+      await db.update(shiftTemplates).set({ startTime: "08:00", endTime: "17:00" }).where(eq(shiftTemplates.id, item.id));
+      item.startTime = "08:00";
+      item.endTime = "17:00";
+    }
+  }
   const seed = [];
   if (!existing.some((item) => item.kind === "shift" && item.name === "الشيفت الصباحي")) seed.push({ name: "الشيفت الصباحي", kind: "shift", startTime: "08:00", endTime: "17:00", crossesMidnight: false, active: true });
   if (!existing.some((item) => item.kind === "shift" && item.name === "الشيفت المسائي")) seed.push({ name: "الشيفت المسائي", kind: "shift", startTime: "16:00", endTime: "01:00", crossesMidnight: true, active: true });
