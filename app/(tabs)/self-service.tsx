@@ -53,6 +53,7 @@ export default function EmployeeSelfServiceScreen() {
 function Section({title,children}:{title:string;children:any}){return <View style={styles.section}><Text style={styles.sectionTitle}>{title}</Text>{children}</View>}
 
 function Card({icon,value,label}:{icon:any,value:string,label:string}){return <View style={styles.card}><IconSymbol name={icon} size={19} color="#163A63" /><Text style={styles.value}>{value}</Text><Text style={styles.label}>{label}</Text></View>}
+function Pay({label,value}:{label:string,value:string}){return <View style={styles.payItem}><Text style={styles.payItemValue}>{value} ج.م</Text><Text style={styles.payItemLabel}>{label}</Text></View>}
 function Balance({label,value,total}:{label:string,value:number,total:number}){const p=total?Math.round(value/total*100):0;return <View style={styles.balance}><Text style={styles.balanceLabel}>{label}</Text><Text style={styles.balanceValue}>{value}</Text><Text style={styles.balanceTotal}>متبقي من {total}</Text><View style={styles.track}><View style={[styles.fill,{width:`${p}%`}]} /></View></View>}
 
 const styles=StyleSheet.create({
