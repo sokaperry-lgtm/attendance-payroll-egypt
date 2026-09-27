@@ -250,6 +250,21 @@ export async function authenticateStaff(phone: string, password: string) {
   return staff;
 }
 
+export async function changeStaffPassword(staffAccountId: number, currentPassword: string, newPassword: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.select().from(staffAccounts).where(eq(staffAccounts.id, staffAccountId)).limit(1);
+  const staff = result[0];
+  if (!staff || !staff.active || !verifyPassword(currentPassword, staff.passwordHash)) {
+    throw new Error("كلمة المرور الحالية غير صحيحة.");
+  }
+  if (newPassword.length < 6) throw new Error("كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل.");
+  if (newPassword === currentPassword) throw new Error("كلمة المرور الجديدة يجب أن تكون مختلفة عن الحالية.");
+  await db.update(staffAccounts).set({ passwordHash: hashPassword(newPassword), updatedAt: new Date() }).where(eq(staffAccounts.id, staffAccountId));
+  await db.delete(staffSessions).where(eq(staffSessions.staffAccountId, staffAccountId));
+  return true;
+}
+
 export async function createStaffSession(staffAccountId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
