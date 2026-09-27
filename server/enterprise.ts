@@ -157,6 +157,81 @@ export async function getBranchForStaff(staffAccountId: number) {
   return (await db.select().from(branches).where(eq(branches.id, m.branchId)).limit(1))[0];
 }
 
+export async function getManagementDashboard(staffAccountId: number, month: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const m = await getCompanyForStaff(staffAccountId);
+  if (!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
+
+  const members = await db.select().from(companyMembers)
+    .where(and(eq(companyMembers.companyId, m.companyId), eq(companyMembers.active, true)));
+  const staffIds = members.map(member => member.staffAccountId);
+  const staff = staffIds.length
+    ? await db.select({
+        id: staffAccounts.id,
+        name: staffAccounts.name,
+        title: staffAccounts.title,
+        department: staffAccounts.department,
+        role: staffAccounts.role,
+        active: staffAccounts.active,
+      }).from(staffAccounts).where(inArray(staffAccounts.id, staffIds))
+    : [];
+
+  const attendance = staffIds.length
+    ? await db.select().from(attendanceRecords).where(inArray(attendanceRecords.staffAccountId, staffIds))
+    : [];
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date());
+
+  const todayRows = attendance.filter(row => row.date === today);
+  const present = todayRows.filter(row => ["حاضر","متأخر"].includes(row.status)).length;
+  const absent = todayRows.filter(row => row.status === "غياب").length;
+  const lateMinutes = todayRows.reduce((sum, row) => sum + Number(row.lateMinutes || 0), 0);
+  const openShifts = todayRows.filter(row => row.checkIn && !row.checkOut).length;
+  const expected = staff.filter(s => s.active && s.role !== "owner").length;
+  const attendanceRate = expected ? Math.round((present / expected) * 100) : 0;
+
+  const requests = staffIds.length
+    ? await db.select().from(staffRequests).where(inArray(staffRequests.staffAccountId, staffIds))
+    : [];
+  const pendingRequests = requests.filter(row => row.status === "قيد المراجعة").length;
+
+  const payroll = await db.select().from(payrollRecords).where(
+    and(eq(payrollRecords.companyId, m.companyId), eq(payrollRecords.month, month))
+  );
+  const payrollTotal = payroll.reduce((sum, row) => sum + Number(row.netSalary || 0), 0);
+  const payrollApproved = payroll.filter(row => row.status === "approved" || row.status === "مقبول" || row.status === "معتمد").length;
+
+  const staffById = new Map(staff.map(s => [s.id, s]));
+  const lateEmployees = todayRows
+    .filter(row => Number(row.lateMinutes || 0) > 0)
+    .sort((a, b) => Number(b.lateMinutes || 0) - Number(a.lateMinutes || 0))
+    .slice(0, 5)
+    .map(row => ({
+      id: row.staffAccountId,
+      name: staffById.get(row.staffAccountId)?.name ?? "موظف",
+      minutes: Number(row.lateMinutes || 0),
+      status: row.status,
+    }));
+
+  const departments = new Map<string, number>();
+  staff.filter(s => s.active && s.role !== "owner").forEach(s => {
+    const key = s.department?.trim() || "غير محدد";
+    departments.set(key, (departments.get(key) || 0) + 1);
+  });
+
+  return {
+    date: today,
+    month,
+    team: { total: expected, present, absent, openShifts, lateMinutes, attendanceRate },
+    requests: { pending: pendingRequests },
+    payroll: { total: payrollTotal, rows: payroll.length, approved: payrollApproved },
+    lateEmployees,
+    departments: Array.from(departments.entries()).map(([name, count]) => ({ name, count })),
+  };
+}
+
 export async function getCompanyAdminOverview(staffAccountId: number) {
   const db = await getDb(); if (!db) return null;
   const m = await getCompanyForStaff(staffAccountId); if (!m) return null;
