@@ -367,6 +367,9 @@ export const appRouter = router({
     addAdvance: companyAdminProcedure.input(z.object({staffAccountId:z.number().int(),amount:z.number().int().positive(),installmentAmount:z.number().int().positive(),startMonth:z.string().regex(/^\d{4}-\d{2}$/),note:z.string().max(500).optional()})).mutation(({ctx,input})=>enterprise.createSalaryAdvance(ctx.staffUser.id,input)),
     employee360: hrProcedure.input(z.object({staffAccountId:z.number().int()})).query(({ctx,input})=>enterprise.listEmployee360(ctx.staffUser.id,input.staffAccountId)),
   }),
+  management: router({
+    dashboard: managerProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/) })).query(({ ctx, input }) => enterprise.getManagementDashboard(ctx.staffUser.id, input.month)),
+  }),
   companyAdmin: router({
     overview: companyAdminProcedure.query(({ ctx }) => enterprise.getCompanyAdminOverview(ctx.staffUser.id)),
     branches: companyAdminProcedure.query(({ ctx }) => enterprise.listCompanyBranches(ctx.staffUser.id)),
