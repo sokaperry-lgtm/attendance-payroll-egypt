@@ -288,9 +288,14 @@ export const appRouter = router({
       }
       return db.listRequests(ctx.staffUser.id);
     }),
-    create: staffProcedure.input(z.object({ type: z.enum(["إجازة","إجازة مرضية","إجازة طارئة","إذن","مأمورية"]), fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), reason: z.string().min(2).max(1000), hours: z.number().min(0.5).max(24).optional() })).mutation(async ({ ctx, input }) => {
+    create: staffProcedure.input(z.object({ type: z.enum(["إجازة","إجازة مرضية","إجازة طارئة","إذن"]), fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), reason: z.string().min(2).max(1000), hours: z.number().min(0.5).max(3).optional() })).mutation(async ({ ctx, input }) => {
       if (input.fromDate > input.toDate) throw new Error("تاريخ بداية الإجازة يجب أن يكون قبل أو مساويًا لتاريخ النهاية.");
-      if (!input.fromDate || !input.toDate) throw new Error("تواريخ الإجازة غير صحيحة.");
+      if (!input.fromDate || !input.toDate) throw new Error("تواريخ الطلب غير صحيحة.");
+      if (input.type === "إذن") {
+        const allowedHours = [0.5, 1, 1.5, 2, 3];
+        if (!input.hours || !allowedHours.includes(input.hours)) throw new Error("مدة الإذن يجب أن تكون نصف ساعة أو ساعة أو ساعة ونصف أو ساعتين أو 3 ساعات.");
+        if (input.fromDate !== input.toDate) throw new Error("الإذن يكون ليوم واحد فقط.");
+      }
       if (["إجازة","إجازة مرضية","إجازة طارئة"].includes(input.type)) {
         await enterprise.validateLeaveRequest(ctx.staffUser.id, input.fromDate, input.toDate, input.type as "إجازة" | "إجازة مرضية" | "إجازة طارئة");
       }
@@ -304,10 +309,10 @@ export const appRouter = router({
             ["owner", "manager", "hr", "supervisor"],
             "request",
             "طلب جديد يحتاج مراجعة",
-            `${actorName} قدم طلب ${input.type} من ${input.fromDate} إلى ${input.toDate}.`
+            `${actorName} قدم طلب ${input.type}${input.hours ? ` لمدة ${input.hours} ساعة` : ""} من ${input.fromDate} إلى ${input.toDate}.`
           );
           await enterprise.writeAudit(ctx.staffUser.id, m.companyId, "request.created", "request", String(row.id), {
-            type: input.type, fromDate: input.fromDate, toDate: input.toDate,
+            type: input.type, fromDate: input.fromDate, toDate: input.toDate, hours: input.hours,
           });
         }
       }
