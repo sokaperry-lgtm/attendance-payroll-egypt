@@ -1229,7 +1229,7 @@ export async function listCompanyRequests(staffAccountId:number) {
   const attendance=await db.select().from(attendanceRecords).orderBy(desc(attendanceRecords.date));
   const regular=rows.filter(r=>ids.includes(r.staffAccountId) && r.fromDate >= "2026-10-01" && r.toDate >= "2026-10-01").map(r=>({...r,source:"request",staffName:staff.find(s=>s.id===r.staffAccountId)?.name ?? "موظف",actionable:r.status==="قيد المراجعة"}));
   const exceptions:any[]=[];
-  for(const r of attendance.filter(a=>ids.includes(a.staffAccountId))){
+  for(const r of attendance.filter(a=>ids.includes(a.staffAccountId) && a.date >= "2026-10-01")){
     const name=staff.find(s=>s.id===r.staffAccountId)?.name ?? "موظف";
     if(Number(r.lateMinutes||0)>0 || (r.note||"").includes("تم إلغاء التأخير")) {
       const status = (r.note||"").includes("تم اعتماد التأخير") ? "مقبول" : (r.note||"").includes("تم إلغاء التأخير") ? "مرفوض" : "قيد المراجعة";
