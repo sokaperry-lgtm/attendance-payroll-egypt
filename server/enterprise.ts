@@ -1371,7 +1371,7 @@ export async function createPenaltyPolicy(staffAccountId: number, input: { title
   if (!m || !["owner","manager","hr"].includes(m.role)) throw new Error("غير مصرح");
   if (!input.title.trim()) throw new Error("اسم المخالفة مطلوب.");
   if (!Number.isFinite(input.deductionValue) || input.deductionValue <= 0) throw new Error("قيمة الخصم يجب أن تكون أكبر من صفر.");
-  const result = await db.execute(sql`INSERT INTO penalty_policies (companyId,title,category,deductionType,deductionValue,note,active,createdBy) VALUES (${m.companyId},${input.title.trim()},${input.category.trim() || "أخرى"},${input.deductionType},${Math.round(input.deductionValue)},${input.note?.trim() || null},TRUE,${staffAccountId})`);
+  const result = await db.execute(sql`INSERT INTO penalty_policies (companyId,title,category,deductionType,deductionValue,note,active,createdBy) VALUES (${m.companyId},${input.title.trim()},${input.category.trim() || "أخرى"},${input.deductionType},${Number(input.deductionValue)},${input.note?.trim() || null},TRUE,${staffAccountId})`);
   const id = Number((result as any)[0]?.insertId);
   await writeAudit(staffAccountId,m.companyId,"penalty_policy.created","penalty_policy",String(id),input);
   return id;
