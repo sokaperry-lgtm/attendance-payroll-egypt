@@ -104,7 +104,7 @@ export async function resetStaffDataKeepOwner(ownerStaffAccountId: number) {
 export async function resetMonthData(month: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  if (!/^\\d{4}-\\d{2}$/.test(month)) throw new Error("صيغة الشهر غير صحيحة.");
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error("صيغة الشهر غير صحيحة.");
   try {
     await db.execute(sql.raw("SET FOREIGN_KEY_CHECKS = 0"));
     // Month-scoped operational records only. Company, employees, balances,
