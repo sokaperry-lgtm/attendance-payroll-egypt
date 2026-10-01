@@ -800,7 +800,8 @@ export async function generatePayroll(staffAccountId: number, month: string) {
 
     for (const record of records) {
       const lateMinutes=Math.max(0, Number(record.lateMinutes || 0));
-      if (lateMinutes >= PAYROLL_RULES.lateQuarterDayMinutes) {
+      const lateApproved=String(record.note || "").includes("تم اعتماد التأخير");
+      if (lateApproved && lateMinutes >= PAYROLL_RULES.lateQuarterDayMinutes) {
         lateCount++;
         const baseDays =
           lateMinutes >= PAYROLL_RULES.lateFullDayMinutes ? 1 :
@@ -810,7 +811,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
         lateDeduction += baseDays * dailyValue * multiplier;
       }
 
-      if (record.status === "غياب") {
+      if (record.status === "غياب" && String(record.note || "").includes("تم اعتماد الغياب")) {
         absenceCount++;
         const hasPermission = String(record.note || "").includes("بإذن");
         const multiplier = absenceCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
@@ -819,7 +820,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     }
 
     const earlyMinutes=records.reduce((total, record) => {
-      if (!record.checkOut || String(record.note || "").includes("تم إلغاء الانصراف المبكر")) return total;
+      if (!record.checkOut || !String(record.note || "").includes("تم اعتماد الانصراف المبكر")) return total;
       const schedule = schedules.find(item => item.staffAccountId === s.id && item.scheduleDate === record.date);
       const shift = schedule ? shifts.find(item => item.id === schedule.shiftTemplateId) : undefined;
       const shiftStart = shift?.startTime ?? s.shiftStart;
@@ -831,6 +832,18 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       return total + Math.max(0, scheduledEnd - actualCheckout);
     }, 0);
     const earlyDeduction=Math.round(hourlyValue*earlyMinutes/60);
+
+    const approvedPermissionDates = (await db.select().from(staffRequests)
+      .where(and(eq(staffRequests.staffAccountId,s.id),eq(staffRequests.type,"إذن"),eq(staffRequests.status,"مقبول"))))
+      .filter(r=>String(r.fromDate).startsWith(month))
+      .map(r=>String(r.fromDate));
+
+    for (const record of records) {
+      if (record.status === "غياب" && approvedPermissionDates.includes(String(record.date)) &&
+          !String(record.note || "").includes("تم اعتماد الغياب")) {
+        record.note = String(record.note || "") + " · بإذن";
+      }
+    }
 
     const approvedOvertimeHours=approvedOvertime
       .filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month))
