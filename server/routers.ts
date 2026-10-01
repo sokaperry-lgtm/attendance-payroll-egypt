@@ -191,8 +191,18 @@ export const appRouter = router({
       if (input.date > cairoToday()) throw new Error("لا يمكن تسجيل حضور بتاريخ مستقبلي.");
       if (input.checkIn) timeMinutes(input.checkIn);
       if (input.checkOut) timeMinutes(input.checkOut);
-      if (input.checkIn && input.checkOut && timeMinutes(input.checkOut) < timeMinutes(input.checkIn) && !String(input.note ?? "").includes("وردية ليلية")) {
-        throw new Error("وقت الانصراف لا يمكن أن يسبق وقت الحضور.");
+      if (input.checkIn && input.checkOut && timeMinutes(input.checkOut) < timeMinutes(input.checkIn)) {
+        const target = await db.getStaffAccountById(input.staffAccountId);
+        const scheduled = (await db.listSchedules(input.staffAccountId)).find(r => r.scheduleDate === input.date);
+        const shiftStart = scheduled?.shift?.startTime ?? target?.shiftStart ?? null;
+        const shiftEnd = scheduled?.shift?.endTime ?? target?.shiftEnd ?? null;
+        const crossesMidnight = Boolean(
+          scheduled?.shift?.crossesMidnight ||
+          (shiftStart && shiftEnd && timeMinutes(shiftEnd) < timeMinutes(shiftStart))
+        );
+        if (!crossesMidnight && !String(input.note ?? "").includes("وردية ليلية")) {
+          throw new Error("وقت الانصراف لا يمكن أن يسبق وقت الحضور.");
+        }
       }
       await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7), input.staffAccountId);
       const row = await db.updateAttendanceByManager(input);
