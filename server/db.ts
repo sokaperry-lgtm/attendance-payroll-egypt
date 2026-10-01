@@ -101,6 +101,30 @@ export async function resetStaffDataKeepOwner(ownerStaffAccountId: number) {
     throw new Error(`فشل تنظيف قاعدة البيانات: ${message}`);
   }
 }
+export async function resetMonthData(month: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  if (!/^\\d{4}-\\d{2}$/.test(month)) throw new Error("صيغة الشهر غير صحيحة.");
+  try {
+    await db.execute(sql.raw("SET FOREIGN_KEY_CHECKS = 0"));
+    // Month-scoped operational records only. Company, employees, balances,
+    // documents, branches, settings and continuing advances are preserved.
+    await db.execute(sql.raw("DELETE FROM payroll_records WHERE month = '" + month + "'"));
+    await db.execute(sql.raw("DELETE FROM salary_adjustments WHERE month = '" + month + "'"));
+    await db.execute(sql.raw("DELETE FROM attendance_records WHERE date LIKE '" + month + "-%'"));
+    await db.execute(sql.raw("DELETE FROM weekly_schedules WHERE scheduleDate LIKE '" + month + "-%'"));
+    await db.execute(sql.raw("DELETE FROM staff_requests WHERE fromDate LIKE '" + month + "-%' OR toDate LIKE '" + month + "-%'"));
+    await db.execute(sql.raw("DELETE FROM notifications WHERE createdAt >= '" + month + "-01 00:00:00' AND createdAt < DATE_ADD('" + month + "-01 00:00:00', INTERVAL 1 MONTH)"));
+    await db.execute(sql.raw("DELETE FROM audit_logs WHERE createdAt >= '" + month + "-01 00:00:00' AND createdAt < DATE_ADD('" + month + "-01 00:00:00', INTERVAL 1 MONTH)"));
+    await db.execute(sql.raw("SET FOREIGN_KEY_CHECKS = 1"));
+    return true;
+  } catch (error: any) {
+    try { await db.execute(sql.raw("SET FOREIGN_KEY_CHECKS = 1")); } catch {}
+    const message = error?.message ? String(error.message) : String(error);
+    throw new Error(`فشل مسح بيانات الشهر: ${message}`);
+  }
+}
+
 export async function countStaffAccounts() {
   const db = await getDb();
   if (!db) return 0;
