@@ -86,11 +86,9 @@ export default function LoginScreen() {
           <Text style={styles.label}>رقم الهاتف</Text>
           <TextInput value={phone} onChangeText={setPhone} placeholder="01xxxxxxxxx" placeholderTextColor="#8592A6" keyboardType="phone-pad" style={styles.input} textAlign="right" />
           <Text style={styles.label}>كلمة المرور</Text>
-          <TextInput value={password} onChangeText={setPassword} placeholder={isSetup ? "6 أحرف على الأقل" : "كلمة المرور"} placeholderTextColor="#8592A6" secureTextEntry style={styles.input} textAlign="right" />
-          {resetMode && <View style={{ backgroundColor: "#3A2418", borderRadius: 12, padding: 10, marginTop: 8 }}><Text style={{ color: "#FDBA74", fontSize: 11, lineHeight: 17, textAlign: "right" }}>⚠️ إعادة التهيئة ستمسح كل حسابات الموظفين وسجلاتهم الحالية.</Text></View>}\n          <Pressable onPress={handleSubmit} disabled={busy} style={({ pressed }) => [styles.button, busy && styles.buttonDisabled, pressed && !busy && styles.buttonPressed]}>
-            <Text style={styles.buttonText}>{busy ? "جاري التنفيذ..." : resetMode ? "مسح الحسابات والبدء من جديد" : isSetup ? "إنشاء حساب المدير" : "دخول إلى النظام"}</Text>
-          </Pressable>
-          <Pressable onPress={() => setResetMode((v) => !v)} disabled={busy} style={{ marginTop: 14 }}><Text style={{ color: "#60A5FA", fontSize: 11, textAlign: "center", fontWeight: "700" }}>{resetMode ? "رجوع لتسجيل الدخول" : "إعادة تهيئة الحسابات من الصفر"}</Text></Pressable>\n          <Text style={styles.securityNote}>بيانات الدخول مشفرة ومخصصة لحسابات الشركة.</Text>
+          <TextInput value={password} onChangeText={setPassword} placeholder={isSetup ? "6 أحرف على الأقل" : "كلمة المرور"} placeholderTextColor="#8592A6" secureTextEntry style={styles.input} textAlign="right" />\n          <Pressable onPress={handleSubmit} disabled={busy} style={({ pressed }) => [styles.button, busy && styles.buttonDisabled, pressed && !busy && styles.buttonPressed]}>
+            <Text style={styles.buttonText}>{busy ? "جاري التنفيذ..." : isSetup ? "إنشاء حساب المدير" : "دخول إلى النظام"}</Text>
+          </Pressable>\n          <Text style={styles.securityNote}>بيانات الدخول مشفرة ومخصصة لحسابات الشركة.</Text>
         </View>
         <Text style={styles.footer}>حاضر · منصة إدارة الموارد البشرية للشركات</Text>
       </KeyboardAvoidingView>
