@@ -784,39 +784,60 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       eq(payrollRecords.month,month)
     )).limit(1))[0];
     if(existing && existing.status==="approved") { result.push(existing); skippedApproved++; continue; }
-    const records=attendance.filter(x=>x.staffAccountId===s.id && x.date.startsWith(month));
-    // Auto-detected absences are not deducted until explicitly approved.
-    const absences=records.filter(x=>x.status==="غياب" && (x.note || "").includes("تم اعتماد الغياب")).length;
-    // Late deductions are only chargeable after explicit manager approval.
-    const lateMinutes=records.reduce((total, record) => {
-      if (!(record.note || "").includes("تم اعتماد التأخير")) return total;
-      return total + Math.max(0, Number(record.lateMinutes || 0));
-    }, 0);
-    const lateDeduction=Math.round((s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours/60)*lateMinutes);
+    const records=attendance
+      .filter(x=>x.staffAccountId===s.id && x.date.startsWith(month))
+      .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+
+    const dailyValue=s.baseSalary/PAYROLL_RULES.calendarDays;
+    const hourlyValue=dailyValue/PAYROLL_RULES.dailyHours;
+
+    // Attendance penalties are automatic. The manager/owner can still correct
+    // the attendance record or waive a penalty before payroll is closed.
+    let lateDeduction=0;
+    let lateCount=0;
+    let absenceDeduction=0;
+    let absenceCount=0;
+
+    for (const record of records) {
+      const lateMinutes=Math.max(0, Number(record.lateMinutes || 0));
+      if (lateMinutes >= PAYROLL_RULES.lateQuarterDayMinutes) {
+        lateCount++;
+        const baseDays =
+          lateMinutes >= PAYROLL_RULES.lateFullDayMinutes ? 1 :
+          lateMinutes >= PAYROLL_RULES.lateHalfDayMinutes ? 0.5 :
+          0.25;
+        const multiplier = lateCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
+        lateDeduction += baseDays * dailyValue * multiplier;
+      }
+
+      if (record.status === "غياب") {
+        absenceCount++;
+        const hasPermission = String(record.note || "").includes("بإذن");
+        const multiplier = absenceCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
+        absenceDeduction += baseDays * dailyValue * multiplier;
+      }
+    }
+
     const earlyMinutes=records.reduce((total, record) => {
-      // Early departure is a payroll deduction only after the manager explicitly approves it.
-      if (!record.checkOut || !(record.note || "").includes("تم اعتماد الانصراف المبكر")) return total;
+      if (!record.checkOut || String(record.note || "").includes("تم إلغاء الانصراف المبكر")) return total;
       const schedule = schedules.find(item => item.staffAccountId === s.id && item.scheduleDate === record.date);
       const shift = schedule ? shifts.find(item => item.id === schedule.shiftTemplateId) : undefined;
       const shiftStart = shift?.startTime ?? s.shiftStart;
       const shiftEnd = shift?.endTime ?? s.shiftEnd;
-      // Support legacy shifts whose overnight flag was not persisted.
       const crossesMidnight = (shift?.crossesMidnight ?? false) || minutesOf(shiftEnd) < minutesOf(shiftStart);
       const scheduledEnd = minutesOf(shiftEnd) + (crossesMidnight ? 24 * 60 : 0);
       let actualCheckout = minutesOf(record.checkOut);
       if (crossesMidnight && actualCheckout < minutesOf(shiftStart)) actualCheckout += 24 * 60;
       return total + Math.max(0, scheduledEnd - actualCheckout);
     }, 0);
-    const earlyDeduction=Math.round((s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours/60)*earlyMinutes);
-    const absenceDeduction=Math.round((s.baseSalary/PAYROLL_RULES.calendarDays)*PAYROLL_RULES.absencePenaltyDays*absences);
+    const earlyDeduction=Math.round(hourlyValue*earlyMinutes/60);
+
     const approvedOvertimeHours=approvedOvertime
       .filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month))
       .reduce((sum,r)=>sum+Math.max(0, Number(r.hours ?? 0)),0);
-    // Overtime is payable only through an approved overtime request.
-    // Staying longer on site is not automatically treated as payable overtime.
     const overtimeHours=approvedOvertimeHours;
-    const overtimeRate=s.baseSalary/PAYROLL_RULES.calendarDays/PAYROLL_RULES.dailyHours;
-    const overtimeValue=Math.round(overtimeHours*overtimeRate);
+    const overtimeRate=hourlyValue;
+    const overtimeValue=Math.round(overtimeHours*overtimeRate*PAYROLL_RULES.overtimeMultiplier);
     const adjustments=await db.select().from(salaryAdjustments).where(and(
       eq(salaryAdjustments.companyId,m.companyId),
       eq(salaryAdjustments.staffAccountId,s.id),
@@ -984,7 +1005,7 @@ export async function unapprovePayroll(staffAccountId:number, id:number) {
 export async function waiveAttendanceException(actorId:number,input:{staffAccountId:number;date:string;kind:"late"|"early"}) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId);
-  if(!m || !["owner","manager","hr","supervisor"].includes(m.role)) throw new Error("غير مصرح");
+  if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   await assertOperationalTarget(actorId,input.staffAccountId);
   await assertPayrollEditable(actorId,input.date.slice(0,7),input.staffAccountId);
   const row=(await db.select().from(attendanceRecords).where(and(eq(attendanceRecords.staffAccountId,input.staffAccountId),eq(attendanceRecords.date,input.date))).limit(1))[0];
@@ -1333,10 +1354,31 @@ export function toCsv(rows: Array<Record<string, unknown>>) {
 }
 
 
+async function ensureDefaultPenaltyPolicies(staffAccountId:number, companyId:number) {
+  const db=await getDb(); if(!db) return;
+  const rows=await db.execute(sql`SELECT COUNT(*) AS count FROM penalty_policies WHERE companyId = ${companyId}`);
+  const count=Number((rows as any)[0]?.[0]?.count ?? 0);
+  if(count>0) return;
+  const defaults=[
+    ["تأخير 15 دقيقة فأكثر وحتى أقل من 30 دقيقة","حضور وانصراف","days",0.25,"خصم ربع يوم"],
+    ["تأخير 30 دقيقة فأكثر وحتى أقل من ساعة","حضور وانصراف","days",0.5,"خصم نصف يوم"],
+    ["تأخير ساعة فأكثر","حضور وانصراف","days",1,"خصم يوم كامل"],
+    ["غياب بدون إذن","حضور وانصراف","days",3,"خصم 3 أيام"],
+    ["غياب بإذن","حضور وانصراف","days",1,"خصم يوم"],
+    ["انصراف مبكر","حضور وانصراف","hours",1,"يحسب حسب مدة الانصراف المبكر"],
+    ["تكرار المخالفة بعد المرة الثالثة","حضور وانصراف","percentage",100,"يتضاعف الجزاء من المخالفة الرابعة"],
+    ["أوفر تايم معتمد","وقت إضافي","percentage",200,"ساعة الأوفر تايم تحسب بضعف الساعة العادية"],
+  ];
+  for(const item of defaults) {
+    await db.execute(sql`INSERT INTO penalty_policies (companyId,title,category,deductionType,deductionValue,note,active,createdBy)
+      VALUES (${companyId},${item[0]},${item[1]},${item[2]},${item[3]},${item[4]},TRUE,${staffAccountId})`);
+  }
+}
 export async function listPenaltyPolicies(staffAccountId: number) {
   const db = await getDb(); if (!db) return [];
   const m = await getCompanyForStaff(staffAccountId);
   if (!m || !["owner","manager","hr"].includes(m.role)) throw new Error("غير مصرح");
+  await ensureDefaultPenaltyPolicies(staffAccountId,m.companyId);
   return db.execute(sql`SELECT id, companyId, title, category, deductionType, deductionValue, note, active, createdBy, createdAt, updatedAt FROM penalty_policies WHERE companyId = ${m.companyId} ORDER BY active DESC, id DESC`).then((rows:any) => rows[0] ?? []);
 }
 
