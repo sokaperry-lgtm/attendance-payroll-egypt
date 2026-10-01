@@ -336,32 +336,6 @@ export default function SettingsScreen() {
             </View>
           </View>
         </View>}
-
-        {showResetModal && <View style={styles.modalOverlay}>
-          <View style={styles.resetModal}>
-            <Text style={styles.resetModalTitle}>تأكيد بدء دورة أكتوبر</Text>
-            <Text style={styles.resetModalText}>سيتم حذف بيانات التشغيل الحالية بالكامل مع الاحتفاظ بحساب المالك وإعدادات الشركة والفروع.</Text>
-            <Text style={styles.resetModalHint}>اكتب RESET-STAFF للتأكيد</Text>
-            <TextInput
-              value={resetConfirmation}
-              onChangeText={setResetConfirmation}
-              placeholder="RESET-STAFF"
-              autoCapitalize="characters"
-              autoCorrect={false}
-              style={styles.resetModalInput}
-              textAlign="center"
-            />
-            <View style={styles.resetModalActions}>
-              <Pressable onPress={() => { setShowResetModal(false); setResetConfirmation(""); }} style={styles.secondaryButton}>
-                <Text style={styles.secondaryText}>إلغاء</Text>
-              </Pressable>
-              <Pressable onPress={executeSystemReset} disabled={resetStaffData.isPending} style={[styles.resetButton, resetStaffData.isPending && styles.resetButtonDisabled]}>
-                <Text style={styles.resetButtonText}>{resetStaffData.isPending ? "جاري التهيئة..." : "تنفيذ الريسيت"}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>}
-
         <Section title="أمان الحساب" subtitle="غيّر كلمة مرور حساب المدير في أي وقت.">
           <View style={styles.passwordHeader}>
             <View style={styles.passwordCopy}>
