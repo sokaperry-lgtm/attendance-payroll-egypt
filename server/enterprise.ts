@@ -886,23 +886,6 @@ export async function approvePayroll(staffAccountId:number, id:number) {
   )).limit(1))[0];
   if(!refreshed) throw new Error("تعذر تحديث مسير الرواتب.");
 
-  // A payroll cannot be closed while any attendance exception for the month
-  // is still waiting for a manager decision.
-  const members=await db.select({staffAccountId:companyMembers.staffAccountId})
-    .from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
-  const monthAttendance=await db.select().from(attendanceRecords);
-  const pending=monthAttendance.filter(r=>{
-    if(r.staffAccountId !== current.staffAccountId || !r.date.startsWith(current.month)) return false;
-    const note=r.note||"";
-    const latePending=Number(r.lateMinutes||0)>0 && !note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
-    const earlyPending=note.includes("انصراف مبكر:") && !note.includes("تم اعتماد الانصراف المبكر") && !note.includes("تم إلغاء الانصراف المبكر");
-    const absencePending=r.status==="غياب" && !note.includes("تم اعتماد الغياب") && !note.includes("تم إلغاء الغياب");
-    return latePending || earlyPending || absencePending;
-  });
-  if(pending.length){
-    throw new Error("لا يمكن اعتماد مسير الشهر قبل مراجعة كل مخالفات الحضور المعلقة.");
-  }
-
   await db.update(payrollRecords).set({status:"approved",approvedAt:new Date(),updatedAt:new Date()}).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId)));
   await createNotification(current.staffAccountId,"payroll","تم اعتماد مسير راتبك","تم اعتماد راتب شهر "+current.month+" ويمكنك مراجعة التفاصيل من النظام.");
   const advances=await db.select().from(salaryAdvances)
@@ -1278,7 +1261,7 @@ export async function listCompanyRequests(staffAccountId:number) {
 export async function reviewAttendanceException(actorId:number,input:{staffAccountId:number;date:string;kind:"late"|"early"|"absence";action:"approve"|"cancel"}) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId);
-  if(!m || !["owner","manager","hr","supervisor"].includes(m.role)) throw new Error("غير مصرح");
+  if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   await assertOperationalTarget(actorId,input.staffAccountId);
   await assertPayrollEditable(actorId,input.date.slice(0,7),input.staffAccountId);
   const row=(await db.select().from(attendanceRecords).where(and(eq(attendanceRecords.staffAccountId,input.staffAccountId),eq(attendanceRecords.date,input.date))).limit(1))[0];
