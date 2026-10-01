@@ -29,7 +29,10 @@ export default function SettingsScreen() {
   const updateRole = trpc.companyAdmin.role.useMutation();
   const updatePermissions = trpc.companyAdmin.updatePermissions.useMutation();
   const resetStaffData = trpc.system.resetAndSetup.useMutation();
+  const resetMonthData = trpc.system.resetMonth.useMutation();
   const [permissionMemberId, setPermissionMemberId] = useState<number | null>(null);
+  const [showMonthResetModal, setShowMonthResetModal] = useState(false);
+  const [monthResetConfirmation, setMonthResetConfirmation] = useState("");
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetConfirmation, setResetConfirmation] = useState("");
 
@@ -151,6 +154,27 @@ export default function SettingsScreen() {
     }
   }
 
+  function confirmMonthReset() {
+    setMonthResetConfirmation("");
+    setShowMonthResetModal(true);
+  }
+
+  async function executeMonthReset() {
+    if (monthResetConfirmation.trim() !== "RESET-SEPTEMBER") {
+      showAlert("لم يتم التنفيذ", "اكتب RESET-SEPTEMBER كما هو بالضبط.");
+      return;
+    }
+    try {
+      await resetMonthData.mutateAsync({ month: "2026-09", confirm: "RESET-SEPTEMBER" });
+      setShowMonthResetModal(false);
+      setMonthResetConfirmation("");
+      await Promise.all([overview.refetch(), branches.refetch(), members.refetch(), permissions.refetch()]);
+      showAlert("تم مسح سبتمبر", "تم حذف سجلات سبتمبر 2026 فقط. الموظفون وإعدادات الشركة والسلف المستمرة محفوظة، والنظام جاهز لأكتوبر.");
+    } catch (e: any) {
+      showAlert("تعذر مسح سبتمبر", e?.message ?? "حدث خطأ غير متوقع.");
+    }
+  }
+
   async function changeRole(staffAccountId: number, nextRole: CompanyRole) {
     try {
       await updateRole.mutateAsync({ staffAccountId, role: nextRole });
@@ -268,6 +292,43 @@ export default function SettingsScreen() {
           {(() => { const selected = (permissions.data ?? []).find((m:any) => m.id === (permissionMemberId ?? permissions.data?.find((m:any) => m.membershipRole !== "owner")?.id)); if (!selected) return <Text style={styles.hint}>أضف موظفًا أولًا لإدارة صلاحياته.</Text>; const labels:Record<string,string> = {"dashboard.view":"لوحة التحكم","employees.view":"عرض الموظفين","employees.manage":"إدارة الموظفين","attendance.view":"عرض الحضور","attendance.manage":"تعديل الحضور","requests.view":"عرض الطلبات","requests.review":"مراجعة الطلبات","payroll.view":"عرض الرواتب","payroll.manage":"إدارة الرواتب","payroll.approve":"اعتماد الرواتب","reports.view":"عرض التقارير","reports.export":"تصدير التقارير","branches.manage":"إدارة الفروع","company.manage":"إدارة الشركة","roles.manage":"تغيير الأدوار","audit.view":"سجل العمليات","documents.view":"عرض المستندات","documents.manage":"إدارة المستندات","advances.manage":"السلف والتعديلات","notifications.manage":"الإشعارات"}; return <View style={styles.permissionGrid}>{Object.entries(selected.permissions ?? {}).map(([key, value]) => <Pressable key={key} onPress={async () => { try { await updatePermissions.mutateAsync({ staffAccountId: selected.id, permissions: { [key]: !value } }); await permissions.refetch(); } catch (e:any) { showAlert("تعذر تحديث الصلاحية", e?.message ?? "حدث خطأ."); } }} style={styles.permissionRow}><View style={[styles.permissionSwitch, value && styles.permissionSwitchOn]}><Text style={styles.permissionSwitchText}>{value ? "✓" : "—"}</Text></View><View style={styles.permissionCopy}><Text style={styles.permissionLabel}>{labels[key] ?? key}</Text><Text style={styles.permissionKey}>{key}</Text></View></Pressable>)}</View>; })()}
         </Section>}
 
+
+        {role === "owner" && <Section title="تهيئة أكتوبر 2026" subtitle="امسح سجلات سبتمبر فقط وابدأ الشهر الجديد بدون فقدان بيانات الموظفين أو إعدادات الشركة.">
+          <View style={styles.resetBox}>
+            <View style={styles.resetCopy}>
+              <Text style={styles.resetTitle}>مسح سبتمبر والبدء من أكتوبر</Text>
+              <Text style={styles.resetText}>سيتم حذف حضور سبتمبر، الطلبات، الجداول، مسير سبتمبر، التعديلات، الإشعارات وسجل العمليات الخاص بسبتمبر فقط. الموظفون والفروع وإعدادات الشركة والأرصدة والسلف المستمرة لن تُحذف.</Text>
+            </View>
+            <Pressable onPress={confirmMonthReset} disabled={resetMonthData.isPending} style={[styles.resetButton, resetMonthData.isPending && styles.resetButtonDisabled]}>
+              <Text style={styles.resetButtonText}>{resetMonthData.isPending ? "جاري مسح سبتمبر..." : "مسح سبتمبر والبدء من أكتوبر"}</Text>
+            </Pressable>
+          </View>
+        </Section>}
+
+        {showMonthResetModal && <View style={styles.modalOverlay}>
+          <View style={styles.resetModal}>
+            <Text style={styles.resetModalTitle}>تأكيد مسح سبتمبر</Text>
+            <Text style={styles.resetModalText}>هذا الإجراء يمسح سجلات سبتمبر 2026 فقط، ولن يحذف الموظفين أو الفروع أو إعدادات الشركة أو السلف المستمرة.</Text>
+            <Text style={styles.resetModalHint}>اكتب RESET-SEPTEMBER للتأكيد</Text>
+            <TextInput
+              value={monthResetConfirmation}
+              onChangeText={setMonthResetConfirmation}
+              placeholder="RESET-SEPTEMBER"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              style={styles.resetModalInput}
+              textAlign="center"
+            />
+            <View style={styles.resetModalActions}>
+              <Pressable onPress={() => { setShowMonthResetModal(false); setMonthResetConfirmation(""); }} style={styles.secondaryButton}>
+                <Text style={styles.secondaryText}>إلغاء</Text>
+              </Pressable>
+              <Pressable onPress={executeMonthReset} disabled={resetMonthData.isPending} style={[styles.resetButton, resetMonthData.isPending && styles.resetButtonDisabled]}>
+                <Text style={styles.resetButtonText}>{resetMonthData.isPending ? "جاري المسح..." : "تأكيد مسح سبتمبر"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>}
 
         {showResetModal && <View style={styles.modalOverlay}>
           <View style={styles.resetModal}>
