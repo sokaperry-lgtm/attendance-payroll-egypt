@@ -51,10 +51,14 @@ function HrToolsContent({ role }: { role: string }) {
   const deleteDoc = trpc.hrTools.deleteDocument.useMutation({ onSuccess: () => docs.refetch() });
   const addAdjustment = trpc.hrTools.addAdjustment.useMutation({ onSuccess: () => adjustments.refetch() });
   const addAdvance = trpc.hrTools.addAdvance.useMutation({ onSuccess: () => advances.refetch() });
+  const penaltyPolicies = trpc.hrTools.penaltyPolicies.useQuery(undefined, { enabled: canManageMoney, retry: false });
+  const addPenaltyPolicy = trpc.hrTools.addPenaltyPolicy.useMutation({ onSuccess: () => penaltyPolicies.refetch() });
+  const togglePenaltyPolicy = trpc.hrTools.togglePenaltyPolicy.useMutation({ onSuccess: () => penaltyPolicies.refetch() });
 
   const [doc, setDoc] = useState({ type: "بطاقة شخصية", title: "", number: "", expiry: "", note: "" });
   const [money, setMoney] = useState({ type: "incentive" as "incentive" | "bonus" | "penalty" | "deduction", title: "", amount: "" });
   const [advance, setAdvance] = useState({ amount: "", installment: "" });
+  const [penalty, setPenalty] = useState({ title: "", category: "حضور وانصراف", deductionType: "fixed" as "fixed"|"percentage"|"days"|"hours", value: "" });
 
   const selectedName = employees.find((x: any) => Number(x.id) === selectedId)?.name || "الموظف المحدد";
   const docRows = Array.isArray(docs.data) ? docs.data : [];
@@ -77,6 +81,15 @@ function HrToolsContent({ role }: { role: string }) {
       setMoney(x => ({ ...x, title: "", amount: "" }));
       Alert.alert("تم", "تم تسجيل التعديل المالي.");
     } catch (e) { Alert.alert("خطأ", e instanceof Error ? e.message : "تعذر الحفظ."); }
+  }
+
+  async function savePenaltyPolicy() {
+    if (!penalty.title.trim() || !penalty.value) return Alert.alert("بيانات ناقصة", "اكتب نوع المخالفة وقيمة الخصم.");
+    try {
+      await addPenaltyPolicy.mutateAsync({ title: penalty.title.trim(), category: penalty.category, deductionType: penalty.deductionType, deductionValue: Number(penalty.value) });
+      setPenalty({ title: "", category: "حضور وانصراف", deductionType: "fixed", value: "" });
+      Alert.alert("تم", "تمت إضافة المخالفة إلى لائحة الخصومات.");
+    } catch (e) { Alert.alert("خطأ", e instanceof Error ? e.message : "تعذر حفظ المخالفة."); }
   }
 
   async function saveAdvance() {
@@ -113,6 +126,18 @@ function HrToolsContent({ role }: { role: string }) {
             {docs.isLoading ? <ActivityIndicator color="#163A63" /> : docRows.length ? docRows.map((d: any) => <View key={d.id} style={styles.item}><View style={styles.itemCopy}><Text style={styles.itemTitle}>{d.title}</Text><Text style={styles.itemSub}>{d.type}{d.documentNumber ? ` · ${d.documentNumber}` : ""}{d.expiryDate ? ` · ينتهي ${d.expiryDate}` : ""}</Text></View><Pressable onPress={() => deleteDoc.mutate({ id: d.id })}><Text style={styles.delete}>حذف</Text></Pressable></View>) : <Empty text="لا توجد مستندات لهذا الموظف." />}
           </>}
         </Section>
+
+        {canManageMoney && <Section title="لائحة الخصومات والجزاءات" hint="هنا بنحدد نوع المخالفة والخصم الذي سيطبقه البرنامج عند تسجيلها.">
+          <TextInput style={styles.input} value={penalty.title} onChangeText={v => setPenalty(x => ({ ...x, title: v }))} placeholder="نوع المخالفة — مثال: تأخير أكثر من 30 دقيقة" placeholderTextColor="#8A98AA" textAlign="right" />
+          <View style={styles.types}>{["حضور وانصراف","سلوك","تشغيل","مالية","أخرى"].map(x => <Pressable key={x} onPress={() => setPenalty(p => ({ ...p, category: x }))} style={[styles.type, penalty.category === x && styles.typeActive]}><Text style={[styles.typeText, penalty.category === x && styles.typeTextActive]}>{x}</Text></Pressable>)}</View>
+          <View style={styles.types}>{[["fixed","مبلغ ثابت"],["percentage","نسبة %"],["days","أيام"],["hours","ساعات"]].map(([v,l]) => <Pressable key={v} onPress={() => setPenalty(p => ({ ...p, deductionType: v as any }))} style={[styles.type, penalty.deductionType === v && styles.typeActive]}><Text style={[styles.typeText, penalty.deductionType === v && styles.typeTextActive]}>{l}</Text></Pressable>)}</View>
+          <TextInput style={styles.input} value={penalty.value} onChangeText={v => setPenalty(x => ({ ...x, value: v }))} placeholder={penalty.deductionType === "fixed" ? "قيمة الخصم بالجنيه" : penalty.deductionType === "percentage" ? "نسبة الخصم %" : penalty.deductionType === "days" ? "عدد الأيام" : "عدد الساعات"} placeholderTextColor="#8A98AA" keyboardType="numeric" textAlign="right" />
+          <Pressable style={styles.button} disabled={addPenaltyPolicy.isPending} onPress={savePenaltyPolicy}><Text style={styles.buttonText}>{addPenaltyPolicy.isPending ? "جاري الحفظ..." : "إضافة إلى اللائحة"}</Text></Pressable>
+          {penaltyPolicies.isLoading ? <ActivityIndicator color="#163A63" /> : Array.isArray(penaltyPolicies.data) && penaltyPolicies.data.length ? penaltyPolicies.data.map((p: any) => <View key={p.id} style={styles.item}>
+            <View style={styles.itemCopy}><Text style={styles.itemTitle}>{p.title}</Text><Text style={styles.itemSub}>{p.category} · {p.deductionType === "fixed" ? `${Number(p.deductionValue).toLocaleString("ar-EG")} ج.م` : p.deductionType === "percentage" ? `${p.deductionValue}%` : p.deductionType === "days" ? `${p.deductionValue} يوم` : `${p.deductionValue} ساعة`}</Text></View>
+            <Pressable onPress={() => togglePenaltyPolicy.mutate({ id: Number(p.id), active: !Boolean(p.active) })}><Text style={styles.delete}>{p.active ? "مفعّلة" : "موقوفة"}</Text></Pressable>
+          </View>) : <Empty text="لسه مفيش مخالفات. ابدأ بأول نوع مخالفة وحدد الخصم." />}
+        </Section>}
 
         {canManageMoney && <Section title={`تعديلات الرواتب · ${month}`} hint="حوافز ومكافآت وخصومات وجزاءات قبل اعتماد المسير.">
           <View style={styles.types}>{[["incentive","حافز"],["bonus","مكافأة"],["penalty","جزاء"],["deduction","خصم"]].map(([v,l]) => <Pressable key={v} onPress={() => setMoney(x => ({ ...x, type: v as any }))} style={[styles.type, money.type === v && styles.typeActive]}><Text style={[styles.typeText, money.type === v && styles.typeTextActive]}>{l}</Text></Pressable>)}</View>
