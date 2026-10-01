@@ -1305,6 +1305,24 @@ export async function reviewAttendanceException(actorId:number,input:{staffAccou
   return (await db.select().from(attendanceRecords).where(eq(attendanceRecords.id,row.id)).limit(1))[0];
 }
 
+export async function listAttendancePenaltyRequests(staffAccountId:number) {
+  const db=await getDb(); if(!db) return [];
+  const m=await getCompanyForStaff(staffAccountId); if(!m || !["owner","manager"].includes(m.role)) return [];
+  const rows=await db.select().from(attendanceRecords).where(eq(attendanceRecords.companyId,m.companyId)).orderBy(desc(attendanceRecords.date));
+  const staff=await db.select({id:staffAccounts.id,name:staffAccounts.name}).from(staffAccounts).where(eq(staffAccounts.companyId,m.companyId));
+  const names=new Map(staff.map(x=>[x.id,x.name]));
+  return rows.flatMap(r=>{
+    const late=Number(r.lateMinutes||0)>=PAYROLL_RULES.lateQuarterDayMinutes && !String(r.note||"").includes("تم اعتماد التأخير") && !String(r.note||"").includes("تم إلغاء التأخير");
+    const early=String(r.note||"").includes("انصراف مبكر:") && !String(r.note||"").includes("تم اعتماد الانصراف المبكر") && !String(r.note||"").includes("تم إلغاء الانصراف المبكر");
+    const absence=r.status==="غياب" && !String(r.note||"").includes("تم اعتماد الغياب") && !String(r.note||"").includes("تم إلغاء الغياب");
+    const out=[];
+    if(late) out.push({id:`late-${r.id}`,staffAccountId:r.staffAccountId,staffName:names.get(r.staffAccountId)??"موظف",fromDate:r.date,exceptionKind:"late",minutes:Number(r.lateMinutes||0),title:"تأخير",status:"قيد المراجعة"});
+    if(early) out.push({id:`early-${r.id}`,staffAccountId:r.staffAccountId,staffName:names.get(r.staffAccountId)??"موظف",fromDate:r.date,exceptionKind:"early",minutes:0,title:"انصراف مبكر",status:"قيد المراجعة"});
+    if(absence) out.push({id:`absence-${r.id}`,staffAccountId:r.staffAccountId,staffName:names.get(r.staffAccountId)??"موظف",fromDate:r.date,exceptionKind:"absence",minutes:0,title:"غياب",status:"قيد المراجعة"});
+    return out;
+  });
+}
+
 export async function listAuditLogs(staffAccountId:number, limit=100) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
