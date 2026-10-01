@@ -51,6 +51,16 @@ export const appRouter = router({
       ctx.res.cookie(INTERNAL_SESSION_COOKIE, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
       return { token, staff: await staffView(staff) };
     }),
+    resetMonth: staffProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/), confirm: z.literal("RESET-SEPTEMBER") })).mutation(async ({ ctx, input }) => {
+      const membership = await enterprise.getMembership(ctx.staffUser.id);
+      if (!membership?.active || membership.role !== "owner") {
+        throw new Error("مسح بيانات الشهر متاح لمالك الشركة فقط.");
+      }
+      if (input.month !== "2026-09") throw new Error("هذه العملية مخصصة لمسح سبتمبر 2026 فقط.");
+      await db.resetMonthData(input.month);
+      await enterprise.writeAudit(ctx.staffUser.id, membership.companyId, "system.month_reset", "month", input.month, { month: input.month });
+      return { success: true, month: input.month };
+    }),
     resetAndSetup: staffProcedure.input(z.object({ confirm: z.literal("RESET-STAFF") })).mutation(async ({ ctx }) => {
       const membership = await enterprise.getMembership(ctx.staffUser.id);
       if (!membership?.active || membership.role !== "owner") {
