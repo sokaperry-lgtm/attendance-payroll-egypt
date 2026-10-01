@@ -15,11 +15,9 @@ export default function LoginScreen() {
   const statusQuery = trpc.system.bootstrapStatus.useQuery();
   const loginMutation = trpc.auth.login.useMutation();
   const setupMutation = trpc.system.setupManager.useMutation();
-  const resetMutation = trpc.system.resetAndSetup.useMutation();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [resetMode, setResetMode] = useState(false);
   const isSetup = statusQuery.data?.hasManager === false;
 
   useEffect(() => {
@@ -28,15 +26,13 @@ export default function LoginScreen() {
 
   async function handleSubmit() {
     try {
-      if (!phone.trim() || !password.trim() || ((isSetup || resetMode) && name.trim().length < 2)) {
+      if (!phone.trim() || !password.trim() || (isSetup && name.trim().length < 2)) {
         showAlert("بيانات ناقصة", "اكتب البيانات المطلوبة أولًا.");
         return;
       }
-      const result = resetMode
-        ? await resetMutation.mutateAsync({ confirm: "RESET-STAFF", phone, password, name })
-        : isSetup
-          ? await setupMutation.mutateAsync({ phone, password, name })
-          : await loginMutation.mutateAsync({ phone, password });
+      const result = isSetup
+        ? await setupMutation.mutateAsync({ phone, password, name })
+        : await loginMutation.mutateAsync({ phone, password });
 
       // Persist the staff session on both web and native. Web requests also
       // send this token as a Bearer header, so login survives cookie quirks.
@@ -51,7 +47,7 @@ export default function LoginScreen() {
     }
   }
 
-  const busy = loginMutation.isPending || setupMutation.isPending || resetMutation.isPending;
+  const busy = loginMutation.isPending || setupMutation.isPending;
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]} containerClassName="bg-background">
@@ -83,10 +79,10 @@ export default function LoginScreen() {
         </View>
         <View style={[styles.card, isWide && styles.cardWide]}>
           <View style={styles.cardHeader}><View style={styles.statusDot} /><Text style={styles.cardStatus}>SECURE COMPANY ACCESS</Text></View>
-          <Text style={styles.kicker}>{resetMode ? "إعادة تهيئة النظام" : isSetup ? "إعداد النظام" : "بوابة الشركة"}</Text>
-          <Text style={styles.title}>{resetMode ? "ابدأ من جديد" : isSetup ? "إعداد حساب المدير" : "مرحبًا بعودتك"}</Text>
-          <Text style={styles.subtitle}>{resetMode ? "سيتم حذف حسابات الموظفين وبيانات الحضور والطلبات والرواتب الحالية، مع الاحتفاظ بإعدادات الشركة والفرع." : isSetup ? "أنشئ حسابك الإداري الأول، وبعدها أضف فريقك." : "سجّل دخولك للوصول إلى لوحة العمل الخاصة بشركتك."}</Text>
-          {(isSetup || resetMode) && <><Text style={styles.label}>اسم المدير</Text><TextInput value={name} onChangeText={setName} placeholder="اسمك" placeholderTextColor="#8592A6" style={styles.input} textAlign="right" /></>}
+          <Text style={styles.kicker}>{isSetup ? "إعداد النظام" : "بوابة الشركة"}</Text>
+          <Text style={styles.title}>{isSetup ? "إعداد حساب المدير" : "مرحبًا بعودتك"}</Text>
+          <Text style={styles.subtitle}>{isSetup ? "أنشئ حسابك الإداري الأول، وبعدها أضف فريقك." : "سجّل دخولك للوصول إلى لوحة العمل الخاصة بشركتك."}</Text>
+          {isSetup && <><Text style={styles.label}>اسم المدير</Text><TextInput value={name} onChangeText={setName} placeholder="اسمك" placeholderTextColor="#8592A6" style={styles.input} textAlign="right" /></>}
           <Text style={styles.label}>رقم الهاتف</Text>
           <TextInput value={phone} onChangeText={setPhone} placeholder="01xxxxxxxxx" placeholderTextColor="#8592A6" keyboardType="phone-pad" style={styles.input} textAlign="right" />
           <Text style={styles.label}>كلمة المرور</Text>
