@@ -28,10 +28,8 @@ export default function RequestsScreen() {
   const [selectedRequest, setSelectedRequest] = useState<(typeof requests)[number] | null>(null);
   const [activeFilter, setActiveFilter] = useState<"الكل" | "قيد المراجعة" | "مقبول" | "مرفوض">("الكل");
   const filteredRequests = requests.filter((request:any) => activeFilter === "الكل" || request.status === activeFilter);
-  const managerAttendanceReview = trpc.requests.list.useQuery(undefined, { enabled: role !== "employee", retry: false });
-  const pendingAbsenceReviews = (managerAttendanceReview.data ?? []).filter((item: any) =>
-    item.source === "attendance" && item.exceptionKind === "absence" && item.status === "قيد المراجعة"
-  );
+  const penaltyRequests = trpc.requests.listPenaltyRequests.useQuery(undefined, { enabled: role !== "employee", retry: false });
+  const pendingPenaltyRequests = penaltyRequests.data ?? [];
   const isLeaveType = type === "إجازة" || type === "إجازة مرضية" || type === "إجازة طارئة";
   const pendingCount = requests.filter((r:any) => r.status === "قيد المراجعة").length;
   const approvedCount = requests.filter((r:any) => r.status === "مقبول").length;
@@ -60,20 +58,20 @@ export default function RequestsScreen() {
     <View style={[styles.header, compact && styles.headerCompact]}><View><Text style={styles.eyebrow}>طلباتك وموافقاتك</Text><Text style={styles.title}>الطلبات</Text><Text style={styles.subtitle}>إجازات وأذونات</Text></View><Pressable onPress={() => setModalOpen(true)} style={[styles.addButton, compact && styles.addButtonCompact]}><Text style={styles.addButtonText}>+ طلب جديد</Text></Pressable></View>
     {role !== "employee" ? <View style={styles.absenceReviewPanel}>
       <View style={styles.absenceReviewHeader}>
-        <View style={styles.absenceReviewBadge}><Text style={styles.absenceReviewBadgeText}>{pendingAbsenceReviews.length}</Text></View>
+        <View style={styles.absenceReviewBadge}><Text style={styles.absenceReviewBadgeText}>{pendingPenaltyRequests.length}</Text></View>
         <View style={styles.absenceReviewCopy}>
-          <Text style={styles.absenceReviewTitle}>غياب يحتاج اعتمادك</Text>
-          <Text style={styles.absenceReviewText}>الغياب التلقائي يدخل للمراجعة أولًا — أنت تقرر: يُعتمد كغياب أو يُستثنى من الغياب.</Text>
+          <Text style={styles.absenceReviewTitle}>خصومات الحضور تحتاج اعتمادك</Text>
+          <Text style={styles.absenceReviewText}>كل خصم ناتج عن الحضور يدخل للمراجعة أولًا — أنت تقرر هل يعتمد الخصم أم يُلغى.</Text>
         </View>
         <IconSymbol name="person.crop.circle.badge.exclamationmark" size={25} color="#163A63" />
       </View>
-      {pendingAbsenceReviews.length === 0 ? (
-        <Text style={styles.absenceReviewEmpty}>لا توجد حالات غياب معلقة حاليًا.</Text>
-      ) : pendingAbsenceReviews.slice(0, 6).map((item: any) => (
+      {pendingPenaltyRequests.length === 0 ? (
+        <Text style={styles.absenceReviewEmpty}>لا توجد خصومات حضور معلقة حاليًا.</Text>
+      ) : pendingPenaltyRequests.slice(0, 6).map((item: any) => (
         <View key={String(item.id)} style={styles.absenceReviewCard}>
           <View style={styles.absenceReviewInfo}>
             <Text style={styles.absenceReviewName}>{item.staffName ?? "موظف"}</Text>
-            <Text style={styles.absenceReviewDate}>{item.fromDate} · غياب تلقائي</Text>
+            <Text style={styles.absenceReviewDate}>{item.fromDate} · {item.title}{item.minutes ? ` · ${item.minutes} دقيقة` : ""}</Text>
             <Text style={styles.absenceReviewHint}>قرار المدير مطلوب قبل احتساب أي خصم من الراتب.</Text>
           </View>
           <View style={styles.absenceReviewActions}>
@@ -81,30 +79,30 @@ export default function RequestsScreen() {
               disabled={reviewAttendanceException.isPending}
               onPress={async () => {
                 try {
-                  await reviewAttendanceException.mutateAsync({ staffAccountId: Number(item.staffAccountId), date: String(item.fromDate), kind: "absence", action: "approve" });
-                  await managerAttendanceReview.refetch();
+                  await reviewAttendanceException.mutateAsync({ staffAccountId: Number(item.staffAccountId), date: String(item.fromDate), kind: item.exceptionKind, action: "approve" });
+                  await penaltyRequests.refetch();
                   await refresh();
-                  showAlert("تم اعتماد كغياب", "سيتم احتساب خصم الغياب في المرتب.");
+                  showAlert("تم اعتماد الخصم", "سيتم احتساب الخصم في المرتب.");
                 } catch (error) {
-                  showAlert("تعذر اعتماد الغياب", error instanceof Error ? error.message : "حدث خطأ أثناء اعتماد الغياب.");
+                  showAlert("تعذر اعتماد الخصم", error instanceof Error ? error.message : "حدث خطأ أثناء اعتماد الخصم.");
                 }
               }}
               style={styles.absenceApproveButton}
-            ><Text style={styles.absenceApproveText}>{reviewAttendanceException.isPending ? "..." : "اعتماد الغياب"}</Text></Pressable>
+            ><Text style={styles.absenceApproveText}>{reviewAttendanceException.isPending ? "..." : "اعتماد الخصم"}</Text></Pressable>
             <Pressable
               disabled={reviewAttendanceException.isPending}
               onPress={async () => {
                 try {
-                  await reviewAttendanceException.mutateAsync({ staffAccountId: Number(item.staffAccountId), date: String(item.fromDate), kind: "absence", action: "cancel" });
-                  await managerAttendanceReview.refetch();
+                  await reviewAttendanceException.mutateAsync({ staffAccountId: Number(item.staffAccountId), date: String(item.fromDate), kind: item.exceptionKind, action: "cancel" });
+                  await penaltyRequests.refetch();
                   await refresh();
-                  showAlert("تم استثناء من الغياب", "لن يتم احتساب خصم الغياب لهذا اليوم.");
+                  showAlert("تم إلغاء الخصم", "لن يتم احتساب الخصم لهذا اليوم.");
                 } catch (error) {
-                  showAlert("تعذر إلغاء الغياب", error instanceof Error ? error.message : "حدث خطأ أثناء إلغاء الغياب.");
+                  showAlert("تعذر إلغاء الخصم", error instanceof Error ? error.message : "حدث خطأ أثناء إلغاء الخصم.");
                 }
               }}
               style={styles.absenceCancelButton}
-            ><Text style={styles.absenceCancelText}>{reviewAttendanceException.isPending ? "..." : "إلغاء الغياب"}</Text></Pressable>
+            ><Text style={styles.absenceCancelText}>{reviewAttendanceException.isPending ? "..." : "إلغاء الخصم"}</Text></Pressable>
           </View>
         </View>
       ))}
@@ -149,7 +147,7 @@ export default function RequestsScreen() {
         </View> : null}
         {isManagerException && request.source === "attendance" && request.status === "قيد المراجعة" ? <View style={styles.actionRow}>
           <Pressable disabled={reviewAttendanceException.isPending} onPress={async()=>{try{await reviewAttendanceException.mutateAsync({staffAccountId:Number(request.staffAccountId),date:String(request.fromDate),kind:request.exceptionKind,action:"approve"});await refresh();showAlert("تم اعتماد الخصم","تم اعتماد مخالفة الحضور وسيتم احتسابها في المرتب.");}catch(error){showAlert("تعذر اعتماد الخصم",error instanceof Error?error.message:"حدث خطأ أثناء اعتماد الخصم.");}}} style={styles.acceptButton}><Text style={styles.acceptText}>{reviewAttendanceException.isPending?"جاري التنفيذ...":"اعتماد الخصم"}</Text></Pressable>
-          <Pressable disabled={reviewAttendanceException.isPending} onPress={async()=>{try{await reviewAttendanceException.mutateAsync({staffAccountId:Number(request.staffAccountId),date:String(request.fromDate),kind:request.exceptionKind,action:"cancel"});await refresh();showAlert("تم رفض الخصم","تم رفض خصم الغياب ولن يتم احتسابه في المرتب.");}catch(error){showAlert("تعذر رفض الخصم",error instanceof Error?error.message:"حدث خطأ أثناء إلغاء الخصم.");}}} style={styles.cancelAction}><Text style={styles.cancelActionText}>{reviewAttendanceException.isPending?"جاري التنفيذ...":"إلغاء الخصم"}</Text></Pressable>
+          <Pressable disabled={reviewAttendanceException.isPending} onPress={async()=>{try{await reviewAttendanceException.mutateAsync({staffAccountId:Number(request.staffAccountId),date:String(request.fromDate),kind:request.exceptionKind,action:"cancel"});await refresh();showAlert("تم رفض الخصم","تم رفض الخصم ولن يتم احتسابه في المرتب.");}catch(error){showAlert("تعذر رفض الخصم",error instanceof Error?error.message:"حدث خطأ أثناء إلغاء الخصم.");}}} style={styles.cancelAction}><Text style={styles.cancelActionText}>{reviewAttendanceException.isPending?"جاري التنفيذ...":"إلغاء الخصم"}</Text></Pressable>
         </View> : null}
         {isManagerException && request.source === "penalty" ? <View style={styles.actionRow}>
           <Pressable disabled={cancelPenalty.isPending} onPress={async()=>{await cancelPenalty.mutateAsync({id:Number(request.adjustmentId)});await refresh();}} style={styles.cancelAction}><Text style={styles.cancelActionText}>إلغاء الجزاء</Text></Pressable>
