@@ -108,6 +108,53 @@ export async function assertOperationalTarget(actorStaffAccountId: number, targe
   return access;
 }
 
+export async function getDailyAttendanceOverview(staffAccountId: number, date: string) {
+  const db = await getDb(); if (!db) return { date, employees: [] };
+  const m = await getCompanyForStaff(staffAccountId);
+  if (!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
+
+  const members = await db.select().from(companyMembers).where(
+    and(eq(companyMembers.companyId, m.companyId), eq(companyMembers.active, true))
+  );
+  const ids = members.map(x => x.staffAccountId);
+  if (!ids.length) return { date, employees: [] };
+
+  const staff = await db.select({
+    id: staffAccounts.id,
+    name: staffAccounts.name,
+    title: staffAccounts.title,
+    role: staffAccounts.role,
+    active: staffAccounts.active,
+  }).from(staffAccounts).where(inArray(staffAccounts.id, ids));
+
+  const rows = await db.select().from(attendanceRecords).where(
+    and(eq(attendanceRecords.date, date), inArray(attendanceRecords.staffAccountId, ids))
+  );
+
+  const byStaff = new Map(rows.map(row => [row.staffAccountId, row]));
+  const employees = staff
+    .filter(s => s.active && s.role !== "owner")
+    .map(s => {
+      const row = byStaff.get(s.id);
+      return {
+        staffAccountId: s.id,
+        name: s.name,
+        title: s.title,
+        status: row?.status ?? "غياب",
+        checkIn: row?.checkIn ?? null,
+        checkOut: row?.checkOut ?? null,
+        lateMinutes: Number(row?.lateMinutes ?? 0),
+        note: row?.note ?? null,
+      };
+    })
+    .sort((a,b) => {
+      const order: Record<string, number> = { "متأخر": 0, "حاضر": 1, "غياب": 2, "إجازة": 3, "مأمورية": 4 };
+      return (order[a.status] ?? 9) - (order[b.status] ?? 9) || a.name.localeCompare(b.name, "ar");
+    });
+
+  return { date, employees };
+}
+
 export async function listCompanyAttendance(staffAccountId: number) {
   const db = await getDb(); if (!db) return [];
   const m = await getCompanyForStaff(staffAccountId); if (!m) return [];
