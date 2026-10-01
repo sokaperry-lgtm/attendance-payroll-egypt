@@ -1,4 +1,4 @@
-import { FlatList, StyleSheet, Text, View, Pressable, useWindowDimensions } from "react-native";
+import { FlatList, StyleSheet, Text, View, Pressable, TextInput, useWindowDimensions } from "react-native";\nimport { useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { PageHeader, SectionTitle, StatusBadge } from "@/components/ui/design-system";
@@ -22,7 +22,7 @@ export default function AttendanceScreen() {
   const attendanceReview = trpc.requests.reviewAttendanceException.useMutation();
   const managerRequests = trpc.requests.list.useQuery(undefined, { enabled: (role === "owner" || role === "manager") || role === "supervisor", retry: false });
   const pendingAbsences = (managerRequests.data ?? []).filter((item: any) => item.source === "attendance" && item.exceptionKind === "absence" && item.status === "قيد المراجعة");
-  const now = new Date();
+  const [managementDate, setManagementDate] = useState(new Date().toISOString().slice(0, 10));\n  const [managementSearch, setManagementSearch] = useState("");\n  const [managementFilter, setManagementFilter] = useState<"all" | "present" | "late" | "absent">("all");\n  const now = new Date();\n  const dailyOverview = trpc.attendance.dailyOverview.useQuery({ date: managementDate }, { enabled: role === "owner" || role === "manager", retry: false });
   const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const monthLabel = now.toLocaleDateString("ar-EG", { month: "long", year: "numeric" });
   const teamAccess = ["owner", "manager", "hr", "supervisor"].includes(role);
@@ -257,6 +257,36 @@ export default function AttendanceScreen() {
 }
 
 const styles = StyleSheet.create({
+  managementDateCard: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#E8EDF3", flexDirection: "row", alignItems: "center", gap: 10 },
+  dateNavButton: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#F2F5F8", alignItems: "center", justifyContent: "center" },
+  dateNavText: { color: "#163A63", fontSize: 25, fontWeight: "700" },
+  managementDateCenter: { flex: 1, alignItems: "center" },
+  managementDateLabel: { color: "#98A6B8", fontSize: 9, fontWeight: "700" },
+  managementDateValue: { color: "#172033", fontSize: 13, fontWeight: "900", marginTop: 3, textAlign: "center" },
+  todayButton: { alignSelf: "flex-start", backgroundColor: "#163A63", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 13, marginTop: -5 },
+  todayButtonText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
+  managementKpis: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 9 },
+  managementKpi: { flex: 1, minWidth: "22%", backgroundColor: "#FFFFFF", borderRadius: 16, padding: 13, borderWidth: 1, borderColor: "#E8EDF3", alignItems: "center" },
+  managementKpiValue: { color: "#163A63", fontSize: 21, fontWeight: "900" },
+  managementKpiLabel: { color: "#667085", fontSize: 10, fontWeight: "800", marginTop: 2 },
+  managementSearch: { backgroundColor: "#FFFFFF", borderRadius: 14, borderWidth: 1, borderColor: "#E8EDF3", paddingHorizontal: 14, paddingVertical: 11, color: "#172033", fontSize: 11 },
+  managementFilters: { flexDirection: "row-reverse", gap: 7, flexWrap: "wrap" },
+  managementFilter: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E8EDF3", borderRadius: 11, paddingVertical: 8, paddingHorizontal: 13 },
+  managementFilterActive: { backgroundColor: "#163A63", borderColor: "#163A63" },
+  managementFilterText: { color: "#667085", fontSize: 10, fontWeight: "800" },
+  managementFilterTextActive: { color: "#FFFFFF" },
+  managementTableHeader: { flexDirection: "row-reverse", backgroundColor: "#F2F5F8", borderRadius: 12, padding: 10, alignItems: "center" },
+  managementHeaderText: { flex: 1, color: "#667085", fontSize: 9, fontWeight: "900", textAlign: "center" },
+  managementRow: { backgroundColor: "#FFFFFF", borderRadius: 16, padding: 12, borderWidth: 1, borderColor: "#E8EDF3", flexDirection: "row-reverse", alignItems: "center", gap: 7 },
+  managementEmployee: { flex: 1.25, flexDirection: "row-reverse", alignItems: "center", gap: 7 },
+  managementAvatar: { width: 34, height: 34, borderRadius: 11, backgroundColor: "#E8F1F8", alignItems: "center", justifyContent: "center" },
+  managementAvatarText: { color: "#163A63", fontSize: 13, fontWeight: "900" },
+  managementName: { color: "#172033", fontSize: 11, fontWeight: "900", textAlign: "right" },
+  managementTitle: { color: "#98A6B8", fontSize: 8, marginTop: 2, textAlign: "right" },
+  managementStatus: { flex: 1, alignItems: "center" },
+  managementTime: { flex: 0.8, color: "#172033", fontSize: 10, fontWeight: "800", textAlign: "center" },
+  managementOut: { flex: 0.8, alignItems: "center" },
+  managementLate: { color: "#8A5A00", fontSize: 7, fontWeight: "800", marginTop: 2 },
   inlineAbsenceReview: { marginTop: 10, padding: 10, borderRadius: 12, backgroundColor: "#FFF8ED", borderWidth: 1, borderColor: "#F4D7A1", gap: 8 },
   inlineAbsenceHint: { color: "#8A5A00", fontSize: 9, fontWeight: "800", textAlign: "right" },
   inlineAbsenceActions: { flexDirection: "row-reverse", gap: 7 },
