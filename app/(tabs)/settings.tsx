@@ -28,13 +28,15 @@ export default function SettingsScreen() {
   const assignBranch = trpc.companyAdmin.assignBranch.useMutation();
   const updateRole = trpc.companyAdmin.role.useMutation();
   const updatePermissions = trpc.companyAdmin.updatePermissions.useMutation();
-  const resetStaffData = trpc.system.resetAndSetup.useMutation();
   const resetMonthData = trpc.system.resetMonth.useMutation();
+  const changePassword = trpc.auth.changePassword.useMutation();
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [permissionMemberId, setPermissionMemberId] = useState<number | null>(null);
   const [showMonthResetModal, setShowMonthResetModal] = useState(false);
   const [monthResetConfirmation, setMonthResetConfirmation] = useState("");
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [resetConfirmation, setResetConfirmation] = useState("");
 
   const [companyName, setCompanyName] = useState("");
   const [legalName, setLegalName] = useState("");
@@ -133,27 +135,6 @@ export default function SettingsScreen() {
     } catch (e: any) { showAlert("تعذر نقل الموظف", e?.message ?? "حدث خطأ غير متوقع."); }
   }
 
-  function confirmSystemReset() {
-    setResetConfirmation("");
-    setShowResetModal(true);
-  }
-
-  async function executeSystemReset() {
-    if (resetConfirmation.trim() !== "RESET-STAFF") {
-      showAlert("لم يتم التنفيذ", "اكتب RESET-STAFF كما هو بالضبط.");
-      return;
-    }
-    try {
-      await resetStaffData.mutateAsync({ confirm: "RESET-STAFF" });
-      setShowResetModal(false);
-      setResetConfirmation("");
-      await Promise.all([overview.refetch(), branches.refetch(), members.refetch(), permissions.refetch()]);
-      showAlert("تمت التهيئة", "تم تنظيف بيانات التشغيل بنجاح. حسابك كمالك محفوظ، والنظام جاهز لبدء أكتوبر.");
-    } catch (e: any) {
-      showAlert("تعذر تنفيذ الريسيت", e?.message ?? "حدث خطأ غير متوقع.");
-    }
-  }
-
   function confirmMonthReset() {
     setMonthResetConfirmation("");
     setShowMonthResetModal(true);
@@ -172,6 +153,32 @@ export default function SettingsScreen() {
       showAlert("تم مسح سبتمبر", "تم حذف سجلات سبتمبر 2026 فقط. الموظفون وإعدادات الشركة والسلف المستمرة محفوظة، والنظام جاهز لأكتوبر.");
     } catch (e: any) {
       showAlert("تعذر مسح سبتمبر", e?.message ?? "حدث خطأ غير متوقع.");
+    }
+  }
+
+  async function executePasswordChange() {
+    if (!currentPassword || !newPassword) {
+      showAlert("بيانات ناقصة", "اكتب كلمة المرور الحالية والجديدة.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      showAlert("كلمة مرور ضعيفة", "كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showAlert("كلمات المرور غير متطابقة", "أكد كلمة المرور الجديدة بشكل صحيح.");
+      return;
+    }
+    try {
+      await changePassword.mutateAsync({ currentPassword, newPassword });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setShowPasswordForm(false);
+      showAlert("تم تغيير كلمة المرور", "سيتم تسجيل خروجك الآن. ادخل مرة أخرى بكلمة المرور الجديدة.");
+      setTimeout(() => router.replace("/logout" as never), 500);
+    } catch (e: any) {
+      showAlert("تعذر تغيير كلمة المرور", e?.message ?? "تأكد من كلمة المرور الحالية وحاول مرة أخرى.");
     }
   }
 
@@ -355,17 +362,37 @@ export default function SettingsScreen() {
           </View>
         </View>}
 
-        {role === "owner" && <Section title="تهيئة دورة جديدة" subtitle="تنظيف بيانات التشغيل والبدء من جديد مع الحفاظ على حساب المالك وإعدادات الشركة.">
-          <View style={styles.resetBox}>
-            <View style={styles.resetCopy}>
-              <Text style={styles.resetTitle}>بدء دورة أكتوبر 2026</Text>
-              <Text style={styles.resetText}>سيتم حذف بيانات التشغيل الحالية بالكامل. هذا الإجراء لا يحذف الشركة أو الفرع أو إعدادات GPS أو حساب المالك.</Text>
+        <Section title="أمان الحساب" subtitle="غيّر كلمة مرور حساب المدير في أي وقت.">
+          <View style={styles.passwordHeader}>
+            <View style={styles.passwordCopy}>
+              <Text style={styles.passwordTitle}>تغيير كلمة المرور</Text>
+              <Text style={styles.passwordHint}>بعد الحفظ سيتم تسجيل خروجك تلقائيًا، ثم تدخل بالكلمة الجديدة.</Text>
             </View>
-            <Pressable onPress={confirmSystemReset} disabled={resetStaffData.isPending} style={[styles.resetButton, resetStaffData.isPending && styles.resetButtonDisabled]}>
-              <Text style={styles.resetButtonText}>{resetStaffData.isPending ? "جاري التهيئة..." : "تهيئة النظام والبدء من أكتوبر"}</Text>
-            </Pressable>
+            <IconSymbol name="lock.shield.fill" size={22} color="#163A63" />
           </View>
-        </Section>}
+          {!showPasswordForm ? (
+            <Pressable onPress={() => setShowPasswordForm(true)} style={styles.securityButton}>
+              <Text style={styles.securityButtonText}>تغيير كلمة المرور</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.passwordForm}>
+              <Text style={styles.label}>كلمة المرور الحالية</Text>
+              <TextInput value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry style={styles.input} textAlign="right" />
+              <Text style={styles.label}>كلمة المرور الجديدة</Text>
+              <TextInput value={newPassword} onChangeText={setNewPassword} secureTextEntry style={styles.input} textAlign="right" />
+              <Text style={styles.label}>تأكيد كلمة المرور الجديدة</Text>
+              <TextInput value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry style={styles.input} textAlign="right" />
+              <View style={styles.actionRow}>
+                <Pressable onPress={() => { setShowPasswordForm(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} style={styles.secondaryButton}>
+                  <Text style={styles.secondaryText}>إلغاء</Text>
+                </Pressable>
+                <Pressable onPress={executePasswordChange} disabled={changePassword.isPending} style={[styles.primaryButton, changePassword.isPending && styles.resetButtonDisabled]}>
+                  <Text style={styles.primaryText}>{changePassword.isPending ? "جاري الحفظ..." : "حفظ كلمة المرور"}</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </Section>
 
         <View style={[styles.bottomGrid, compact && styles.bottomGridOne]}>
           <Section title="SaaS & Security" subtitle="حالة الاشتراك والحماية.">
