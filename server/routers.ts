@@ -348,7 +348,8 @@ export const appRouter = router({
       return row;
     }),
     waiveAttendance: managerProcedure.input(z.object({ staffAccountId:z.number().int(), date:z.string().length(10), kind:z.enum(["late","early"]) })).mutation(({ctx,input})=>enterprise.waiveAttendanceException(ctx.staffUser.id,input)),
-    reviewAttendanceException: managerProcedure.input(z.object({ staffAccountId:z.number().int(), date:z.string().length(10), kind:z.enum(["late","early","absence"]), action:z.enum(["approve","cancel"]) })).mutation(({ctx,input})=>enterprise.reviewAttendanceException(ctx.staffUser.id,input)),
+listPenaltyRequests: managerProcedure.query(({ctx})=>enterprise.listAttendancePenaltyRequests(ctx.staffUser.id)),
+        reviewAttendanceException: managerProcedure.input(z.object({ staffAccountId:z.number().int(), date:z.string().length(10), kind:z.enum(["late","early","absence"]), action:z.enum(["approve","cancel"]) })).mutation(({ctx,input})=>enterprise.reviewAttendanceException(ctx.staffUser.id,input)),
     cancelPenalty: companyAdminProcedure.input(z.object({ id:z.number().int() })).mutation(({ctx,input})=>enterprise.cancelSalaryAdjustment(ctx.staffUser.id,input.id)),
   }),
   leave: router({
