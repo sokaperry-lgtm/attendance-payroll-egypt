@@ -1,4 +1,5 @@
-import { FlatList, StyleSheet, Text, View, Pressable, TextInput, useWindowDimensions } from "react-native";\nimport { useState } from "react";
+import { FlatList, StyleSheet, Text, View, Pressable, TextInput, useWindowDimensions } from "react-native";
+import { useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { PageHeader, SectionTitle, StatusBadge } from "@/components/ui/design-system";
@@ -22,7 +23,11 @@ export default function AttendanceScreen() {
   const attendanceReview = trpc.requests.reviewAttendanceException.useMutation();
   const managerRequests = trpc.requests.list.useQuery(undefined, { enabled: (role === "owner" || role === "manager") || role === "supervisor", retry: false });
   const pendingAbsences = (managerRequests.data ?? []).filter((item: any) => item.source === "attendance" && item.exceptionKind === "absence" && item.status === "قيد المراجعة");
-  const [managementDate, setManagementDate] = useState(new Date().toISOString().slice(0, 10));\n  const [managementSearch, setManagementSearch] = useState("");\n  const [managementFilter, setManagementFilter] = useState<"all" | "present" | "late" | "absent">("all");\n  const now = new Date();\n  const dailyOverview = trpc.attendance.dailyOverview.useQuery({ date: managementDate }, { enabled: role === "owner" || role === "manager", retry: false });
+  const [managementDate, setManagementDate] = useState(new Date().toISOString().slice(0, 10));
+  const [managementSearch, setManagementSearch] = useState("");
+  const [managementFilter, setManagementFilter] = useState<"all" | "present" | "late" | "absent">("all");
+  const now = new Date();
+  const dailyOverview = trpc.attendance.dailyOverview.useQuery({ date: managementDate }, { enabled: role === "owner" || role === "manager", retry: false });
   const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const monthLabel = now.toLocaleDateString("ar-EG", { month: "long", year: "numeric" });
   const teamAccess = ["owner", "manager", "hr", "supervisor"].includes(role);
@@ -53,6 +58,58 @@ export default function AttendanceScreen() {
         : recentLateMinutes < previousLateMinutes
           ? { title: "التأخير بيتحسن", text: `دقائق التأخير الأخيرة أقل من الفترة السابقة بـ ${previousLateMinutes - recentLateMinutes} دقيقة.` }
           : { title: "الحضور مستقر", text: `معدل الحضور الحالي ${rate}% مع ${totalLateMinutes} دقيقة تأخير إجماليًا.` };
+
+  if (role === "owner" || role === "manager") {
+    const allRows = dailyOverview.data?.employees ?? [];
+    const rows = allRows.filter((item: any) =>
+      (!managementSearch.trim() || String(item.name ?? "").includes(managementSearch.trim())) &&
+      (managementFilter === "all" ||
+       (managementFilter === "present" && item.status === "حاضر") ||
+       (managementFilter === "late" && item.status === "متأخر") ||
+       (managementFilter === "absent" && item.status === "غياب"))
+    );
+    const shiftDate = (days: number) => {
+      const d = new Date(managementDate + "T12:00:00");
+      d.setDate(d.getDate() + days);
+      setManagementDate(d.toISOString().slice(0, 10));
+    };
+    return (
+      <ScreenContainer>
+        <FlatList
+          data={rows}
+          keyExtractor={(item: any) => String(item.staffAccountId)}
+          contentContainerStyle={[styles.content, compact && styles.contentCompact]}
+          ListHeaderComponent={<>
+            <PageHeader eyebrow="إدارة الحضور" title="حضور وانصراف الموظفين" subtitle="لـ Owner و Manager فقط" icon="calendar" />
+            <View style={styles.managementDateCard}>
+              <Pressable style={styles.dateNavButton} onPress={() => shiftDate(-1)}><Text style={styles.dateNavText}>‹</Text></Pressable>
+              <View style={styles.managementDateCenter}>
+                <Text style={styles.managementDateLabel}>تاريخ المتابعة</Text>
+                <Text style={styles.managementDateValue}>{new Date(managementDate + "T12:00:00").toLocaleDateString("ar-EG", { weekday:"long", day:"numeric", month:"long", year:"numeric" })}</Text>
+              </View>
+              <Pressable style={styles.dateNavButton} onPress={() => shiftDate(1)}><Text style={styles.dateNavText}>›</Text></Pressable>
+            </View>
+            <Pressable style={styles.todayButton} onPress={() => setManagementDate(new Date().toISOString().slice(0,10))}><Text style={styles.todayButtonText}>اليوم</Text></Pressable>
+            <View style={styles.managementKpis}>
+              <View style={styles.managementKpi}><Text style={styles.managementKpiValue}>{allRows.filter((x:any)=>x.status==="حاضر").length}</Text><Text style={styles.managementKpiLabel}>حاضر</Text></View>
+              <View style={styles.managementKpi}><Text style={styles.managementKpiValue}>{allRows.filter((x:any)=>x.status==="متأخر").length}</Text><Text style={styles.managementKpiLabel}>متأخر</Text></View>
+              <View style={styles.managementKpi}><Text style={styles.managementKpiValue}>{allRows.filter((x:any)=>x.status==="غياب").length}</Text><Text style={styles.managementKpiLabel}>غائب</Text></View>
+              <View style={styles.managementKpi}><Text style={styles.managementKpiValue}>{allRows.filter((x:any)=>x.checkIn&&!x.checkOut).length}</Text><Text style={styles.managementKpiLabel}>لم ينصرف</Text></View>
+            </View>
+            <TextInput value={managementSearch} onChangeText={setManagementSearch} placeholder="ابحث باسم الموظف..." placeholderTextColor="#98A6B8" style={styles.managementSearch} textAlign="right" />
+            <View style={styles.managementFilters}>{([["all","الكل"],["present","حاضر"],["late","متأخر"],["absent","غائب"]] as const).map(([k,l])=><Pressable key={k} onPress={()=>setManagementFilter(k)} style={[styles.managementFilter,managementFilter===k&&styles.managementFilterActive]}><Text style={[styles.managementFilterText,managementFilter===k&&styles.managementFilterTextActive]}>{l}</Text></Pressable>)}</View>
+          </>}
+          renderItem={({item}:any)=><View style={styles.managementRow}>
+            <View style={styles.managementEmployee}><View style={styles.managementAvatar}><Text style={styles.managementAvatarText}>{String(item.name).slice(0,1)}</Text></View><View style={{flex:1}}><Text style={styles.managementName}>{item.name}</Text><Text style={styles.managementTitle}>{item.title||"موظف"}</Text></View></View>
+            <View style={styles.managementStatus}><StatusBadge label={item.status} tone={item.status==="حاضر"?"success":item.status==="متأخر"?"warning":item.status==="غياب"?"danger":"neutral"} /></View>
+            <Text style={styles.managementTime}>{item.checkIn||"—"}</Text>
+            <View style={styles.managementOut}><Text style={styles.managementTime}>{item.checkOut||"—"}</Text>{item.lateMinutes>0&&<Text style={styles.managementLate}>{item.lateMinutes} دقيقة</Text>}</View>
+          </View>}
+          ListEmptyComponent={<View style={styles.empty}><Text style={styles.emptyTitle}>{dailyOverview.isLoading?"جاري تحميل الحضور...":"لا توجد بيانات"}</Text><Text style={styles.emptyText}>لا توجد سجلات لهذا التاريخ.</Text></View>}
+        />
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer>
