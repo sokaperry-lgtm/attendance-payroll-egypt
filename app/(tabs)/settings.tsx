@@ -435,7 +435,8 @@ function roleLabel(role?: string) {
 }
 
 const styles=StyleSheet.create({
-  content:{padding:22,paddingBottom:60,gap:16,maxWidth:1200,width:"100%",alignSelf:"center"},\n  passwordHeader:{flexDirection:"row-reverse",alignItems:"center",justifyContent:"space-between",gap:12,paddingBottom:8},passwordCopy:{flex:1,gap:3},passwordTitle:{color:"#172033",fontSize:13,fontWeight:"900",textAlign:"right"},passwordHint:{color:"#667085",fontSize:9,lineHeight:16,textAlign:"right"},passwordForm:{gap:2},
+  content:{padding:22,paddingBottom:60,gap:16,maxWidth:1200,width:"100%",alignSelf:"center"},
+  passwordHeader:{flexDirection:"row-reverse",alignItems:"center",justifyContent:"space-between",gap:12,paddingBottom:8},passwordCopy:{flex:1,gap:3},passwordTitle:{color:"#172033",fontSize:13,fontWeight:"900",textAlign:"right"},passwordHint:{color:"#667085",fontSize:9,lineHeight:16,textAlign:"right"},passwordForm:{gap:2},
   resetBox:{borderWidth:1,borderColor:"#F1D5D5",backgroundColor:"#FFF9F9",borderRadius:16,padding:14,gap:12},resetCopy:{gap:4},resetTitle:{color:"#8B2E2E",fontSize:13,fontWeight:"900",textAlign:"right"},resetText:{color:"#7A6A6A",fontSize:10,lineHeight:17,textAlign:"right"},resetButton:{backgroundColor:"#8B2E2E",borderRadius:12,padding:13,alignItems:"center",justifyContent:"center"},resetButtonDisabled:{opacity:.55},resetButtonText:{color:"#FFFFFF",fontSize:11,fontWeight:"900"},
   header:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",gap:16},
   headerCompact:{alignItems:"flex-end"},
