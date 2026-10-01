@@ -51,7 +51,7 @@ export const appRouter = router({
       ctx.res.cookie(INTERNAL_SESSION_COOKIE, token, { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
       return { token, staff: await staffView(staff) };
     }),
-    resetMonth: staffProcedure.input(z.object({ month: z.string().regex(/^\\d{4}-\\d{2}$/), confirm: z.literal("RESET-SEPTEMBER") })).mutation(async ({ ctx, input }) => {
+    resetMonth: staffProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/), confirm: z.literal("RESET-SEPTEMBER") })).mutation(async ({ ctx, input }) => {
       const membership = await enterprise.getMembership(ctx.staffUser.id);
       if (!membership?.active || membership.role !== "owner") {
         throw new Error("مسح بيانات الشهر متاح لمالك الشركة فقط.");
