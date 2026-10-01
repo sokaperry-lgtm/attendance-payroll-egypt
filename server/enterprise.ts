@@ -1332,6 +1332,35 @@ export function toCsv(rows: Array<Record<string, unknown>>) {
   return [headers.map(escape).join(","),...rows.map(row=>headers.map(h=>escape(row[h])).join(","))].join("\r\n");
 }
 
+
+export async function listPenaltyPolicies(staffAccountId: number) {
+  const db = await getDb(); if (!db) return [];
+  const m = await getCompanyForStaff(staffAccountId);
+  if (!m || !["owner","manager","hr"].includes(m.role)) throw new Error("غير مصرح");
+  return db.execute(sql`SELECT id, companyId, title, category, deductionType, deductionValue, note, active, createdBy, createdAt, updatedAt FROM penalty_policies WHERE companyId = ${m.companyId} ORDER BY active DESC, id DESC`).then((rows:any) => rows[0] ?? []);
+}
+
+export async function createPenaltyPolicy(staffAccountId: number, input: { title: string; category: string; deductionType: "fixed"|"percentage"|"days"|"hours"; deductionValue: number; note?: string }) {
+  const db = await getDb(); if (!db) throw new Error("Database not available");
+  const m = await getCompanyForStaff(staffAccountId);
+  if (!m || !["owner","manager","hr"].includes(m.role)) throw new Error("غير مصرح");
+  if (!input.title.trim()) throw new Error("اسم المخالفة مطلوب.");
+  if (!Number.isFinite(input.deductionValue) || input.deductionValue <= 0) throw new Error("قيمة الخصم يجب أن تكون أكبر من صفر.");
+  const result = await db.execute(sql`INSERT INTO penalty_policies (companyId,title,category,deductionType,deductionValue,note,active,createdBy) VALUES (${m.companyId},${input.title.trim()},${input.category.trim() || "أخرى"},${input.deductionType},${Math.round(input.deductionValue)},${input.note?.trim() || null},TRUE,${staffAccountId})`);
+  const id = Number((result as any)[0]?.insertId);
+  await writeAudit(staffAccountId,m.companyId,"penalty_policy.created","penalty_policy",String(id),input);
+  return id;
+}
+
+export async function togglePenaltyPolicy(staffAccountId: number, id: number, active: boolean) {
+  const db = await getDb(); if (!db) throw new Error("Database not available");
+  const m = await getCompanyForStaff(staffAccountId);
+  if (!m || !["owner","manager","hr"].includes(m.role)) throw new Error("غير مصرح");
+  await db.execute(sql`UPDATE penalty_policies SET active=${active} WHERE id=${id} AND companyId=${m.companyId}`);
+  await writeAudit(staffAccountId,m.companyId,"penalty_policy.toggled","penalty_policy",String(id),{active});
+  return true;
+}
+
 export async function listCompanySalaryAdjustments(staffAccountId:number, month?:string) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
