@@ -88,7 +88,7 @@ export default function RequestsScreen() {
                 }
               }}
               style={styles.absenceApproveButton}
-            ><Text style={styles.absenceApproveText}>{reviewAttendanceException.isPending ? "..." : "اعتماد الخصم"}</Text></Pressable>
+            ><Text style={styles.absenceApproveText}>{reviewAttendanceException.isPending ? "..." : "✓  اعتماد الخصم"}</Text></Pressable>
             <Pressable
               disabled={reviewAttendanceException.isPending}
               onPress={async () => {
@@ -102,7 +102,7 @@ export default function RequestsScreen() {
                 }
               }}
               style={styles.absenceCancelButton}
-            ><Text style={styles.absenceCancelText}>{reviewAttendanceException.isPending ? "..." : "إلغاء الخصم"}</Text></Pressable>
+            ><Text style={styles.absenceCancelText}>{reviewAttendanceException.isPending ? "..." : "✕  إلغاء الخصم"}</Text></Pressable>
           </View>
         </View>
       ))}
@@ -175,11 +175,11 @@ const styles = StyleSheet.create({
   absenceReviewName: { color: "#172033", fontSize: 12, fontWeight: "900", textAlign: "right" },
   absenceReviewDate: { color: "#31577F", fontSize: 10, fontWeight: "800", marginTop: 3, textAlign: "right" },
   absenceReviewHint: { color: "#98A6B8", fontSize: 9, marginTop: 3, textAlign: "right" },
-  absenceReviewActions: { gap: 6, minWidth: 104 },
-  absenceApproveButton: { backgroundColor: "#163A63", borderRadius: 10, paddingVertical: 9, paddingHorizontal: 10, alignItems: "center" },
-  absenceApproveText: { color: "#FFFFFF", fontSize: 10, fontWeight: "900" },
-  absenceCancelButton: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D9E6F2", borderRadius: 10, paddingVertical: 9, paddingHorizontal: 10, alignItems: "center" },
-  absenceCancelText: { color: "#31577F", fontSize: 10, fontWeight: "900" },
+  absenceReviewActions: { gap: 10, marginTop: 10, minWidth: 122 },
+  absenceApproveButton: { minHeight: 46, backgroundColor: "#163A63", borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#163A63", elevation: 2 },
+  absenceApproveText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
+  absenceCancelButton: { minHeight: 46, backgroundColor: "#FFF5F5", borderWidth: 2, borderColor: "#D64545", borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14, alignItems: "center", justifyContent: "center" },
+  absenceCancelText: { color: "#B42318", fontSize: 13, fontWeight: "900" },
 
   detailModal:{backgroundColor:"#FFFFFF",borderTopLeftRadius:26,borderTopRightRadius:26,padding:20,gap:10},detailHead:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},detailTitle:{color:"#172033",fontSize:20,fontWeight:"900"},closeText:{color:"#163A63",fontSize:11},detailType:{color:"#163A63",fontSize:18,fontWeight:"800",textAlign:"right"},detailDates:{color:"#667085",fontSize:12,textAlign:"right"},detailStatus:{alignSelf:"flex-end",backgroundColor:"#EEF4FB",borderRadius:99,paddingHorizontal:12,paddingVertical:6},detailStatusText:{color:"#31577F",fontSize:10,fontWeight:"800"},detailLabel:{color:"#667085",fontSize:10,fontWeight:"700",textAlign:"right",marginTop:10},detailReason:{color:"#172033",fontSize:13,lineHeight:20,textAlign:"right"},timeline:{backgroundColor:"#172033",borderRadius:14,padding:13,marginTop:8},timelineTitle:{color:"#FFFFFF",fontSize:12,fontWeight:"800",textAlign:"right"},timelineText:{color:"#D9E6F2",fontSize:11,lineHeight:18,textAlign:"right",marginTop:4},
   smartInsight:{backgroundColor:"#F7F9FC",borderRadius:18,padding:15,borderWidth:1,borderColor:"#D9E2EC",flexDirection:"row-reverse",alignItems:"center",gap:11},
