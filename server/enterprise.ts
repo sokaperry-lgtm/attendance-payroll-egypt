@@ -1411,8 +1411,21 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   const attendance=await db.select().from(attendanceRecords).where(eq(attendanceRecords.staffAccountId,staffAccountId)).orderBy(desc(attendanceRecords.date));
   const requests=await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,staffAccountId)).orderBy(desc(staffRequests.createdAt)).limit(50);
   const payroll=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.staffAccountId,staffAccountId),eq(payrollRecords.month,month))).limit(1))[0] ?? null;
+
+  // For the active month, employee self-service shows salary earned only up to today.
+  const cairoToday = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date());
+  const isCurrentMonth = month === cairoToday.slice(0, 7);
+  const workedDaysToDate = new Set(
+    attendance
+      .filter(record => record.date.startsWith(month) && (!isCurrentMonth || record.date <= cairoToday) && Boolean(record.checkIn) && ["حاضر", "متأخر"].includes(String(record.status || "")))
+      .map(record => record.date)
+  ).size;
+  const earnedBaseSalaryToDate = Math.round((Number(staff.baseSalary || 0) / PAYROLL_RULES.calendarDays) * workedDaysToDate);
+
   const balance=await ensureLeaveBalance(staffAccountId,Number(month.slice(0,4)));
-  return { staff, attendance: attendance.slice(0,90), requests, payroll, leaveBalance: balance };
+  return { staff, attendance: attendance.slice(0,90), requests, payroll, leaveBalance: balance, earnedBaseSalaryToDate, workedDaysToDate, isCurrentMonth };
 }
 
 export function toCsv(rows: Array<Record<string, unknown>>) {
