@@ -207,7 +207,66 @@ export const appRouter = router({
       await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7), input.staffAccountId);
       const row = await db.updateAttendanceByManager(input);
       const m = await enterprise.getCompanyForStaff(ctx.staffUser.id);
-      if (m) await enterprise.writeAudit(ctx.staffUser.id, m.companyId, "attendance.updated", "attendance", String(row?.id ?? ""), {staffAccountId:input.staffAccountId,date:input.date,status:input.status});
+
+      // Manual manager/owner checkout must trigger the same automatic
+      // overtime request flow as employee self-checkout.
+      if (input.checkOut) {
+        const target = await db.getStaffAccountById(input.staffAccountId);
+        const scheduled = (await db.listSchedules(input.staffAccountId)).find(r => r.scheduleDate === input.date);
+        const shiftStart = scheduled?.shift?.startTime ?? target?.shiftStart ?? "09:00";
+        const shiftEnd = scheduled?.shift?.endTime ?? target?.shiftEnd ?? "17:00";
+        const crossesMidnight = Boolean(
+          scheduled?.shift?.crossesMidnight ||
+          timeMinutes(shiftEnd) < timeMinutes(shiftStart)
+        );
+        const overtimeMinutes = enterprise.overtimeAfterShiftEndMinutes(
+          input.checkIn ?? row?.checkIn ?? "",
+          input.checkOut,
+          shiftStart,
+          shiftEnd,
+          crossesMidnight
+        );
+
+        if (overtimeMinutes >= 30) {
+          const overtimeHours = Number((overtimeMinutes / 60).toFixed(2));
+          const existingRequests = await db.listRequests(input.staffAccountId);
+          const hasOvertimeRequest = existingRequests.some(request =>
+            request.type === "أوفر تايم" &&
+            request.fromDate === input.date &&
+            request.toDate === input.date
+          );
+
+          if (!hasOvertimeRequest) {
+            const overtimeRequest = await db.createRequest({
+              staffAccountId: input.staffAccountId,
+              type: "أوفر تايم",
+              fromDate: input.date,
+              toDate: input.date,
+              reason: "أوفر تايم تلقائي — الحضور " + (input.checkIn ?? row?.checkIn ?? "—") + " والانصراف " + input.checkOut + " — وقت إضافي " + overtimeHours + " ساعة",
+              hours: overtimeHours,
+            });
+
+            if (overtimeRequest && m) {
+              const actorName = target?.name || "الموظف";
+              await enterprise.notifyCompanyRoles(
+                input.staffAccountId,
+                ["owner", "manager"],
+                "request",
+                "طلب أوفر تايم جديد",
+                actorName + " لديه " + overtimeHours + " ساعة أوفر تايم تحتاج اعتمادًا."
+              );
+            }
+          }
+        }
+      }
+
+      if (m) await enterprise.writeAudit(ctx.staffUser.id, m.companyId, "attendance.updated", "attendance", String(row?.id ?? ""), {
+        staffAccountId:input.staffAccountId,
+        date:input.date,
+        status:input.status,
+        checkIn:input.checkIn ?? row?.checkIn ?? null,
+        checkOut:input.checkOut ?? row?.checkOut ?? null,
+      });
       return row;
     }),
     checkIn: staffProcedure.input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), latitude: gpsCoordinate.min(-90).max(90), longitude: gpsCoordinate.min(-180).max(180) })).mutation(async ({ ctx, input }) => {
