@@ -156,15 +156,18 @@ export default function PayrollScreen() {
 
   if (!isAdmin) {
     const p = selfService.data?.payroll;
-    const gross = p?.grossSalary ?? (employee.baseSalary + payroll.overtimeValue);
-    const deductions = p ? p.employeeSocialInsurance + p.employeeIncomeTax + p.absenceDeduction + p.lateDeduction + (p.earlyDeduction ?? 0) + p.otherDeductions + p.advances : payroll.absenceDeduction + payroll.lateDeduction;
-    const net = p?.netSalary ?? payroll.net;
+    const liveBase = Number(selfService.data?.earnedBaseSalaryToDate ?? 0);
+    const isLiveCurrentMonth = selfService.data?.isCurrentMonth === true && p?.status !== "approved";
+    const gross = p?.status === "approved" ? p.grossSalary : (isLiveCurrentMonth ? liveBase + payroll.overtimeValue : (p?.grossSalary ?? liveBase + payroll.overtimeValue));
+    const deductions = p?.status === "approved" ? p.employeeSocialInsurance + p.employeeIncomeTax + p.absenceDeduction + p.lateDeduction + (p.earlyDeduction ?? 0) + p.otherDeductions + p.advances : payroll.absenceDeduction + payroll.lateDeduction + payroll.earlyDeduction;
+    const net = p?.status === "approved" ? p.netSalary : Math.max(0, gross - deductions);
+    const salaryMeta = isLiveCurrentMonth ? "حتى " + (selfService.data?.workedDaysToDate ?? 0) + " يوم عمل مسجل" : undefined;
     return (
       <ScreenContainer>
         <ScrollView contentContainerStyle={[styles.content, compact && styles.contentCompact]} showsVerticalScrollIndicator={false}>
           <Header title="راتبي" subtitle="قسيمة راتبك التفصيلية لهذا الشهر." icon="banknote" />
           <View style={styles.hero}>
-            <View style={styles.heroCopy}><Text style={styles.heroKicker}>NET SALARY</Text><Text style={styles.heroValue}>{formatMoney(net)}</Text><Text style={styles.heroMeta}>{monthLabel(month)} · {p?.status === "approved" ? "راتب معتمد" : "قيد المراجعة"}</Text></View>
+            <View style={styles.heroCopy}><Text style={styles.heroKicker}>NET SALARY</Text><Text style={styles.heroValue}>{formatMoney(net)}</Text><Text style={styles.heroMeta}>{monthLabel(month)} · {p?.status === "approved" ? "راتب معتمد" : (salaryMeta || "قيد المراجعة")}</Text></View>
             <View style={styles.heroIcon}><IconSymbol name="banknote" size={25} color="#FFFFFF" /></View>
           </View>
           <View style={[styles.monthBar, compact && styles.monthBarCompact]}>
@@ -175,7 +178,7 @@ export default function PayrollScreen() {
           <View style={[styles.kpiGrid, compact && styles.kpiGridCompact]}><Kpi label="إجمالي المستحقات" value={formatMoney(gross)} /><Kpi label="إجمالي الخصومات" value={formatMoney(deductions)} /><Kpi label="الأوفر تايم" value={formatMoney(p?.overtime ?? payroll.overtimeValue)} /></View>
           <Section title="قسيمة الراتب" subtitle="تفصيل كامل للمستحقات والخصومات والتأمين والضريبة" />
           <View style={styles.detailCard}>
-            <Row label="الراتب الأساسي" value={formatMoney(p?.baseSalary ?? employee.baseSalary)} />
+            <Row label={isLiveCurrentMonth ? "الراتب المستحق حتى الآن" : "الراتب الأساسي"} value={formatMoney(p?.status === "approved" ? p.baseSalary : liveBase)} />
             <Row label="البدلات" value={formatMoney(p?.allowances ?? 0)} />
             <Row label="الحوافز والمكافآت" value={formatMoney(p?.bonuses ?? 0)} />
             <Row label="الأوفر تايم" value={formatMoney(p?.overtime ?? payroll.overtimeValue)} />
