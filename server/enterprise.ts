@@ -835,6 +835,14 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       .filter(x=>x.staffAccountId===s.id && x.date.startsWith(month))
       .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
 
+    // Payroll is earned on worked days, not automatically the full monthly salary.
+    // A 30-day salary is divided by 30, then multiplied by actual worked days.
+    const workedDays = new Set(
+      records
+        .filter(record => Boolean(record.checkIn) && ["حاضر", "متأخر"].includes(String(record.status || "")))
+        .map(record => String(record.date))
+    ).size;
+    const earnedBaseSalary = Math.round((Number(s.baseSalary) / PAYROLL_RULES.calendarDays) * workedDays);
     const dailyValue=s.baseSalary/PAYROLL_RULES.calendarDays;
     const hourlyValue=dailyValue/PAYROLL_RULES.dailyHours;
 
@@ -912,14 +920,14 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       eq(salaryAdvances.status,"active")
     ));
     const advanceInstallment=activeAdvances.filter(a=>a.startMonth<=month && a.remainingAmount>0).reduce((sum,a)=>sum+Math.min(a.installmentAmount,a.remainingAmount),0);
-    const gross=s.baseSalary+allowances+overtimeValue+bonuses;
+    const gross=earnedBaseSalary+allowances+overtimeValue+bonuses;
     const egypt = calculateEgyptPayroll({
       monthlyGross: gross,
-      insuranceWage: s.baseSalary,
+      insuranceWage: earnedBaseSalary,
       monthlyOtherDeductions: 0,
     });
     const net=Math.max(0, egypt.net-absenceDeduction-lateDeduction-earlyDeduction-extraDeductions-advanceInstallment);
-    const values={companyId:m.companyId,staffAccountId:s.id,month,baseSalary:s.baseSalary,allowances,bonuses,overtime:overtimeValue,absenceDeduction,lateDeduction,earlyDeduction,otherDeductions:extraDeductions,advances:advanceInstallment,employeeSocialInsurance:egypt.employeeSocialInsurance,employeeIncomeTax:egypt.employeeIncomeTax,grossSalary:gross,netSalary:net,status:"draft"};
+    const values={companyId:m.companyId,staffAccountId:s.id,month,baseSalary:earnedBaseSalary,allowances,bonuses,overtime:overtimeValue,absenceDeduction,lateDeduction,earlyDeduction,otherDeductions:extraDeductions,advances:advanceInstallment,employeeSocialInsurance:egypt.employeeSocialInsurance,employeeIncomeTax:egypt.employeeIncomeTax,grossSalary:gross,netSalary:net,status:"draft"};
     if(existing) await db.update(payrollRecords).set({...values,updatedAt:new Date()}).where(eq(payrollRecords.id,existing.id));
     else await db.insert(payrollRecords).values(values);
     result.push(values);
