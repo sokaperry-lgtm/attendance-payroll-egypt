@@ -208,9 +208,12 @@ export const appRouter = router({
       const row = await db.updateAttendanceByManager(input);
       const m = await enterprise.getCompanyForStaff(ctx.staffUser.id);
 
-      // Manual manager/owner checkout must trigger the same automatic
-      // overtime request flow as employee self-checkout.
-      if (input.checkOut) {
+      // Any manual attendance edit must recalculate overtime from the final
+      // saved row, not only when a new checkout is entered. This covers cases
+      // such as correcting a fingerprint record from 13:00 to 15:00.
+      const finalCheckIn = row?.checkIn ?? input.checkIn ?? null;
+      const finalCheckOut = row?.checkOut ?? input.checkOut ?? null;
+      if (finalCheckOut) {
         const target = await db.getStaffAccountById(input.staffAccountId);
         const scheduled = (await db.listSchedules(input.staffAccountId)).find(r => r.scheduleDate === input.date);
         const shiftStart = scheduled?.shift?.startTime ?? target?.shiftStart ?? "09:00";
@@ -220,32 +223,37 @@ export const appRouter = router({
           timeMinutes(shiftEnd) < timeMinutes(shiftStart)
         );
         const overtimeMinutes = enterprise.overtimeAfterShiftEndMinutes(
-          input.checkIn ?? row?.checkIn ?? "",
-          input.checkOut,
+          finalCheckIn ?? "",
+          finalCheckOut,
           shiftStart,
           shiftEnd,
           crossesMidnight
         );
+        const overtimeHours = Number((overtimeMinutes / 60).toFixed(2));
+        const requests = await db.listRequests(input.staffAccountId);
+        const automaticRequest = requests.find(request =>
+          request.type === "أوفر تايم" &&
+          request.fromDate === input.date &&
+          request.toDate === input.date &&
+          String(request.reason ?? "").startsWith("أوفر تايم تلقائي —")
+        );
 
         if (overtimeMinutes >= 30) {
-          const overtimeHours = Number((overtimeMinutes / 60).toFixed(2));
-          const existingRequests = await db.listRequests(input.staffAccountId);
-          const hasOvertimeRequest = existingRequests.some(request =>
-            request.type === "أوفر تايم" &&
-            request.fromDate === input.date &&
-            request.toDate === input.date
-          );
-
-          if (!hasOvertimeRequest) {
+          const reason = "أوفر تايم تلقائي — الحضور " + (finalCheckIn ?? "—") +
+            " والانصراف " + finalCheckOut + " — وقت إضافي " + overtimeHours + " ساعة";
+          if (automaticRequest) {
+            if (automaticRequest.status === "قيد المراجعة") {
+              await db.updateRequest(automaticRequest.id, { hours: overtimeHours, reason });
+            }
+          } else {
             const overtimeRequest = await db.createRequest({
               staffAccountId: input.staffAccountId,
               type: "أوفر تايم",
               fromDate: input.date,
               toDate: input.date,
-              reason: "أوفر تايم تلقائي — الحضور " + (input.checkIn ?? row?.checkIn ?? "—") + " والانصراف " + input.checkOut + " — وقت إضافي " + overtimeHours + " ساعة",
+              reason,
               hours: overtimeHours,
             });
-
             if (overtimeRequest && m) {
               const actorName = target?.name || "الموظف";
               await enterprise.notifyCompanyRoles(
@@ -257,6 +265,15 @@ export const appRouter = router({
               );
             }
           }
+        } else if (automaticRequest?.status === "قيد المراجعة") {
+          // If a later correction removes the overtime, don't leave a stale
+          // pending approval that could be approved accidentally.
+          await db.updateRequest(automaticRequest.id, {
+            status: "مرفوض",
+            reviewedBy: ctx.staffUser.id,
+            reviewedAt: new Date(),
+            reason: String(automaticRequest.reason ?? "") + " — أُلغي تلقائيًا بعد تعديل الحضور"
+          });
         }
       }
 
