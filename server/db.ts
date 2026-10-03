@@ -379,6 +379,14 @@ export async function approveRequest(id: number, managerId: number, status: "Ù…Ù
   return getRequestById(id);
 }
 
+export async function updateRequest(id: number, input: { hours?: number; reason?: string; status?: string; reviewedBy?: number; reviewedAt?: Date }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(staffRequests).set(input).where(eq(staffRequests.id, id));
+  return getRequestById(id);
+}
+
+
 export async function getMonthlyStaffReports(month: string, companyId?: number) {
   const db = await getDb();
   if (!db) return { month, employees: [], summary: { staffCount: 0, presentDays: 0, absentDays: 0, lateMinutes: 0, pendingRequests: 0 } };
