@@ -48,7 +48,10 @@ export default function HomeScreen(){
   const managementDashboard = trpc.management.dashboard.useQuery({ month: currentMonth }, { enabled: isManagement, refetchInterval: 60000 });
   const [working,setWorking]=useState(false);
   const [gpsMessage,setGpsMessage]=useState("الموقع جاهز للتحقق");
-  const isCheckedOut=Boolean(todayRecord?.checkOut);
+  const [attendanceConfirmed,setAttendanceConfirmed]=useState(false);
+  const [attendanceFinished,setAttendanceFinished]=useState(false);
+  const isCheckedOut=Boolean(todayRecord?.checkOut) || attendanceFinished;
+  const effectiveCheckedIn=checkedIn || attendanceConfirmed;
   const isWeeklyOff=Boolean(shift?.kind==="weekly_off");
   const presentDays=records.filter(r=>r.status==="حاضر"||r.status==="متأخر").length;
   const unread=(notificationsQuery.data??[]).filter(n=>!n.readAt).length;
@@ -58,7 +61,7 @@ export default function HomeScreen(){
   const teamAbsent = teamToday.filter((r:any) => r.status === "غياب").length;
   const teamCheckedOut = teamToday.filter((r:any) => Boolean(r.checkOut)).length;
   const payrollTotal = (payrollQuery.data ?? []).reduce((sum:number,r:any) => sum + Number(r.netSalary || 0), 0);
-  const attendanceActionLabel = working ? "جارٍ التحقق..." : checkedIn ? "تسجيل الانصراف" : "تسجيل الحضور";
+  const attendanceActionLabel = working ? "جارٍ التحقق..." : isCheckedOut ? "تم إنهاء الوردية ✓" : effectiveCheckedIn ? "تسجيل الانصراف" : "تسجيل الحضور";
   const dateLabel=useMemo(()=>new Intl.DateTimeFormat("ar-EG",{weekday:"long",day:"numeric",month:"long"}).format(new Date()),[]);
 
   async function handleCheckIn(){
@@ -67,7 +70,9 @@ export default function HomeScreen(){
       if(d>branch.radiusMeters)throw new Error(`أنت خارج نطاق الفرع بـ ${d} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`);
       const lateMinutes=calculateLateMinutes(new Date(),shift.start,PAYROLL_RULES.graceMinutes);
       await checkIn({time:currentTime(now),latitude:c.latitude,longitude:c.longitude,status:lateMinutes>0?"متأخر":"حاضر",lateMinutes});
-      setGpsMessage(`تم التحقق من الموقع — ${d} متر من الفرع`);
+      setAttendanceConfirmed(true);
+      setGpsMessage(`تم تسجيل الحضور بنجاح ✓ — ${d} متر من الفرع`);
+      showAlert("تم تسجيل الحضور ✓", "تم تسجيل حضورك بنجاح. يمكنك الآن تسجيل الانصراف في نهاية الوردية.");
       if(Platform.OS!=="web")await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }catch(e){const m=e instanceof Error?e.message:"تعذر التحقق من الموقع";setGpsMessage(m);showAlert("لم يتم تسجيل الحضور",m);}
     finally{setWorking(false);}
@@ -76,7 +81,11 @@ export default function HomeScreen(){
     setWorking(true);
     try{const c=await getCurrentCoordinates(),d=distanceBetween(branch.latitude,branch.longitude,c.latitude,c.longitude);
       if(d>branch.radiusMeters)throw new Error(`أنت خارج نطاق الفرع بـ ${d} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`);
-      await checkOut({time:currentTime(now),latitude:c.latitude,longitude:c.longitude});setGpsMessage(`تم تسجيل الانصراف — ${d} متر من الفرع`);
+      await checkOut({time:currentTime(now),latitude:c.latitude,longitude:c.longitude});
+      setAttendanceFinished(true);
+      setGpsMessage(`تم تسجيل الانصراف بنجاح ✓ — ${d} متر من الفرع`);
+      showAlert("تم تسجيل الانصراف ✓", "تم إنهاء ورديتك وتسجيل وقت الانصراف بنجاح.");
+
     }catch(e){showAlert("تعذر تسجيل الانصراف",e instanceof Error?e.message:"حدث خطأ غير متوقع.");}
     finally{setWorking(false);}
   }
@@ -107,11 +116,11 @@ export default function HomeScreen(){
           <View style={[styles.heroStats, isMobile && styles.heroStatsMobile]}><View><Text style={styles.heroLabel}>الفرع</Text><Text style={styles.heroValue}>الفرع الرئيسي</Text></View><View><Text style={styles.heroLabel}>الوردية</Text><Text style={styles.heroValue}>{isWeeklyOff?"إجازة":shift.start+" — "+shift.end}</Text></View><View><Text style={styles.heroLabel}>الالتزام</Text><Text style={styles.heroValue}>92%</Text></View></View>
         </View>
         <View style={styles.attendanceCard}>
-          <Text style={styles.attendanceLabel}>{isCheckedOut?"تم إنهاء الوردية":checkedIn?"الوردية جارية":"ابدأ يومك"}</Text>
+          <Text style={styles.attendanceLabel}>{isCheckedOut?"تم إنهاء الوردية":effectiveCheckedIn?"الوردية جارية":"ابدأ يومك"}</Text>
           <Text style={styles.clock}>{currentTime(now)}</Text>
           <View style={styles.locationRow}><View style={styles.locationIcon}><IconSymbol name="location.fill" size={14} color="#163A63"/></View><Text style={styles.locationText}>{gpsMessage}</Text></View>
-          <Pressable disabled={working||isWeeklyOff||isCheckedOut} onPress={checkedIn?handleCheckOut:handleCheckIn} style={({pressed})=>[styles.attendanceButton,(working||isWeeklyOff||isCheckedOut)&&styles.disabled,pressed&&styles.pressed]}>
-            <IconSymbol name={checkedIn?"arrow.right":"checkmark"} size={17} color="#FFFFFF"/><Text style={styles.attendanceButtonText}>{attendanceActionLabel}</Text>
+          <Pressable disabled={working||isWeeklyOff||isCheckedOut} onPress={effectiveCheckedIn?handleCheckOut:handleCheckIn} style={({pressed})=>[styles.attendanceButton,(working||isWeeklyOff||isCheckedOut)&&styles.disabled,pressed&&styles.pressed]}>
+            <IconSymbol name={effectiveCheckedIn?"arrow.right":"checkmark"} size={17} color="#FFFFFF"/><Text style={styles.attendanceButtonText}>{attendanceActionLabel}</Text>
           </Pressable>
         </View>
       </View>
