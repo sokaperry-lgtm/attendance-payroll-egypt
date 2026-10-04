@@ -205,7 +205,24 @@ export const appRouter = router({
         }
       }
       await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7), input.staffAccountId);
-      const row = await db.updateAttendanceByManager(input);
+      // Manual edits must derive lateness from the actual check-in time, exactly
+      // like the employee fingerprint flow. A manager should not have to enter
+      // lateMinutes manually.
+      let effectiveLateMinutes = 0;
+      let effectiveStatus = input.status;
+      if (input.checkIn) {
+        const target = await db.getStaffAccountById(input.staffAccountId);
+        const scheduled = (await db.listSchedules(input.staffAccountId)).find(r => r.scheduleDate === input.date);
+        const shiftStart = scheduled?.shift?.startTime ?? target?.shiftStart ?? "08:00";
+        const rawLate = Math.max(0, timeMinutes(input.checkIn) - timeMinutes(shiftStart));
+        effectiveLateMinutes = rawLate;
+        effectiveStatus = rawLate > 0 ? "متأخر" : "حاضر";
+      }
+      const row = await db.updateAttendanceByManager({
+        ...input,
+        lateMinutes: effectiveLateMinutes,
+        status: effectiveStatus,
+      });
       const m = await enterprise.getCompanyForStaff(ctx.staffUser.id);
 
       // Any manual attendance edit must recalculate overtime from the final
