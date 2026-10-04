@@ -218,10 +218,14 @@ export const appRouter = router({
         effectiveLateMinutes = rawLate;
         effectiveStatus = rawLate > 0 ? "متأخر" : "حاضر";
       }
+      const effectiveNote = effectiveLateMinutes > 0
+        ? ((input.note ?? "").includes("تم اعتماد التأخير") ? input.note : [input.note, "تم اعتماد التأخير تلقائيًا من تعديل الحضور"].filter(Boolean).join(" · "))
+        : input.note;
       const row = await db.updateAttendanceByManager({
         ...input,
         lateMinutes: effectiveLateMinutes,
         status: effectiveStatus,
+        note: effectiveNote,
       });
       const m = await enterprise.getCompanyForStaff(ctx.staffUser.id);
 
