@@ -7,6 +7,12 @@ import * as enterprise from "./enterprise";
 import * as db from "./db";
 import { PAYROLL_RULES } from "../lib/payroll";
 
+function previousCalendarDate(date: string) {
+  const d = new Date(date + "T12:00:00");
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 function timeMinutes(value: string) {
   const match = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value);
   if (!match) throw new Error("صيغة الوقت غير صحيحة.");
@@ -254,8 +260,8 @@ export const appRouter = router({
         const requests = await db.listRequests(input.staffAccountId);
         const automaticRequest = requests.find(request =>
           request.type === "أوفر تايم" &&
-          request.fromDate === input.date &&
-          request.toDate === input.date &&
+          request.fromDate === attendanceDate &&
+          request.toDate === attendanceDate &&
           String(request.reason ?? "").startsWith("أوفر تايم تلقائي —")
         );
 
@@ -342,12 +348,50 @@ export const appRouter = router({
       const distanceMeters = gpsDistanceMeters(branchLatitude, branchLongitude, input.latitude, input.longitude);
       if (distanceMeters > branch.radiusMeters) throw new Error(`أنت خارج نطاق الانصراف المسموح (${branch.radiusMeters} متر).`);
       const records = await db.listAttendance(ctx.staffUser.id);
-      const current = records.find((item) => item.date === input.date);
-      if (!current) throw new Error("سجل الحضور غير موجود.");
+
+      // An overnight shift belongs to the attendance day on which it started.
+      // After midnight, the employee must close that open session instead of
+      // accidentally starting a new attendance record for the new calendar day.
+      const openRecords = records
+        .filter((item) => item.checkIn && !item.checkOut && item.date <= input.date)
+        .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+      const sameDayOpen = openRecords.find((item) => item.date === input.date);
+      const previousDayOpen = openRecords.find((item) => item.date !== input.date && item.date === previousCalendarDate(input.date));
+
+      let current = sameDayOpen;
+      let attendanceDate = input.date;
+
+      if (!current && previousDayOpen) {
+        const previousSchedule = (await db.listSchedules(ctx.staffUser.id))
+          .find(r => r.scheduleDate === previousDayOpen.date);
+        const previousShiftStart = previousSchedule?.shift?.startTime ?? ctx.staffUser.shiftStart;
+        const previousShiftEnd = previousSchedule?.shift?.endTime ?? ctx.staffUser.shiftEnd;
+        const previousCrossesMidnight = Boolean(
+          previousSchedule?.shift?.crossesMidnight ||
+          timeMinutes(previousShiftEnd) < timeMinutes(previousShiftStart)
+        );
+
+        if (previousCrossesMidnight) {
+          current = previousDayOpen;
+          attendanceDate = previousDayOpen.date;
+        }
+      }
+
+      if (!current) {
+        const staleOpen = openRecords[0];
+        if (staleOpen) {
+          throw new Error("لديك تسجيل حضور مفتوح لم يتم تسجيل الانصراف له. يجب تسجيل الانصراف من نفس الشيفت أولًا.");
+        }
+        throw new Error("سجل الحضور غير موجود.");
+      }
       if (!current.checkIn) throw new Error("يجب تسجيل الحضور أولًا.");
       if (current.checkOut) throw new Error("تم تسجيل الانصراف بالفعل.");
 
-      const scheduled = (await db.listSchedules(ctx.staffUser.id)).find(r => r.scheduleDate === input.date);
+      // Payroll/shift calculations must follow the attendance start date,
+      // not the new calendar date after midnight.
+      await enterprise.assertPayrollEditable(ctx.staffUser.id, attendanceDate.slice(0,7));
+
+      const scheduled = (await db.listSchedules(ctx.staffUser.id)).find(r => r.scheduleDate === attendanceDate);
       const shiftEnd = scheduled?.shift?.endTime ?? ctx.staffUser.shiftEnd;
       const crossesMidnight = scheduled?.shift?.crossesMidnight ?? false;
       const scheduledEnd = timeMinutes(shiftEnd) + (crossesMidnight ? 24 * 60 : 0);
@@ -383,8 +427,8 @@ export const appRouter = router({
           await db.createRequest({
             staffAccountId: ctx.staffUser.id,
             type: "أوفر تايم",
-            fromDate: input.date,
-            toDate: input.date,
+            fromDate: attendanceDate,
+            toDate: attendanceDate,
             reason: `أوفر تايم تلقائي — الحضور ${current.checkIn} والانصراف ${input.time} — وقت إضافي ${overtimeHours} ساعة`,
             hours: overtimeHours,
           });
