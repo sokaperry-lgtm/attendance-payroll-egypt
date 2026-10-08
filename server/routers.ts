@@ -260,8 +260,8 @@ export const appRouter = router({
         const requests = await db.listRequests(input.staffAccountId);
         const automaticRequest = requests.find(request =>
           request.type === "أوفر تايم" &&
-          request.fromDate === attendanceDate &&
-          request.toDate === attendanceDate &&
+          request.fromDate === input.date &&
+          request.toDate === input.date &&
           String(request.reason ?? "").startsWith("أوفر تايم تلقائي —")
         );
 
