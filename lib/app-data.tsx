@@ -85,26 +85,43 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const schedules: ScheduleEntry[] = (mineScheduleQuery.data ?? []) as ScheduleEntry[];
   const teamSchedules: ScheduleEntry[] = (teamScheduleQuery.data ?? []) as ScheduleEntry[];
   const teamAttendance: AttendanceRecord[] = (teamAttendanceQuery.data ?? []).map((record: any) => ({ id: String(record.id), date: record.date, checkIn: record.checkIn, checkOut: record.checkOut, status: record.status as AttendanceState, lateMinutes: record.lateMinutes, distanceMeters: record.distanceMeters, note: record.note, staffAccountId: Number(record.staffAccountId) } as AttendanceRecord & { staffAccountId: number }));
-  const todayRecord = records.find((record) => record.date === todayKey());
-  const todaySchedule = schedules.find((item) => item.scheduleDate === todayKey());
-  const activeShift = todaySchedule?.shift;
-  const currentMonth = todayKey().slice(0, 7);
+  const today = todayKey();
+  const previousDay = (() => {
+    const d = new Date(today + "T12:00:00");
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  })();
+  const todayRecord = records.find((record) => record.date === today);
+  const previousRecord = records.find((record) => record.date === previousDay);
+  const todaySchedule = schedules.find((item) => item.scheduleDate === today);
+  const previousSchedule = schedules.find((item) => item.scheduleDate === previousDay);
+
+  // An overnight shift remains active after midnight until its original
+  // attendance record is checked out.
+  const previousOvernightOpen = Boolean(
+    previousRecord?.checkIn &&
+    !previousRecord?.checkOut &&
+    previousSchedule?.shift?.crossesMidnight
+  );
+  const activeAttendanceRecord = previousOvernightOpen ? previousRecord : todayRecord;
+  const activeShift = previousOvernightOpen ? previousSchedule?.shift : todaySchedule?.shift;
+  const currentMonth = today.slice(0, 7);
   const approvedOvertimeHours = requests.filter((request) => request.type === "أوفر تايم" && request.status === "مقبول" && request.from.startsWith(currentMonth)).reduce((sum, request) => sum + (request.hours ?? 0), 0);
   const payrollInputs: PayrollInputs = useMemo(() => ({ baseSalary: employee.baseSalary, allowances: 0, bonuses: 0, overtimeHours: approvedOvertimeHours, absences: records.filter((record) => record.status === "غياب" && (record.note || "").includes("تم اعتماد الغياب")).length, lateMinutes: records.reduce((sum, record) => sum + record.lateMinutes, 0), deductions: 0, advances: 0 }), [employee.baseSalary, records, approvedOvertimeHours]);
   const payroll = useMemo(() => calculatePayroll(payrollInputs), [payrollInputs]);
 
   const invalidateAll = () => queryClient.invalidateQueries();
   const value = useMemo<AppDataContext>(() => ({
-    role, employee, branch, shift: { name: activeShift?.name ?? "الوردية الأساسية", start: activeShift?.startTime ?? meQuery.data?.shiftStart ?? "09:00", end: activeShift?.endTime ?? meQuery.data?.shiftEnd ?? "18:00", days: "حسب جدول الأسبوع", crossesMidnight: activeShift?.crossesMidnight, kind: activeShift?.kind as "shift" | "weekly_off" | undefined }, records, requests, staffMembers, payrollInputs, payroll, todayRecord, checkedIn: Boolean(todayRecord?.checkIn && !todayRecord?.checkOut), loading: meQuery.isLoading || attendanceQuery.isLoading, refresh: invalidateAll, shiftTemplates, schedules, teamSchedules, teamAttendance,
+    role, employee, branch, shift: { name: activeShift?.name ?? "الوردية الأساسية", start: activeShift?.startTime ?? meQuery.data?.shiftStart ?? "09:00", end: activeShift?.endTime ?? meQuery.data?.shiftEnd ?? "18:00", days: "حسب جدول الأسبوع", crossesMidnight: activeShift?.crossesMidnight, kind: activeShift?.kind as "shift" | "weekly_off" | undefined }, records, requests, staffMembers, payrollInputs, payroll, todayRecord: activeAttendanceRecord, checkedIn: Boolean(activeAttendanceRecord?.checkIn && !activeAttendanceRecord?.checkOut), loading: meQuery.isLoading || attendanceQuery.isLoading, refresh: invalidateAll, shiftTemplates, schedules, teamSchedules, teamAttendance,
     checkIn: async (payload) => { await checkInMutation.mutateAsync({ date: todayKey(), time: payload.time, status: payload.status, lateMinutes: payload.lateMinutes, latitude: payload.latitude, longitude: payload.longitude }); await invalidateAll(); },
-    checkOut: async (payload) => { await checkOutMutation.mutateAsync({ date: todayKey(), time: payload.time, latitude: payload.latitude, longitude: payload.longitude }); await invalidateAll(); },
+    checkOut: async (payload) => { await checkOutMutation.mutateAsync({ date: activeAttendanceRecord?.date ?? todayKey(), time: payload.time, latitude: payload.latitude, longitude: payload.longitude }); await invalidateAll(); },
     submitRequest: async (request) => { await requestMutation.mutateAsync({ type: request.type, fromDate: request.from, toDate: request.to, reason: request.reason, hours: request.hours ?? undefined }); await invalidateAll(); },
     approveRequest: async (id, status) => { await reviewMutation.mutateAsync({ id: Number(id), status: status as "مقبول" | "مرفوض" }); await invalidateAll(); },
     createStaffAccount: async (input) => { await createStaffMutation.mutateAsync({ ...input, shiftStart: "08:00", shiftEnd: "17:00" }); await invalidateAll(); },
     updateStaffAccount: async (input) => { await updateStaffMutation.mutateAsync(input); await invalidateAll(); },
     updateBranch: async (input) => { await updateCompanyMutation.mutateAsync(input); await invalidateAll(); },
     saveSchedule: async (input) => { await saveScheduleMutation.mutateAsync(input); await invalidateAll(); },
-  }), [role, employee, branch, meQuery.data?.shiftStart, meQuery.data?.shiftEnd, records, requests, staffMembers, payrollInputs, payroll, todayRecord, meQuery.isLoading, attendanceQuery.isLoading, teamAttendanceQuery.isLoading, shiftTemplates, schedules, teamSchedules, teamAttendance, activeShift, checkInMutation, checkOutMutation, requestMutation, reviewMutation, createStaffMutation, updateStaffMutation, updateCompanyMutation, saveScheduleMutation]);
+  }), [role, employee, branch, meQuery.data?.shiftStart, meQuery.data?.shiftEnd, records, requests, staffMembers, payrollInputs, payroll, todayRecord, activeAttendanceRecord, previousRecord, previousSchedule, meQuery.isLoading, attendanceQuery.isLoading, teamAttendanceQuery.isLoading, shiftTemplates, schedules, teamSchedules, teamAttendance, activeShift, checkInMutation, checkOutMutation, requestMutation, reviewMutation, createStaffMutation, updateStaffMutation, updateCompanyMutation, saveScheduleMutation]);
   return <AppData.Provider value={value}>{children}</AppData.Provider>;
 }
 
