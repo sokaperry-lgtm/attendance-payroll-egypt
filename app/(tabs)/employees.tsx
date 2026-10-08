@@ -6,7 +6,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAppData, type Role } from "@/lib/app-data";
 import { formatMoney } from "@/lib/payroll";
 
-const roleLabels: Record<Role, string> = { manager: "مدير", supervisor: "سوبرفايزر", employee: "موظف عادي" };
+const roleLabels: Record<Role, string> = { owner: "مالك النظام", manager: "مدير", hr: "موارد بشرية", supervisor: "سوبرفايزر", accountant: "محاسب", employee: "موظف عادي" };
 
 export default function EmployeesScreen() {
   const router = useRouter();
