@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/lib/payroll";
@@ -12,12 +12,16 @@ export default function EmployeeProfileScreen() {
   const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
   const staffAccountId = Number(rawId);
   const [tab, setTab] = useState<Tab>("overview");
+  const [editOpen, setEditOpen] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", phone: "", title: "", department: "", baseSalary: "", shiftStart: "", shiftEnd: "", active: true });
   const { width } = useWindowDimensions();
   const compact = width < 700;
 
   const me = trpc.auth.me.useQuery(undefined, { retry: false });
   const canLoad = ["owner", "manager", "hr"].includes(me.data?.membershipRole ?? me.data?.role ?? "") && Number.isInteger(staffAccountId) && staffAccountId > 0;
   const profile = trpc.hrTools.employee360.useQuery({ staffAccountId }, { enabled: canLoad, retry: false });
+  const updateStaff = trpc.staff.update.useMutation();
 
   if (me.isLoading) return <Screen><Loading text="جاري التحقق من صلاحية الحساب..." /></Screen>;
   if (!me.data) return <State title="انتهت جلسة الدخول" message="سجل الدخول مرة أخرى ثم افتح ملف الموظف." onBack={() => router.replace("/login" as never)} />;
@@ -62,6 +66,22 @@ export default function EmployeeProfileScreen() {
   const previousLate = previousEight.reduce((sum, r) => sum + Number(r.lateMinutes || 0), 0);
   const attendanceTrend = recentRate - previousRate;
   const lateTrend = recentLate - previousLate;
+
+  const openEdit = () => {
+    setEditForm({ name: employee.name || "", phone: employee.phone || "", title: employee.title || "", department: employee.department || "", baseSalary: String(employee.baseSalary ?? 0), shiftStart: employee.shiftStart || "", shiftEnd: employee.shiftEnd || "", active: employee.active !== false });
+    setEditOpen(true);
+  };
+  const saveEdit = async () => {
+    if (!editForm.name.trim() || !editForm.department.trim()) { Alert.alert("بيانات ناقصة", "اكتب الاسم ومكان/قسم العمل."); return; }
+    setSavingEdit(true);
+    try {
+      await updateStaff.mutateAsync({ id: staffAccountId, name: editForm.name.trim(), phone: editForm.phone.trim() || undefined, title: editForm.title.trim() || undefined, department: editForm.department.trim(), baseSalary: Math.max(0, Number(editForm.baseSalary) || 0), shiftStart: editForm.shiftStart.trim() || undefined, shiftEnd: editForm.shiftEnd.trim() || undefined, active: editForm.active });
+      await profile.refetch();
+      setEditOpen(false);
+      Alert.alert("تم الحفظ", "تم تحديث بيانات الموظف بنجاح.");
+    } catch (error) { Alert.alert("تعذر الحفظ", error instanceof Error ? error.message : "حدث خطأ غير متوقع."); }
+    finally { setSavingEdit(false); }
+  };
   const smartInsight = !attendance.length
     ? { tone: "neutral", title: "لسه مفيش بيانات كفاية", text: "أول ما يبدأ تسجيل الحضور والطلبات، الملف هيبدأ يطلع مؤشرات ذكية." }
     : attendanceTrend >= 5
@@ -85,7 +105,7 @@ export default function EmployeeProfileScreen() {
             <Text style={styles.kicker}>EMPLOYEE 360</Text>
             <Text style={styles.name}>{employee.name}</Text>
             <Text style={styles.role}>{employee.title || "موظف"} · {employee.department || "—"}</Text>
-            <Text style={styles.phone}>{employee.phone || "لا يوجد رقم هاتف"}</Text>            <View style={styles.heroBadges}><Text style={styles.heroBadge}>{employee.active ? "نشط" : "غير نشط"}</Text><Text style={styles.heroBadgeGhost}>{(data as any).staff?.membershipRole === "owner" ? "مالك" : (data as any).staff?.membershipRole === "manager" ? "مدير" : (data as any).staff?.membershipRole === "hr" ? "HR" : (data as any).staff?.membershipRole === "accountant" ? "محاسب" : (data as any).staff?.membershipRole === "supervisor" ? "مشرف" : "موظف"}</Text></View>
+            <Text style={styles.phone}>{employee.phone || "لا يوجد رقم هاتف"}</Text>            <View style={styles.heroActions}><Pressable onPress={openEdit} style={styles.editButton}><Text style={styles.editButtonText}>تعديل بيانات الموظف</Text></Pressable></View><View style={styles.heroBadges}><Text style={styles.heroBadge}>{employee.active ? "نشط" : "غير نشط"}</Text><Text style={styles.heroBadgeGhost}>{(data as any).staff?.membershipRole === "owner" ? "مالك" : (data as any).staff?.membershipRole === "manager" ? "مدير" : (data as any).staff?.membershipRole === "hr" ? "HR" : (data as any).staff?.membershipRole === "accountant" ? "محاسب" : (data as any).staff?.membershipRole === "supervisor" ? "مشرف" : "موظف"}</Text></View>
           </View>
         </View>
 
@@ -177,10 +197,37 @@ export default function EmployeeProfileScreen() {
         )}
         {tab === "documents" && <Card title="مستندات الموظف">{documents.length ? documents.map((d) => <Row key={d.id} label={`${d.type} · ${d.title}`} value={d.expiryDate ? String(d.expiryDate) : "—"} />) : <Empty text="لا توجد مستندات." />}</Card>}
       </ScrollView>
+
+      <Modal visible={editOpen} animationType="slide" transparent onRequestClose={() => !savingEdit && setEditOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View><Text style={styles.modalEyebrow}>EMPLOYEE EDITOR</Text><Text style={styles.modalTitle}>تعديل بيانات الموظف</Text></View>
+              <Pressable disabled={savingEdit} onPress={() => setEditOpen(false)} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.editForm}>
+              <EditField label="الاسم بالكامل" value={editForm.name} onChangeText={name => setEditForm(v => ({...v,name}))} />
+              <EditField label="رقم الهاتف" value={editForm.phone} onChangeText={phone => setEditForm(v => ({...v,phone}))} keyboardType="phone-pad" />
+              <EditField label="المسمى الوظيفي" value={editForm.title} onChangeText={title => setEditForm(v => ({...v,title}))} />
+              <EditField label="مكان العمل / القسم" value={editForm.department} onChangeText={department => setEditForm(v => ({...v,department}))} placeholder="مثال: Bar أو Kitchen" />
+              <EditField label="الراتب الأساسي" value={editForm.baseSalary} onChangeText={baseSalary => setEditForm(v => ({...v,baseSalary}))} keyboardType="numeric" />
+              <View style={styles.editRow}>
+                <View style={styles.editHalf}><EditField label="بداية الشيفت" value={editForm.shiftStart} onChangeText={shiftStart => setEditForm(v => ({...v,shiftStart}))} placeholder="08:00" /></View>
+                <View style={styles.editHalf}><EditField label="نهاية الشيفت" value={editForm.shiftEnd} onChangeText={shiftEnd => setEditForm(v => ({...v,shiftEnd}))} placeholder="17:00" /></View>
+              </View>
+              <Pressable onPress={() => setEditForm(v => ({...v,active:!v.active}))} style={[styles.activeToggle, editForm.active ? styles.activeToggleOn : styles.activeToggleOff]}><Text style={styles.activeToggleText}>{editForm.active ? "الموظف نشط" : "الموظف موقوف"}</Text></Pressable>
+              <Pressable disabled={savingEdit} onPress={saveEdit} style={[styles.saveButton, savingEdit && styles.disabled]}>{savingEdit ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveText}>حفظ التعديلات</Text>}</Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
 
+function EditField({ label, value, onChangeText, placeholder, keyboardType }: { label: string; value: string; onChangeText: (value: string) => void; placeholder?: string; keyboardType?: "default" | "phone-pad" | "numeric" }) {
+  return <View style={styles.editField}><Text style={styles.editLabel}>{label}</Text><TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#98A6B8" keyboardType={keyboardType} textAlign="right" style={styles.editInput} /></View>;
+}
 function Kpi({ label, value }: { label: string; value: string }) {
   return <View style={styles.kpi}><Text style={styles.kpiValue}>{value}</Text><Text style={styles.kpiLabel}>{label}</Text></View>;
 }
@@ -207,7 +254,8 @@ const styles = StyleSheet.create({
   name: { color: "#FFFFFF", fontSize: 27, fontWeight: "900", textAlign: "right", marginTop: 4 },
   role: { color: "#D9E6F2", fontSize: 12, textAlign: "right", marginTop: 4 },
   phone: { color: "#FFFFFF", opacity: 0.75, fontSize: 11, textAlign: "right", marginTop: 5 },
-  heroBadges:{flexDirection:"row-reverse",gap:7,marginTop:10},heroBadge:{color:"#163A63",backgroundColor:"#FFFFFF",borderRadius:8,paddingHorizontal:9,paddingVertical:4,fontSize:9,fontWeight:"900"},heroBadgeGhost:{color:"#FFFFFF",backgroundColor:"rgba(255,255,255,0.12)",borderRadius:8,paddingHorizontal:9,paddingVertical:4,fontSize:9,fontWeight:"800"},
+  heroActions:{flexDirection:"row-reverse",marginTop:12},editButton:{backgroundColor:"#FFFFFF",borderRadius:11,paddingHorizontal:14,paddingVertical:9,alignSelf:"flex-end"},editButtonText:{color:"#163A63",fontSize:10,fontWeight:"900"},heroBadges:{flexDirection:"row-reverse",gap:7,marginTop:10},heroBadge:{color:"#163A63",backgroundColor:"#FFFFFF",borderRadius:8,paddingHorizontal:9,paddingVertical:4,fontSize:9,fontWeight:"900"},heroBadgeGhost:{color:"#FFFFFF",backgroundColor:"rgba(255,255,255,0.12)",borderRadius:8,paddingHorizontal:9,paddingVertical:4,fontSize:9,fontWeight:"800"},
+  modalBackdrop:{flex:1,backgroundColor:"rgba(2,6,23,0.58)",justifyContent:"flex-end"},modalCard:{backgroundColor:"#FFFFFF",borderTopLeftRadius:28,borderTopRightRadius:28,maxHeight:"92%",padding:20},modalHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",marginBottom:10},modalEyebrow:{color:"#98A6B8",fontSize:9,fontWeight:"900",textAlign:"right"},modalTitle:{color:"#172033",fontSize:22,fontWeight:"900",textAlign:"right"},close:{width:36,height:36,borderRadius:18,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},closeText:{color:"#98A6B8",fontSize:25,lineHeight:28},editForm:{paddingBottom:30,gap:8},editField:{gap:5},editLabel:{color:"#667085",fontSize:10,fontWeight:"800",textAlign:"right"},editInput:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#D5DCE5",borderRadius:12,paddingHorizontal:12,paddingVertical:11,fontSize:12,color:"#172033"},editRow:{flexDirection:"row-reverse",gap:10},editHalf:{flex:1},activeToggle:{borderRadius:12,padding:12,alignItems:"center"},activeToggleOn:{backgroundColor:"#EEF4FB"},activeToggleOff:{backgroundColor:"#F2F4F7"},activeToggleText:{color:"#163A63",fontSize:11,fontWeight:"900"},saveButton:{backgroundColor:"#163A63",borderRadius:14,padding:14,alignItems:"center",justifyContent:"center",marginTop:8},saveText:{color:"#FFFFFF",fontWeight:"900"},disabled:{opacity:0.6},
   smartInsight:{backgroundColor:"#F7F9FC",borderWidth:1,borderColor:"#D9E2EC",borderRadius:18,padding:16,flexDirection:"row-reverse",alignItems:"center",gap:12},
   smartInsightIcon:{width:42,height:42,borderRadius:14,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},
   smartInsightIconText:{color:"#FFFFFF",fontSize:20,fontWeight:"900"},
