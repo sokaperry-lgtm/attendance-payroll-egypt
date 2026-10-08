@@ -98,10 +98,16 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
   // An overnight shift remains active after midnight until its original
   // attendance record is checked out.
+  const previousShiftStart = previousSchedule?.shift?.startTime ?? meQuery.data?.shiftStart ?? "09:00";
+  const previousShiftEnd = previousSchedule?.shift?.endTime ?? meQuery.data?.shiftEnd ?? "18:00";
+  const previousShiftCrossesMidnight = Boolean(
+    previousSchedule?.shift?.crossesMidnight ||
+    previousShiftEnd < previousShiftStart
+  );
   const previousOvernightOpen = Boolean(
     previousRecord?.checkIn &&
     !previousRecord?.checkOut &&
-    previousSchedule?.shift?.crossesMidnight
+    previousShiftCrossesMidnight
   );
   const activeAttendanceRecord = previousOvernightOpen ? previousRecord : todayRecord;
   const activeShift = previousOvernightOpen ? previousSchedule?.shift : todaySchedule?.shift;
