@@ -412,6 +412,44 @@ export default function ScheduleScreen() {
                   <View style={styles.detailInfo}><Text style={styles.detailLabel}>خروج</Text><Text style={styles.detailValue}>{selectedAttendance?.checkOut ?? "—"}</Text></View>
                 </View>
 
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>اختيار شيفت اليوم</Text>
+                  <Text style={{ color: "#667085", fontSize: 9, textAlign: "right" }}>اختار الوردية للموظف في اليوم المحدد، وهيتحدث الجدول تلقائيًا.</Text>
+                  <View style={{ flexDirection: "row-reverse", flexWrap: "wrap", gap: 8 }}>
+                    {shiftTemplates.filter(s => s.active).map((s) => {
+                      const active = selectedEntry?.shift?.id === s.id;
+                      const colors = tone(s);
+                      return (
+                        <Pressable
+                          key={s.id}
+                          disabled={saving || detailSaving}
+                          onPress={() => assignShift(s)}
+                          style={{
+                            minWidth: 125,
+                            flexGrow: 1,
+                            borderWidth: 1,
+                            borderColor: active ? "#163A63" : colors.accent,
+                            backgroundColor: active ? "#EAF3FF" : colors.bg,
+                            borderRadius: 12,
+                            padding: 11,
+                            opacity: saving ? 0.6 : 1,
+                          }}
+                        >
+                          <Text style={{ color: active ? "#163A63" : colors.text, fontSize: 11, fontWeight: "900", textAlign: "right" }}>
+                            {s.kind === "weekly_off" ? "إجازة أسبوعية" : s.name}
+                          </Text>
+                          <Text style={{ color: active ? "#163A63" : colors.text, fontSize: 9, marginTop: 4, textAlign: "right" }}>
+                            {s.kind === "weekly_off" ? "راحة أسبوعية" : shiftLabel(s)}
+                          </Text>
+                          <Text style={{ color: active ? "#163A63" : colors.accent, fontSize: 9, fontWeight: "900", marginTop: 7, textAlign: "right" }}>
+                            {saving ? "جارٍ الحفظ..." : active ? "الشيفت الحالي ✓" : "اختيار الشيفت"}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
                 <View style={styles.detailSection}><Text style={styles.detailSectionTitle}>تحديث الحضور</Text>
                   <View style={styles.detailInputsRow}>
                     <View style={styles.detailField}><Text style={styles.detailLabel}>وقت الدخول</Text><TextInput style={styles.detailInput} value={detailForm.checkIn} onChangeText={v=>setDetailForm(f=>({...f,checkIn:v}))} placeholder="09:00" textAlign="right"/></View>
