@@ -393,14 +393,18 @@ export const appRouter = router({
 
       const scheduled = (await db.listSchedules(ctx.staffUser.id)).find(r => r.scheduleDate === attendanceDate);
       const shiftEnd = scheduled?.shift?.endTime ?? ctx.staffUser.shiftEnd;
-      const crossesMidnight = scheduled?.shift?.crossesMidnight ?? false;
+      const shiftStart = scheduled?.shift?.startTime ?? ctx.staffUser.shiftStart;
+      const crossesMidnight = Boolean(
+        scheduled?.shift?.crossesMidnight ||
+        timeMinutes(shiftEnd) < timeMinutes(shiftStart)
+      );
       const scheduledEnd = timeMinutes(shiftEnd) + (crossesMidnight ? 24 * 60 : 0);
       let actualCheckout = timeMinutes(input.time);
-      if (crossesMidnight && actualCheckout < timeMinutes(scheduled?.shift?.startTime ?? ctx.staffUser.shiftStart)) actualCheckout += 24 * 60;
+      if (crossesMidnight && actualCheckout < timeMinutes(shiftStart)) actualCheckout += 24 * 60;
       const earlyMinutes = Math.max(0, scheduledEnd - actualCheckout);
       const earlyNote = earlyMinutes > 0 ? `انصراف مبكر: ${earlyMinutes} دقيقة` : null;
       const note = [current.note, earlyNote].filter(Boolean).join(" · ") || null;
-      const attendance = await db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: current.checkIn, checkOut: input.time, status: current.status, lateMinutes: current.lateMinutes, distanceMeters: current.distanceMeters, note });
+      const attendance = await db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: attendanceDate, checkIn: current.checkIn, checkOut: input.time, status: current.status, lateMinutes: current.lateMinutes, distanceMeters: current.distanceMeters, note });
 
       // Detect overtime automatically from the actual checkout time.
       // A manager must approve the generated request before it reaches payroll.
@@ -409,7 +413,7 @@ export const appRouter = router({
         input.time,
         scheduled?.shift?.startTime ?? ctx.staffUser.shiftStart,
         scheduled?.shift?.endTime ?? ctx.staffUser.shiftEnd,
-        scheduled?.shift?.crossesMidnight ?? false
+        crossesMidnight
       );
       if (overtimeMinutes >= 30) {
         const overtimeHours = Number((overtimeMinutes / 60).toFixed(2));
