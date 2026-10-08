@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { trpc } from "@/lib/trpc";
@@ -49,8 +49,8 @@ export default function EmployeeProfileScreen() {
   const payrollSummary = latestPayroll ? { gross:Number(latestPayroll.grossSalary||0), overtime:Number(latestPayroll.overtime||0), absence:Number(latestPayroll.absenceDeduction||0), lateDeduction:Number(latestPayroll.lateDeduction||0), earlyDeduction:Number(latestPayroll.earlyDeduction||0), other:Number(latestPayroll.otherDeductions||0), advances:Number(latestPayroll.advances||0), insurance:Number(latestPayroll.employeeSocialInsurance||0), tax:Number(latestPayroll.employeeIncomeTax||0), net:Number(latestPayroll.netSalary||0) } : null;
   const trackedAttendanceDays = present + absent;
   const attendanceRate = trackedAttendanceDays ? Math.round((present / trackedAttendanceDays) * 100) : 0;
-  const recentAttendance = useMemo(() => attendance.slice(0, 8), [attendance]);
-  const workSchedules = useMemo(() => schedules.slice(0, 14), [schedules]);
+  const recentAttendance = attendance.slice(0, 8);
+  const workSchedules = schedules.slice(0, 14);
   const currentMonthPayroll = latestPayroll ? Number(latestPayroll.netSalary || 0) : 0;
   const pendingRequests = requests.filter((r) => r.status === "قيد المراجعة").length;
   const approvedLeave = requests.filter((r) => r.status === "مقبول" && String(r.type || "").includes("إجاز")).length;
