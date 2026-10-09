@@ -875,12 +875,17 @@ export async function generatePayroll(staffAccountId: number, month: string) {
         lateDeduction += baseDays * dailyValue * multiplier;
       }
 
-      if (record.status === "غياب" && String(record.note || "").includes("تم اعتماد الغياب")) {
+      if (record.status === "غياب") {
         const hasPermission = String(record.note || "").includes("بإذن");
         if (!hasPermission) {
-          absenceCount++;
-          const multiplier = absenceCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
-          absenceDeduction += PAYROLL_RULES.absencePenaltyDays * dailyValue * multiplier;
+          // Deduct the normal daily wage for every recorded absence. A reviewed
+          // disciplinary absence may additionally apply the configured penalty.
+          absenceDeduction += dailyValue;
+          if (String(record.note || "").includes("تم اعتماد الغياب")) {
+            absenceCount++;
+            const multiplier = absenceCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
+            absenceDeduction += PAYROLL_RULES.absencePenaltyDays * dailyValue * multiplier;
+          }
         }
       }
     }
