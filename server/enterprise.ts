@@ -1365,7 +1365,7 @@ export async function reviewAttendanceException(actorId:number,input:{staffAccou
   if(input.action==="approve" && noteText.includes(approvedMarker)) throw new Error("تم اعتماد هذه المخالفة بالفعل.");
   if(input.action==="cancel" && noteText.includes(cancelledMarker)) throw new Error("تم إلغاء هذه المخالفة بالفعل.");
   if(input.action==="approve" && noteText.includes(cancelledMarker)) throw new Error("تم إلغاء هذه المخالفة بالفعل ولا يمكن اعتمادها مرة أخرى.");
-  if(input.action==="cancel" && noteText.includes(approvedMarker)) throw new Error("تم اعتماد هذه المخالفة بالفعل ولا يمكن إلغاء الخصم بعد الاعتماد.");
+  // Reversing an approved attendance deduction is allowed only before payroll approval; assertPayrollEditable above enforces the lock.
   let nextNote=noteText.replace(/\s*·\s*(?:تم اعتماد|تم إلغاء )?(?:التأخير|الانصراف المبكر|الغياب)/g,"").trim();
   if(input.action==="cancel"){
     if(input.kind==="late") row.lateMinutes=0;
@@ -1389,13 +1389,17 @@ export async function listAttendancePenaltyRequests(staffAccountId:number) {
   const names=new Map(staff.map(x=>[x.id,x.name]));
   const rows=await db.select().from(attendanceRecords).orderBy(desc(attendanceRecords.date));
   return rows.filter(r=>names.has(r.staffAccountId)).flatMap(r=>{
-    const late=Number(r.lateMinutes||0)>=PAYROLL_RULES.lateQuarterDayMinutes && !String(r.note||"").includes("تم اعتماد التأخير") && !String(r.note||"").includes("تم إلغاء التأخير");
-    const early=String(r.note||"").includes("انصراف مبكر:") && !String(r.note||"").includes("تم اعتماد الانصراف المبكر") && !String(r.note||"").includes("تم إلغاء الانصراف المبكر");
-    const absence=r.status==="غياب" && !String(r.note||"").includes("تم اعتماد الغياب") && !String(r.note||"").includes("تم إلغاء الغياب");
+    const note=String(r.note||"");
+    const latePending=Number(r.lateMinutes||0)>=PAYROLL_RULES.lateQuarterDayMinutes && !note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
+    const lateApproved=Number(r.lateMinutes||0)>=PAYROLL_RULES.lateQuarterDayMinutes && note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
+    const earlyPending=note.includes("انصراف مبكر:") && !note.includes("تم اعتماد الانصراف المبكر") && !note.includes("تم إلغاء الانصراف المبكر");
+    const earlyApproved=note.includes("انصراف مبكر:") && note.includes("تم اعتماد الانصراف المبكر") && !note.includes("تم إلغاء الانصراف المبكر");
+    const absencePending=r.status==="غياب" && !note.includes("تم اعتماد الغياب") && !note.includes("تم إلغاء الغياب");
+    const absenceApproved=r.status==="غياب" && note.includes("تم اعتماد الغياب") && !note.includes("تم إلغاء الغياب");
     const out=[];
-    if(late) out.push({id:`late-${r.id}`,staffAccountId:r.staffAccountId,staffName:names.get(r.staffAccountId)??"موظف",fromDate:r.date,exceptionKind:"late",minutes:Number(r.lateMinutes||0),title:"تأخير",status:"قيد المراجعة"});
-    if(early) out.push({id:`early-${r.id}`,staffAccountId:r.staffAccountId,staffName:names.get(r.staffAccountId)??"موظف",fromDate:r.date,exceptionKind:"early",minutes:0,title:"انصراف مبكر",status:"قيد المراجعة"});
-    if(absence) out.push({id:`absence-${r.id}`,staffAccountId:r.staffAccountId,staffName:names.get(r.staffAccountId)??"موظف",fromDate:r.date,exceptionKind:"absence",minutes:0,title:"غياب",status:"قيد المراجعة"});
+    if(latePending || lateApproved) out.push({id:"late-"+r.id,staffAccountId:r.staffAccountId,staffName:names.get(r.staffAccountId)??"موظف",fromDate:r.date,exceptionKind:"late",minutes:Number(r.lateMinutes||0),title:"تأخير",status:lateApproved?"معتمد":"قيد المراجعة"});
+    if(earlyPending || earlyApproved) out.push({id:"early-"+r.id,staffAccountId:r.staffAccountId,staffName:names.get(r.staffAccountId)??"موظف",fromDate:r.date,exceptionKind:"early",minutes:0,title:"انصراف مبكر",status:earlyApproved?"معتمد":"قيد المراجعة"});
+    if(absencePending || absenceApproved) out.push({id:"absence-"+r.id,staffAccountId:r.staffAccountId,staffName:names.get(r.staffAccountId)??"موظف",fromDate:r.date,exceptionKind:"absence",minutes:0,title:"غياب",status:absenceApproved?"معتمد":"قيد المراجعة"});
     return out;
   });
 }
