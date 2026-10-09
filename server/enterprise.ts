@@ -442,6 +442,7 @@ export async function setMemberRole(actorId: number, staffAccountId: number, rol
     throw new Error("لا يمكن تغيير صلاحيات حساب المالك.");
   }
   if (role === "owner") throw new Error("لا يمكن تعيين دور المالك من شاشة الموظفين.");
+  if (role === "manager" && actor.role !== "owner") throw new Error("تعيين دور المدير متاح لمالك الشركة فقط.");
   if (staffAccountId === actorId) {
     throw new Error("لا يمكن تغيير دور حسابك من هذه الشاشة.");
   }
@@ -1118,6 +1119,9 @@ export async function syncCompanyMemberRole(actorId:number,targetId:number,role:
   if(!["owner","manager"].includes(access.actor.role)) throw new Error("غير مصرح");
   if(access.target.role === "owner" && access.actor.role !== "owner") {
     throw new Error("لا يمكن لمدير الشركة تغيير صلاحيات المالك.");
+  }
+  if(role === "manager" && access.actor.role !== "owner") {
+    throw new Error("ترقية الموظف إلى مدير متاحة لمالك الشركة فقط.");
   }
 
   // This helper is only for legacy staff-role changes. Keep both role sources
