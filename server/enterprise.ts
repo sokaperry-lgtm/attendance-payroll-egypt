@@ -630,7 +630,7 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
   }).from(payrollRecords).where(and(
     eq(payrollRecords.companyId, m.companyId),
     eq(payrollRecords.month, month),
-    eq(payrollRecords.status, "approved"),
+    inArray(payrollRecords.status, ["approved", "مقبول", "معتمد"]),
   ));
   const closedStaffIds = new Set(approvedPayrollRows.map(row => row.staffAccountId));
 
