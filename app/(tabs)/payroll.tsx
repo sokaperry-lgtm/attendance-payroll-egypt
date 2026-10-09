@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -79,6 +79,7 @@ export default function PayrollScreen() {
   const approve = trpc.payroll.approve.useMutation({ onSuccess: () => query.refetch() });
   const unapprove = trpc.payroll.unapprove.useMutation({ onSuccess: () => query.refetch() });
   const adjustments = trpc.hrTools.adjustments.useQuery({ month }, { enabled: isAdmin });
+  const cancelAdjustment = trpc.hrTools.cancelPenalty.useMutation({ onSuccess: async () => { await Promise.all([adjustments.refetch(), query.refetch()]); Alert.alert("تم إلغاء الخصم", "تم إلغاء الخصم وتحديث بيانات الشهر."); }, onError: (error) => Alert.alert("تعذر إلغاء الخصم", error.message || "حاول مرة أخرى.") });
   const advances = trpc.hrTools.advances.useQuery(undefined, { enabled: isAdmin });
   const selfService = trpc.selfService.me.useQuery({ month }, { enabled: !isAdmin });
   const [printPayrollId, setPrintPayrollId] = useState<number | null>(null);
@@ -277,6 +278,39 @@ export default function PayrollScreen() {
           <Insight title="المتبقي من السلف" value={formatMoney((advances.data ?? []).filter(a => a.status === "active").reduce((s, a) => s + a.remainingAmount, 0))} meta="إجمالي المتبقي" />
         </View>
 
+        <View style={styles.adjustmentsCard}>
+          <Section title="تعديلات الشهر" subtitle="مراجعة الخصومات وإلغاؤها قبل اعتماد مسير الموظف" />
+          {((adjustments.data ?? []).filter((a: any) => a.type === "penalty" || a.type === "deduction")).length === 0 ? (
+            <View style={styles.adjustmentEmpty}><Text style={styles.adjustmentEmptyText}>لا توجد خصومات مسجلة لهذا الشهر.</Text></View>
+          ) : (adjustments.data ?? []).filter((a: any) => a.type === "penalty" || a.type === "deduction").map((a: any) => {
+            const staffName = payrollStaffMembers.find(s => String(s.id) === String(a.staffAccountId))?.name ?? `موظف #${a.staffAccountId}`;
+            const linkedPayroll = rows.find(row => String(row.staffAccountId) === String(a.staffAccountId) && row.month === a.month);
+            const locked = linkedPayroll?.status === "approved";
+            return (
+              <View key={a.id} style={styles.adjustmentRow}>
+                <View style={styles.adjustmentCopy}>
+                  <Text style={styles.adjustmentTitle}>{a.title}</Text>
+                  <Text style={styles.adjustmentMeta}>{staffName} · {monthLabel(a.month)} · {a.type === "penalty" ? "جزاء" : "خصم"}</Text>
+                  {a.note ? <Text style={styles.adjustmentMeta}>{a.note}</Text> : null}
+                </View>
+                <View style={styles.adjustmentAction}>
+                  <Text style={styles.adjustmentAmount}>-{formatMoney(Number(a.amount || 0))}</Text>
+                  <Pressable
+                    disabled={cancelAdjustment.isPending || locked}
+                    onPress={() => Alert.alert("تأكيد إلغاء الخصم", `هل تريد إلغاء خصم "${a.title}" للموظف ${staffName} بقيمة ${formatMoney(Number(a.amount || 0))}؟`, [
+                      { text: "رجوع", style: "cancel" },
+                      { text: "إلغاء الخصم", style: "destructive", onPress: () => cancelAdjustment.mutate({ id: Number(a.id) }) }
+                    ])}
+                    style={[styles.cancelAdjustmentButton, (cancelAdjustment.isPending || locked) && styles.cancelAdjustmentDisabled]}
+                  >
+                    <Text style={styles.cancelAdjustmentText}>{locked ? "المسير معتمد" : cancelAdjustment.isPending ? "جارٍ الإلغاء..." : "إلغاء الخصم"}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+
         <View style={styles.sectionHeader}>
           <View style={styles.filters}>
             {([["all", "الكل"], ["draft", "مسودة"], ["approved", "معتمد"]] as const).map(([key, label]) => (
@@ -388,6 +422,7 @@ function Row({ label, value, strong = false }: { label: string; value: string; s
 
 const styles = StyleSheet.create({
   content:{padding:20,paddingBottom:60,gap:14,maxWidth:1200,width:"100%",alignSelf:"center"},contentCompact:{padding:14,paddingBottom:38,gap:10},
+  adjustmentsCard:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,padding:14,gap:10},adjustmentRow:{flexDirection:"row-reverse",alignItems:"center",gap:10,paddingVertical:12,borderTopWidth:1,borderTopColor:"#EEF1F4"},adjustmentCopy:{flex:1,gap:4},adjustmentTitle:{fontSize:12,fontWeight:"900",color:"#172033",textAlign:"right"},adjustmentMeta:{fontSize:9,color:"#7B8798",textAlign:"right"},adjustmentAction:{alignItems:"flex-end",gap:7},adjustmentAmount:{fontSize:12,fontWeight:"900",color:"#B42318"},cancelAdjustmentButton:{backgroundColor:"#FFF1F0",borderWidth:1,borderColor:"#FECACA",borderRadius:9,paddingHorizontal:10,paddingVertical:8},cancelAdjustmentDisabled:{opacity:0.45},cancelAdjustmentText:{fontSize:9,fontWeight:"900",color:"#B42318"},adjustmentEmpty:{paddingVertical:18,alignItems:"center"},adjustmentEmptyText:{fontSize:11,color:"#7B8798"},
   header:{flexDirection:"row-reverse",alignItems:"center",gap:12},headerIcon:{width:52,height:52,borderRadius:17,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},headerCopy:{flex:1},eyebrow:{color:"#7B8798",fontSize:9,fontWeight:"900",textAlign:"right",letterSpacing:1},title:{color:"#172033",fontSize:29,fontWeight:"900",textAlign:"right",marginTop:3},subtitle:{color:"#667085",fontSize:11,lineHeight:18,textAlign:"right",marginTop:4},
   hero:{backgroundColor:"#102A47",borderRadius:24,padding:20,minHeight:142,flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},heroCopy:{flex:1},heroKicker:{color:"#8EA7BE",fontSize:9,fontWeight:"900",textAlign:"right",letterSpacing:1},heroValue:{color:"#FFFFFF",fontSize:32,fontWeight:"900",textAlign:"right",marginTop:5},heroMeta:{color:"#B8C9D8",fontSize:10,textAlign:"right",marginTop:4},heroIcon:{width:58,height:58,borderRadius:18,backgroundColor:"#1D4268",alignItems:"center",justifyContent:"center"},
   monthBar:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:17,padding:10,flexDirection:"row",alignItems:"center",justifyContent:"space-between"},monthCenter:{alignItems:"center"},monthKicker:{color:"#98A6B8",fontSize:8,fontWeight:"900"},monthTitle:{color:"#172033",fontSize:14,fontWeight:"900",marginTop:2},monthButton:{minWidth:78,height:40,borderRadius:11,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center",flexDirection:"row",gap:5,paddingHorizontal:9},monthArrow:{color:"#163A63",fontSize:18,fontWeight:"900"},monthButtonLabel:{color:"#163A63",fontSize:9,fontWeight:"900",textAlign:"center"},monthHint:{color:"#A1ACBA",fontSize:8,marginTop:3},
