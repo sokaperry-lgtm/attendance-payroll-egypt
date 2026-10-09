@@ -12,6 +12,18 @@ export const PAYROLL_RULES = {
   overtimeMultiplier: 2,
 } as const;
 
+/**
+ * Salary earned so far from recorded work time. Monthly salary is based on
+ * the existing payroll convention of 30 calendar days × 9 hours per day.
+ * Open shifts are measured by the caller up to the current time.
+ */
+export function calculateEarnedSalary(baseSalary: number, workedMinutes: number) {
+  const monthlySalary = Math.max(0, Number(baseSalary) || 0);
+  const minutes = Math.max(0, Number(workedMinutes) || 0);
+  const hourlyValue = monthlySalary / PAYROLL_RULES.calendarDays / PAYROLL_RULES.dailyHours;
+  return Math.min(Math.round(monthlySalary), Math.round(hourlyValue * minutes / 60));
+}
+
 export type PayrollInputs = {
   baseSalary: number;
   allowances?: number;
