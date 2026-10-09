@@ -182,14 +182,14 @@ export const appRouter = router({
     templates: staffProcedure.query(() => db.listShiftTemplates()),
     mine: staffProcedure.query(({ ctx }) => db.listSchedules(ctx.staffUser.id)),
     all: supervisorProcedure.query(({ ctx }) => enterprise.listCompanySchedules(ctx.staffUser.id)),
-    save: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), scheduleDate: z.string().length(10), shiftTemplateId: z.number().int(), note: z.string().max(255).optional() })).mutation(async ({ ctx, input }) => { await enterprise.assertOperationalTarget(ctx.staffUser.id, input.staffAccountId); await enterprise.assertPayrollEditable(ctx.staffUser.id, input.scheduleDate.slice(0,7), input.staffAccountId); return db.saveSchedule(input); }),
+    save: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), scheduleDate: z.string().length(10), shiftTemplateId: z.number().int(), note: z.string().max(255).optional() })).mutation(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage"); await enterprise.assertOperationalTarget(ctx.staffUser.id, input.staffAccountId); await enterprise.assertPayrollEditable(ctx.staffUser.id, input.scheduleDate.slice(0,7), input.staffAccountId); return db.saveSchedule(input); }),
   }),
   attendance: router({
     list: staffProcedure.query(({ ctx }) => db.listAttendance(ctx.staffUser.id)),
     team: supervisorProcedure.query(async ({ ctx }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.listCompanyAttendance(ctx.staffUser.id); }),
     sync: supervisorProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).mutation(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage"); return enterprise.syncMonthlyAttendance(ctx.staffUser.id, input.month); }),
     workSummary: supervisorProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.getAttendanceWorkSummary(ctx.staffUser.id, input.month); }),
-    dailyOverview: managerProcedure.input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })).query(({ ctx, input }) => enterprise.getDailyAttendanceOverview(ctx.staffUser.id, input.date)),
+    dailyOverview: managerProcedure.input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })).query(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.getDailyAttendanceOverview(ctx.staffUser.id, input.date); }),
     managerUpdate: managerProcedure.input(z.object({ staffAccountId: z.number().int(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), checkIn: z.string().max(8).nullable().optional(), checkOut: z.string().max(8).nullable().optional(), status: z.enum(["حاضر", "متأخر", "غياب", "إجازة", "مأمورية"]), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0).nullable().optional(), note: z.string().max(1000).nullable().optional() })).mutation(async ({ ctx, input }) => {
       await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage");
       const access = await enterprise.assertOperationalTarget(ctx.staffUser.id, input.staffAccountId);
@@ -512,10 +512,10 @@ listPenaltyRequests: managerProcedure.query(({ctx})=>enterprise.listAttendancePe
     balance: staffProcedure.input(z.object({ year: z.number().int().min(2024).max(2100) })).query(({ ctx, input }) => enterprise.getLeaveBalance(ctx.staffUser.id, input.year)),
   }),
   payroll: router({
-    list: payrollAdminProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(({ ctx, input }) => enterprise.getPayroll(ctx.staffUser.id, input.month)),
-    generate: payrollAdminProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).mutation(({ ctx, input }) => enterprise.generatePayroll(ctx.staffUser.id, input.month)),
-    approve: payrollAdminProcedure.input(z.object({ id: z.number().int() })).mutation(({ ctx, input }) => enterprise.approvePayroll(ctx.staffUser.id, input.id)),
-    unapprove: companyAdminProcedure.input(z.object({ id: z.number().int() })).mutation(({ ctx, input }) => enterprise.unapprovePayroll(ctx.staffUser.id, input.id)),
+    list: payrollAdminProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "payroll.view"); return enterprise.getPayroll(ctx.staffUser.id, input.month); }),
+    generate: payrollAdminProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).mutation(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "payroll.manage"); return enterprise.generatePayroll(ctx.staffUser.id, input.month); }),
+    approve: payrollAdminProcedure.input(z.object({ id: z.number().int() })).mutation(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "payroll.approve"); return enterprise.approvePayroll(ctx.staffUser.id, input.id); }),
+    unapprove: companyAdminProcedure.input(z.object({ id: z.number().int() })).mutation(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "payroll.approve"); return enterprise.unapprovePayroll(ctx.staffUser.id, input.id); }),
     payslip: staffProcedure.input(z.object({ id: z.number().int() })).query(({ ctx, input }) => enterprise.getPayrollPayslip(ctx.staffUser.id, input.id)),
   }),
   notifications: router({
@@ -535,7 +535,7 @@ listPenaltyRequests: managerProcedure.query(({ctx})=>enterprise.listAttendancePe
     advances: companyAdminProcedure.query(({ctx}) => enterprise.listCompanyAdvances(ctx.staffUser.id)),
     addAdjustment: companyAdminProcedure.input(z.object({staffAccountId:z.number().int(),month:z.string().regex(/^\d{4}-\d{2}$/),type:z.enum(["allowance","bonus","incentive","penalty","deduction"]),title:z.string().min(2).max(160),amount:z.number().int().positive(),note:z.string().max(500).optional()})).mutation(({ctx,input})=>enterprise.createSalaryAdjustment(ctx.staffUser.id,input)),
     addAdvance: companyAdminProcedure.input(z.object({staffAccountId:z.number().int(),amount:z.number().int().positive(),installmentAmount:z.number().int().positive(),startMonth:z.string().regex(/^\d{4}-\d{2}$/),note:z.string().max(500).optional()})).mutation(({ctx,input})=>enterprise.createSalaryAdvance(ctx.staffUser.id,input)),
-    employee360: hrProcedure.input(z.object({staffAccountId:z.number().int()})).query(({ctx,input})=>enterprise.listEmployee360(ctx.staffUser.id,input.staffAccountId)),
+    employee360: hrProcedure.input(z.object({staffAccountId:z.number().int()})).query(async ({ctx,input})=>{ await enterprise.assertPermission(ctx.staffUser.id, "employees.view"); return enterprise.listEmployee360(ctx.staffUser.id,input.staffAccountId); }),
   }),
   management: router({
     dashboard: managerProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(({ ctx, input }) => enterprise.getManagementDashboard(ctx.staffUser.id, input.month)),
