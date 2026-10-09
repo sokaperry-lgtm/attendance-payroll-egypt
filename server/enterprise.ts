@@ -836,43 +836,22 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       .filter(x=>x.staffAccountId===s.id && x.date.startsWith(month))
       .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
 
-    // Accrue base salary only for time actually recorded as worked.
-    // An open shift on today (including an overnight shift that began yesterday)
-    // accrues only up to the current Cairo time; it never assumes the full shift.
+    // Monthly salary accrues by calendar day, including the four paid weekly
+    // rest days. Actual absences are deducted separately below; rest days are
+    // never treated as missing attendance. The company payroll month is 30 days.
     const monthlyBaseSalary = Math.max(0, Math.round(Number(s.baseSalary) || 0));
-    const cairoParts = new Intl.DateTimeFormat("en-CA", {
+    const cairoDateParts = new Intl.DateTimeFormat("en-CA", {
       timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
     }).formatToParts(new Date());
-    const cairoValues = Object.fromEntries(cairoParts.map(part => [part.type, part.value]));
-    const todayCairo = `${cairoValues.year}-${cairoValues.month}-${cairoValues.day}`;
-    const nowCairoMinutes = Number(cairoValues.hour) * 60 + Number(cairoValues.minute);
-    const yesterdayDate = new Date(todayCairo + "T12:00:00");
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdayCairo = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth()+1).padStart(2,"0")}-${String(yesterdayDate.getDate()).padStart(2,"0")}`;
-    let workedMinutes = 0;
-    for (const record of records) {
-      if (!record.checkIn || record.status === "غياب" || record.status === "إجازة") continue;
-      const schedule = schedules.find(item => item.staffAccountId === s.id && item.scheduleDate === record.date);
-      const shift = schedule ? shifts.find(item => item.id === schedule.shiftTemplateId) : undefined;
-      const shiftStart = shift?.startTime ?? s.shiftStart;
-      const shiftEnd = shift?.endTime ?? s.shiftEnd;
-      const crossesMidnight = Boolean(shift?.crossesMidnight) || minutesOf(shiftEnd) < minutesOf(shiftStart);
-      const actualCheckIn = minutesOf(record.checkIn);
-      let actualCheckOut: number | null = null;
-      if (record.checkOut) {
-        actualCheckOut = minutesOf(record.checkOut);
-        if (actualCheckOut < actualCheckIn) actualCheckOut += 24 * 60;
-      } else if (record.date === todayCairo) {
-        actualCheckOut = nowCairoMinutes;
-      } else if (record.date === yesterdayCairo && crossesMidnight) {
-        actualCheckOut = nowCairoMinutes + 24 * 60;
-      }
-      if (actualCheckOut !== null) {
-        workedMinutes += Math.max(0, actualCheckOut - actualCheckIn);
-      }
-    }
-    const earnedBaseSalary = calculateEarnedSalary(monthlyBaseSalary, workedMinutes);
+    const cairoDateValues = Object.fromEntries(cairoDateParts.map(part => [part.type, part.value]));
+    const todayCairo = `${cairoDateValues.year}-${cairoDateValues.month}-${cairoDateValues.day}`;
+    const currentMonth = todayCairo.slice(0, 7);
+    const elapsedDays = month < currentMonth
+      ? PAYROLL_RULES.calendarDays
+      : month > currentMonth
+        ? 0
+        : Math.min(PAYROLL_RULES.calendarDays, Number(todayCairo.slice(8, 10)));
+    const earnedBaseSalary = Math.round(monthlyBaseSalary * elapsedDays / PAYROLL_RULES.calendarDays);
     const dailyValue=monthlyBaseSalary/PAYROLL_RULES.calendarDays;
     const hourlyValue=dailyValue/PAYROLL_RULES.dailyHours;
 
