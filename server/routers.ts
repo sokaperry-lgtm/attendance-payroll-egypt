@@ -489,6 +489,7 @@ export const appRouter = router({
       return row;
     }),
     review: supervisorProcedure.input(z.object({ id: z.number().int(), status: z.enum(["مقبول", "مرفوض"]) })).mutation(async ({ ctx, input }) => {
+      await enterprise.assertPermission(ctx.staffUser.id, "requests.review");
       const existing = (await enterprise.listCompanyRequests(ctx.staffUser.id)).find(r => r.id === input.id);
       if (!existing) throw new Error("الطلب غير موجود.");
       if (existing.status !== "قيد المراجعة") throw new Error("هذا الطلب تمت معالجته بالفعل.");
@@ -507,10 +508,10 @@ export const appRouter = router({
       }
       return row;
     }),
-    waiveAttendance: managerProcedure.input(z.object({ staffAccountId:z.number().int(), date:z.string().length(10), kind:z.enum(["late","early"]) })).mutation(({ctx,input})=>enterprise.waiveAttendanceException(ctx.staffUser.id,input)),
-listPenaltyRequests: managerProcedure.query(({ctx})=>enterprise.listAttendancePenaltyRequests(ctx.staffUser.id)),
-        reviewAttendanceException: managerProcedure.input(z.object({ staffAccountId:z.number().int(), date:z.string().length(10), kind:z.enum(["late","early","absence"]), action:z.enum(["approve","cancel"]) })).mutation(({ctx,input})=>enterprise.reviewAttendanceException(ctx.staffUser.id,input)),
-    cancelPenalty: companyAdminProcedure.input(z.object({ id:z.number().int() })).mutation(({ctx,input})=>enterprise.cancelSalaryAdjustment(ctx.staffUser.id,input.id)),
+    waiveAttendance: managerProcedure.input(z.object({ staffAccountId:z.number().int(), date:z.string().length(10), kind:z.enum(["late","early"]) })).mutation(async ({ctx,input})=>{ await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage"); return enterprise.waiveAttendanceException(ctx.staffUser.id,input); }),
+listPenaltyRequests: managerProcedure.query(async ({ctx})=>{ await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.listAttendancePenaltyRequests(ctx.staffUser.id); }),
+        reviewAttendanceException: managerProcedure.input(z.object({ staffAccountId:z.number().int(), date:z.string().length(10), kind:z.enum(["late","early","absence"]), action:z.enum(["approve","cancel"]) })).mutation(async ({ctx,input})=>{ await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage"); return enterprise.reviewAttendanceException(ctx.staffUser.id,input); }),
+    cancelPenalty: companyAdminProcedure.input(z.object({ id:z.number().int() })).mutation(async ({ctx,input})=>{ await enterprise.assertPermission(ctx.staffUser.id, "payroll.manage"); return enterprise.cancelSalaryAdjustment(ctx.staffUser.id,input.id); }),
   }),
   leave: router({
     balance: staffProcedure.input(z.object({ year: z.number().int().min(2024).max(2100) })).query(({ ctx, input }) => enterprise.getLeaveBalance(ctx.staffUser.id, input.year)),
