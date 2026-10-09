@@ -66,6 +66,25 @@ export default function RootLayout() {
   );
   const [trpcClient] = useState(() => createTRPCClient());
 
+  // Refresh active app data whenever the installed web app returns to the foreground.
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+
+    const refreshActiveQueries = () => {
+      if (document.visibilityState === "visible") {
+        void queryClient.invalidateQueries();
+      }
+    };
+
+    document.addEventListener("visibilitychange", refreshActiveQueries);
+    window.addEventListener("pageshow", refreshActiveQueries);
+
+    return () => {
+      document.removeEventListener("visibilitychange", refreshActiveQueries);
+      window.removeEventListener("pageshow", refreshActiveQueries);
+    };
+  }, [queryClient]);
+
   // Ensure minimum 8px padding for top and bottom on mobile
   const providerInitialMetrics = useMemo(() => {
     const metrics = initialWindowMetrics ?? { insets: initialInsets, frame: initialFrame };
