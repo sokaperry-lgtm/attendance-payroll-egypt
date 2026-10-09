@@ -987,7 +987,9 @@ export async function getPayrollPayslip(staffAccountId:number, payrollId:number)
   const payroll=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,payrollId),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
   if(!payroll) throw new Error("قسيمة الراتب غير موجودة");
   const payrollAdminRoles: CompanyRole[] = ["owner","manager","hr","accountant"];
-  if(!payrollAdminRoles.includes(m.role as CompanyRole) && payroll.staffAccountId!==staffAccountId) {
+  if (payrollAdminRoles.includes(m.role as CompanyRole)) {
+    await assertPermission(staffAccountId, "payroll.view");
+  } else if (payroll.staffAccountId !== staffAccountId) {
     throw new Error("غير مصرح بالوصول إلى قسيمة موظف آخر");
   }
   const staff=(await db.select().from(staffAccounts).where(eq(staffAccounts.id,payroll.staffAccountId)).limit(1))[0];
