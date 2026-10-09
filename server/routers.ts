@@ -119,8 +119,8 @@ export const appRouter = router({
     create: hrProcedure.input(z.object({ phone: z.string().min(3).max(32), password: z.string().min(6).max(120), name: z.string().min(2).max(160), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).default(0), role: z.enum(["manager","supervisor","employee"]).default("employee"), shiftStart: z.string().max(8).default("08:00"), shiftEnd: z.string().max(8).default("17:00") })).mutation(async ({ ctx, input }) => {
       await enterprise.assertPermission(ctx.staffUser.id, "employees.manage");
       const actorMembership = await enterprise.getMembership(ctx.staffUser.id);
-      if (input.role === "manager" && !["owner", "manager"].includes(actorMembership?.role ?? "")) {
-        throw new Error("إنشاء حساب مدير متاح للمالك أو مدير الشركة فقط.");
+      if (input.role === "manager" && actorMembership?.role !== "owner") {
+        throw new Error("إنشاء حساب مدير متاح لمالك الشركة فقط.");
       }
       const staff = await db.createStaffAccount({ ...input });
       if (staff) {
@@ -165,6 +165,9 @@ export const appRouter = router({
       // but only owner/manager can change a member's access level.
       if (changes.role && !["owner", "manager"].includes(access.actor.role)) {
         throw new Error("غير مصرح بتغيير صلاحيات الموظفين.");
+      }
+      if (changes.role === "manager" && access.actor.role !== "owner") {
+        throw new Error("ترقية الموظف إلى مدير متاحة لمالك الشركة فقط.");
       }
       if (changes.role && access.target.role === "owner" && access.actor.role !== "owner") {
         throw new Error("لا يمكن لمدير الشركة تغيير صلاحيات المالك.");
