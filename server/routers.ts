@@ -193,8 +193,8 @@ export const appRouter = router({
     team: supervisorProcedure.query(async ({ ctx }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.listCompanyAttendance(ctx.staffUser.id); }),
     sync: supervisorProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).mutation(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage"); return enterprise.syncMonthlyAttendance(ctx.staffUser.id, input.month); }),
     workSummary: supervisorProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.getAttendanceWorkSummary(ctx.staffUser.id, input.month); }),
-    dailyOverview: managerProcedure.input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })).query(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.getDailyAttendanceOverview(ctx.staffUser.id, input.date); }),
-    managerUpdate: managerProcedure.input(z.object({ staffAccountId: z.number().int(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), checkIn: z.string().max(8).nullable().optional(), checkOut: z.string().max(8).nullable().optional(), status: z.enum(["حاضر", "متأخر", "غياب", "إجازة", "مأمورية"]), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0).nullable().optional(), note: z.string().max(1000).nullable().optional() })).mutation(async ({ ctx, input }) => {
+    dailyOverview: supervisorProcedure.input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })).query(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.getDailyAttendanceOverview(ctx.staffUser.id, input.date); }),
+    managerUpdate: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), checkIn: z.string().max(8).nullable().optional(), checkOut: z.string().max(8).nullable().optional(), status: z.enum(["حاضر", "متأخر", "غياب", "إجازة", "مأمورية"]), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0).nullable().optional(), note: z.string().max(1000).nullable().optional() })).mutation(async ({ ctx, input }) => {
       await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage");
       const access = await enterprise.assertOperationalTarget(ctx.staffUser.id, input.staffAccountId);
       if (access.target.role === "owner" && access.actor.role !== "owner") throw new Error("لا يمكن تعديل حضور المالك من هذا الحساب.");
@@ -509,9 +509,9 @@ export const appRouter = router({
       }
       return row;
     }),
-    waiveAttendance: managerProcedure.input(z.object({ staffAccountId:z.number().int(), date:z.string().length(10), kind:z.enum(["late","early"]) })).mutation(async ({ctx,input})=>{ await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage"); return enterprise.waiveAttendanceException(ctx.staffUser.id,input); }),
-listPenaltyRequests: managerProcedure.query(async ({ctx})=>{ await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.listAttendancePenaltyRequests(ctx.staffUser.id); }),
-        reviewAttendanceException: managerProcedure.input(z.object({ staffAccountId:z.number().int(), date:z.string().length(10), kind:z.enum(["late","early","absence"]), action:z.enum(["approve","cancel"]) })).mutation(async ({ctx,input})=>{ await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage"); return enterprise.reviewAttendanceException(ctx.staffUser.id,input); }),
+    waiveAttendance: supervisorProcedure.input(z.object({ staffAccountId:z.number().int(), date:z.string().length(10), kind:z.enum(["late","early"]) })).mutation(async ({ctx,input})=>{ await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage"); return enterprise.waiveAttendanceException(ctx.staffUser.id,input); }),
+listPenaltyRequests: supervisorProcedure.query(async ({ctx})=>{ await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.listAttendancePenaltyRequests(ctx.staffUser.id); }),
+        reviewAttendanceException: supervisorProcedure.input(z.object({ staffAccountId:z.number().int(), date:z.string().length(10), kind:z.enum(["late","early","absence"]), action:z.enum(["approve","cancel"]) })).mutation(async ({ctx,input})=>{ await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage"); return enterprise.reviewAttendanceException(ctx.staffUser.id,input); }),
     cancelPenalty: payrollAdminProcedure.input(z.object({ id:z.number().int() })).mutation(async ({ctx,input})=>{ await enterprise.assertPermission(ctx.staffUser.id, "payroll.manage"); return enterprise.cancelSalaryAdjustment(ctx.staffUser.id,input.id); }),
   }),
   leave: router({
@@ -544,7 +544,7 @@ listPenaltyRequests: managerProcedure.query(async ({ctx})=>{ await enterprise.as
     employee360: hrProcedure.input(z.object({staffAccountId:z.number().int()})).query(async ({ctx,input})=>{ await enterprise.assertPermission(ctx.staffUser.id, "employees.view"); return enterprise.listEmployee360(ctx.staffUser.id,input.staffAccountId); }),
   }),
   management: router({
-    dashboard: managerProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "dashboard.view"); return enterprise.getManagementDashboard(ctx.staffUser.id, input.month); }),
+    dashboard: reportsProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "dashboard.view"); return enterprise.getManagementDashboard(ctx.staffUser.id, input.month); }),
   }),
   companyAdmin: router({
     overview: companyAdminProcedure.query(async ({ ctx }) => { await enterprise.assertPermission(ctx.staffUser.id, "company.manage"); return enterprise.getCompanyAdminOverview(ctx.staffUser.id); }),
