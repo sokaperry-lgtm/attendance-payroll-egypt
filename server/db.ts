@@ -345,15 +345,24 @@ export async function getAttendanceById(id: number) {
 }
 
 export async function updateAttendanceByManager(input: { staffAccountId: number; date: string; checkIn?: string | null; checkOut?: string | null; status: string; lateMinutes: number; distanceMeters?: number | null; note?: string | null }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await db.select().from(attendanceRecords)
+    .where(and(eq(attendanceRecords.staffAccountId, input.staffAccountId), eq(attendanceRecords.date, input.date)))
+    .limit(1);
+  const current = existing[0];
+  // Undefined means the editor did not change this field; explicit null means
+  // the manager intentionally cleared it. Never erase punches during a
+  // status/note-only correction.
   return upsertAttendance({
     staffAccountId: input.staffAccountId,
     date: input.date,
-    checkIn: input.checkIn ?? null,
-    checkOut: input.checkOut ?? null,
+    checkIn: input.checkIn !== undefined ? input.checkIn : current?.checkIn ?? null,
+    checkOut: input.checkOut !== undefined ? input.checkOut : current?.checkOut ?? null,
     status: input.status,
     lateMinutes: input.lateMinutes,
-    distanceMeters: input.distanceMeters ?? null,
-    note: input.note ?? null,
+    distanceMeters: input.distanceMeters !== undefined ? input.distanceMeters : current?.distanceMeters ?? null,
+    note: input.note !== undefined ? input.note : current?.note ?? null,
   });
 }
 
