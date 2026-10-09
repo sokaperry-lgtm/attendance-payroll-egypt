@@ -185,7 +185,7 @@ export const appRouter = router({
   schedule: router({
     templates: staffProcedure.query(() => db.listShiftTemplates()),
     mine: staffProcedure.query(({ ctx }) => db.listSchedules(ctx.staffUser.id)),
-    all: supervisorProcedure.query(({ ctx }) => enterprise.listCompanySchedules(ctx.staffUser.id)),
+    all: supervisorProcedure.query(async ({ ctx }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.listCompanySchedules(ctx.staffUser.id); }),
     save: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), scheduleDate: z.string().length(10), shiftTemplateId: z.number().int(), note: z.string().max(255).optional() })).mutation(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage"); await enterprise.assertOperationalTarget(ctx.staffUser.id, input.staffAccountId); await enterprise.assertPayrollEditable(ctx.staffUser.id, input.scheduleDate.slice(0,7), input.staffAccountId); return db.saveSchedule(input); }),
   }),
   attendance: router({
@@ -448,6 +448,7 @@ export const appRouter = router({
   }),
   requests: router({
     list: staffProcedure.query(async ({ ctx }) => {
+      await enterprise.assertPermission(ctx.staffUser.id, "requests.view");
       const membership = await enterprise.getMembership(ctx.staffUser.id);
       const canViewTeamRequests = ["owner", "manager", "hr", "supervisor"].includes(membership?.role ?? "");
       if (canViewTeamRequests) {
