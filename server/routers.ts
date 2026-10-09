@@ -214,7 +214,7 @@ export const appRouter = router({
       // Manual edits must derive lateness from the actual check-in time, exactly
       // like the employee fingerprint flow. A manager should not have to enter
       // lateMinutes manually.
-      let effectiveLateMinutes = 0;
+      let effectiveLateMinutes = input.lateMinutes;
       let effectiveStatus = input.status;
       if (input.checkIn) {
         const target = await db.getStaffAccountById(input.staffAccountId);
@@ -423,8 +423,8 @@ export const appRouter = router({
         const existingRequests = await db.listRequests(ctx.staffUser.id);
         const hasOvertimeRequest = existingRequests.some((request) =>
           request.type === "أوفر تايم" &&
-          request.fromDate === input.date &&
-          request.toDate === input.date
+          request.fromDate === attendanceDate &&
+          request.toDate === attendanceDate
         );
 
         if (!hasOvertimeRequest) {
