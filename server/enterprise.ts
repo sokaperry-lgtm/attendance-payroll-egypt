@@ -1444,7 +1444,16 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
       .filter(record => record.date.startsWith(month) && (!isCurrentMonth || record.date <= cairoToday) && Boolean(record.checkIn) && ["حاضر", "متأخر"].includes(String(record.status || "")))
       .map(record => record.date)
   ).size;
-  const earnedBaseSalaryToDate = Math.round((Number(staff.baseSalary || 0) / PAYROLL_RULES.calendarDays) * workedDaysToDate);
+  // Monthly salary accrues through the current calendar date, including paid weekly rest days.
+  // Attendance days remain a separate metric; absences are handled in payroll deductions.
+  const elapsedPayrollDays = month < cairoToday.slice(0, 7)
+    ? PAYROLL_RULES.calendarDays
+    : month > cairoToday.slice(0, 7)
+      ? 0
+      : Math.min(PAYROLL_RULES.calendarDays, Number(cairoToday.slice(8, 10)));
+  const earnedBaseSalaryToDate = Math.round(
+    (Number(staff.baseSalary || 0) / PAYROLL_RULES.calendarDays) * elapsedPayrollDays
+  );
 
   const balance=await ensureLeaveBalance(staffAccountId,Number(month.slice(0,4)));
   return { staff, attendance: attendance.slice(0,90), requests, payroll, leaveBalance: balance, earnedBaseSalaryToDate, workedDaysToDate, isCurrentMonth };
