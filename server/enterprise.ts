@@ -1609,36 +1609,36 @@ export async function listEmployee360(actorId:number,targetId:number) {
   }));
 
   const m=await getCompanyForStaff(actorId);
-  const payroll = m ? await safe(
+  const permissions = await getEffectivePermissions(actorId);
+  const payroll = m && permissions["payroll.view"] ? await safe(
     db.select().from(payrollRecords)
       .where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.staffAccountId,targetId)))
       .orderBy(desc(payrollRecords.month)),
     []
   ) : [];
 
-  // Keep company-owned employee data explicitly tenant-scoped even though
-  // the target membership has already been validated. This protects the
-  // Employee 360 view if historical records remain after membership changes.
-  const companyAdjustments = m ? await safe(
+  // Keep sensitive Employee 360 sections behind their explicit permissions.
+  // The UI receives empty arrays when a section is not authorized.
+  const companyAdjustments = m && permissions["payroll.view"] ? await safe(
     db.select().from(salaryAdjustments)
       .where(and(eq(salaryAdjustments.companyId,m.companyId),eq(salaryAdjustments.staffAccountId,targetId)))
       .orderBy(desc(salaryAdjustments.createdAt)),
     []
   ) : [];
-  const companyAdvances = m ? await safe(
+  const companyAdvances = m && permissions["advances.manage"] ? await safe(
     db.select().from(salaryAdvances)
       .where(and(eq(salaryAdvances.companyId,m.companyId),eq(salaryAdvances.staffAccountId,targetId)))
       .orderBy(desc(salaryAdvances.createdAt)),
     []
   ) : [];
-  const companyDocuments = m ? await safe(
+  const companyDocuments = m && permissions["documents.view"] ? await safe(
     db.select().from(employeeDocuments)
       .where(and(eq(employeeDocuments.companyId,m.companyId),eq(employeeDocuments.staffAccountId,targetId)))
       .orderBy(desc(employeeDocuments.createdAt)),
     []
   ) : [];
 
-  const companyAudit = m ? await safe(
+  const companyAudit = m && permissions["audit.view"] ? await safe(
     db.select().from(auditLogs)
       .where(eq(auditLogs.companyId,m.companyId))
       .orderBy(desc(auditLogs.createdAt))
