@@ -45,6 +45,7 @@ export default function HomeScreen(){
   const todayCairo = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const teamQuery = trpc.attendance.team.useQuery(undefined, { enabled: isManagement || role === "supervisor" });
   const payrollQuery = trpc.payroll.list.useQuery({ month: currentMonth }, { enabled: isManagement });
+  const selfServicePayroll = trpc.selfService.me.useQuery({ month: currentMonth }, { enabled: !isManagement });
   const managementDashboard = trpc.management.dashboard.useQuery({ month: currentMonth }, { enabled: isManagement, refetchInterval: 60000 });
   const [working,setWorking]=useState(false);
   const [gpsMessage,setGpsMessage]=useState("الموقع جاهز للتحقق");
@@ -61,6 +62,21 @@ export default function HomeScreen(){
   const teamAbsent = teamToday.filter((r:any) => r.status === "غياب").length;
   const teamCheckedOut = teamToday.filter((r:any) => Boolean(r.checkOut)).length;
   const payrollTotal = (payrollQuery.data ?? []).reduce((sum:number,r:any) => sum + Number(r.netSalary || 0), 0);
+  // Employee dashboard uses the same accrued-to-date payroll figures as the "My Salary" screen.
+  const selfPayroll = selfServicePayroll.data?.payroll;
+  const selfLiveBase = Number(selfServicePayroll.data?.earnedBaseSalaryToDate ?? 0);
+  const selfIsLiveCurrentMonth = selfServicePayroll.data?.isCurrentMonth === true && selfPayroll?.status !== "approved";
+  const employeeGross = selfPayroll?.status === "approved"
+    ? Number(selfPayroll.grossSalary ?? 0)
+    : selfIsLiveCurrentMonth
+      ? selfLiveBase + Number(payroll.overtimeValue ?? 0)
+      : Number(selfPayroll?.grossSalary ?? (selfLiveBase + Number(payroll.overtimeValue ?? 0)));
+  const employeeDeductions = selfPayroll?.status === "approved"
+    ? Number(selfPayroll.employeeSocialInsurance ?? 0) + Number(selfPayroll.employeeIncomeTax ?? 0) + Number(selfPayroll.absenceDeduction ?? 0) + Number(selfPayroll.lateDeduction ?? 0) + Number(selfPayroll.earlyDeduction ?? 0) + Number(selfPayroll.otherDeductions ?? 0) + Number(selfPayroll.advances ?? 0)
+    : Number(payroll.absenceDeduction ?? 0) + Number(payroll.lateDeduction ?? 0) + Number(payroll.earlyDeduction ?? 0);
+  const employeeNet = selfPayroll?.status === "approved"
+    ? Number(selfPayroll.netSalary ?? 0)
+    : Math.max(0, employeeGross - employeeDeductions);
   const attendanceActionLabel = working ? "جارٍ التحقق..." : isCheckedOut ? "تم إنهاء الوردية ✓" : effectiveCheckedIn ? "تسجيل الانصراف" : "تسجيل الحضور";
   const dateLabel=useMemo(()=>new Intl.DateTimeFormat("ar-EG",{weekday:"long",day:"numeric",month:"long"}).format(new Date()),[]);
 
@@ -99,7 +115,7 @@ export default function HomeScreen(){
     ? [["حالة الفريق","مستقر","person.2.fill"],["الطلبات",unread+" جديدة","doc.text.fill"],["الرواتب","هذا الشهر","banknote"]]
     : role==="supervisor"
       ? [["حضور الفريق",presentDays+" سجل","person.2.fill"],["الطلبات",unread+" تحتاج مراجعة","doc.text.fill"],["تغطية الوردية","92%","calendar"]]
-      : [["وردية اليوم",isWeeklyOff?"إجازة":shift.start+" — "+shift.end,"calendar"],["الحضور",checkedIn?"مسجل الآن":"لم يُسجل بعد","checkmark"],["الراتب",payroll.net.toLocaleString("ar-EG")+" EGP","banknote"]];
+      : [["وردية اليوم",isWeeklyOff?"إجازة":shift.start+" — "+shift.end,"calendar"],["الحضور",checkedIn?"مسجل الآن":"لم يُسجل بعد","checkmark"],["الراتب",employeeNet.toLocaleString("ar-EG")+" EGP","banknote"]];
 
   return <ScreenContainer edges={["top","left","right"]}>
     <ScrollView contentContainerStyle={[styles.page, isMobile && styles.pageMobile]} showsVerticalScrollIndicator={false}>
@@ -140,7 +156,7 @@ export default function HomeScreen(){
         </> : <>
           <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="calendar" value={isWeeklyOff?"إجازة":shift.start} label="وردية اليوم" note={isWeeklyOff?"راحة أسبوعية":"بداية الوردية"}/></View>
           <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="checkmark" value={checkedIn?"جاري":"بانتظارك"} label="حالة الحضور" note={checkedIn?"تم تسجيل الدخول":"سجل حضورك لبدء اليوم"}/></View>
-          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="banknote" value={payroll.net.toLocaleString("ar-EG")} label="صافي الراتب" note="جنيه مصري"/></View>
+          <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="banknote" value={employeeNet.toLocaleString("ar-EG")} label="صافي الراتب" note="جنيه مصري"/></View>
           <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="notifications" value={String(unread)} label="تنبيهاتك" note="تحتاج انتباهك"/></View>
         </>}
       </View>
@@ -153,7 +169,7 @@ export default function HomeScreen(){
         <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>تغطية الوردية</Text><Text style={styles.cardMeta}>مؤشر تشغيلي</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>%</Text><Text style={styles.payrollValue}>92</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>الحضور المسجل</Text><Text style={styles.payrollStatus}>{presentDays} سجل</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{payrollInputs.lateMinutes??0} دقيقة</Text></View></View>
       </View> : <View style={styles.executiveGrid}>
         <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>Personal Workday</Text><Text style={styles.cardMeta}>اليوم</Text></View><View style={styles.pulseRow}><View style={styles.pulseRing}><Text style={styles.pulseValue}>{checkedIn?"ON":"OFF"}</Text></View><View style={styles.pulseCopy}><Text style={styles.pulseTitle}>{checkedIn?"وردية جارية الآن":"لم يبدأ يوم العمل"}</Text><Text style={styles.pulseSub}>{isWeeklyOff?"اليوم إجازتك الأسبوعية":"سجل حضورك وتابع وقت الوردية من هنا."}</Text></View></View><View style={styles.miniMetric}><Text style={styles.miniValue}>{shift.start+" — "+shift.end}</Text><Text style={styles.miniLabel}>ساعات الوردية</Text></View></View>
-        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>ملخصك المالي</Text><Text style={styles.cardMeta}>هذا الشهر</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>EGP</Text><Text style={styles.payrollValue}>{payroll.net.toLocaleString("ar-EG")}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>صافي الراتب</Text><Text style={styles.payrollStatus}>محدث</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{payrollInputs.lateMinutes??0} دقيقة</Text></View></View>
+        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>ملخصك المالي</Text><Text style={styles.cardMeta}>هذا الشهر</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>EGP</Text><Text style={styles.payrollValue}>{employeeNet.toLocaleString("ar-EG")}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>صافي الراتب</Text><Text style={styles.payrollStatus}>محدث</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{payrollInputs.lateMinutes??0} دقيقة</Text></View></View>
       </View>}
 
       <View style={[styles.insightStrip, isMobile && styles.insightStripMobile]}>
