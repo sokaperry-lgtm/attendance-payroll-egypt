@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculatePayroll, PAYROLL_RULES } from "../lib/payroll";
+import { calculatePayroll, calculateEarnedSalary, PAYROLL_RULES } from "../lib/payroll";
 
 describe("قواعد المرتب الداخلية", () => {
   it("تحسب قيمة اليوم والساعة من 30 يوم و9 ساعات مع 26 يوم عمل و4 إجازة مدفوعة", () => {
@@ -41,5 +41,25 @@ describe("قواعد المرتب الداخلية", () => {
     expect(result.lateDeduction).toBe(0);
     expect(result.overtimeValue).toBe(250);
     expect(result.gross).toBe(9250);
+  });
+});
+
+describe("الراتب المستحق حسب ساعات الحضور الفعلية", () => {
+  it("لا يصرف الراتب الشهري كاملًا عند عدم وجود ساعات عمل", () => {
+    expect(calculateEarnedSalary(9000, 0)).toBe(0);
+  });
+
+  it("يحسب فقط وقت العمل المسجل حتى الآن", () => {
+    // 9,000 ÷ 30 يوم ÷ 9 ساعات = 33.33 جنيه تقريبًا في الساعة.
+    expect(calculateEarnedSalary(9000, 9 * 60)).toBe(300);
+    expect(calculateEarnedSalary(9000, 9 * 60 * 10)).toBe(3000);
+  });
+
+  it("لا يسمح بأن يتجاوز المستحق الأساسي قيمة المرتب الشهري", () => {
+    expect(calculateEarnedSalary(9000, 60 * 60 * 40)).toBe(9000);
+  });
+
+  it("يتجاهل دقائق العمل السالبة", () => {
+    expect(calculateEarnedSalary(9000, -120)).toBe(0);
   });
 });
