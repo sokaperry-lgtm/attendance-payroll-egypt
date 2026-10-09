@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, getStaffAccountById } from "./db";
 import * as dbQueries from "./db";
 import { calculateEgyptPayroll } from "./egypt-payroll";
-import { PAYROLL_RULES } from "../lib/payroll";
+import { PAYROLL_RULES, calculateEarnedSalary } from "../lib/payroll";
 import {
   companies, branches, companyMembers, leaveBalances,
   payrollRecords, notifications, subscriptions, auditLogs, staffAccounts,
@@ -836,11 +836,44 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       .filter(x=>x.staffAccountId===s.id && x.date.startsWith(month))
       .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
 
-    // Monthly salaries are paid as a monthly amount; weekly rest days must
-    // not reduce salary simply because there is no attendance punch.
-    // Approved absences are handled explicitly below using the configured policy.
-    const earnedBaseSalary = Math.max(0, Math.round(Number(s.baseSalary) || 0));
-    const dailyValue=earnedBaseSalary/PAYROLL_RULES.calendarDays;
+    // Accrue base salary only for time actually recorded as worked.
+    // An open shift on today (including an overnight shift that began yesterday)
+    // accrues only up to the current Cairo time; it never assumes the full shift.
+    const monthlyBaseSalary = Math.max(0, Math.round(Number(s.baseSalary) || 0));
+    const cairoParts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).formatToParts(new Date());
+    const cairoValues = Object.fromEntries(cairoParts.map(part => [part.type, part.value]));
+    const todayCairo = `${cairoValues.year}-${cairoValues.month}-${cairoValues.day}`;
+    const nowCairoMinutes = Number(cairoValues.hour) * 60 + Number(cairoValues.minute);
+    const yesterdayDate = new Date(todayCairo + "T12:00:00");
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayCairo = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth()+1).padStart(2,"0")}-${String(yesterdayDate.getDate()).padStart(2,"0")}`;
+    let workedMinutes = 0;
+    for (const record of records) {
+      if (!record.checkIn || record.status === "غياب" || record.status === "إجازة") continue;
+      const schedule = schedules.find(item => item.staffAccountId === s.id && item.scheduleDate === record.date);
+      const shift = schedule ? shifts.find(item => item.id === schedule.shiftTemplateId) : undefined;
+      const shiftStart = shift?.startTime ?? s.shiftStart;
+      const shiftEnd = shift?.endTime ?? s.shiftEnd;
+      const crossesMidnight = Boolean(shift?.crossesMidnight) || minutesOf(shiftEnd) < minutesOf(shiftStart);
+      const actualCheckIn = minutesOf(record.checkIn);
+      let actualCheckOut: number | null = null;
+      if (record.checkOut) {
+        actualCheckOut = minutesOf(record.checkOut);
+        if (actualCheckOut < actualCheckIn) actualCheckOut += 24 * 60;
+      } else if (record.date === todayCairo) {
+        actualCheckOut = nowCairoMinutes;
+      } else if (record.date === yesterdayCairo && crossesMidnight) {
+        actualCheckOut = nowCairoMinutes + 24 * 60;
+      }
+      if (actualCheckOut !== null) {
+        workedMinutes += Math.max(0, actualCheckOut - actualCheckIn);
+      }
+    }
+    const earnedBaseSalary = calculateEarnedSalary(monthlyBaseSalary, workedMinutes);
+    const dailyValue=monthlyBaseSalary/PAYROLL_RULES.calendarDays;
     const hourlyValue=dailyValue/PAYROLL_RULES.dailyHours;
 
     // Resolve approved permissions before calculating absence deductions so a
