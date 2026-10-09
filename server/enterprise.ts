@@ -835,16 +835,25 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       .filter(x=>x.staffAccountId===s.id && x.date.startsWith(month))
       .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
 
-    // Payroll is earned on worked days, not automatically the full monthly salary.
-    // A 30-day salary is divided by 30, then multiplied by actual worked days.
-    const workedDays = new Set(
-      records
-        .filter(record => Boolean(record.checkIn) && ["حاضر", "متأخر"].includes(String(record.status || "")))
-        .map(record => String(record.date))
-    ).size;
-    const earnedBaseSalary = Math.round((Number(s.baseSalary) / PAYROLL_RULES.calendarDays) * workedDays);
-    const dailyValue=s.baseSalary/PAYROLL_RULES.calendarDays;
+    // Monthly salaries are paid as a monthly amount; weekly rest days must
+    // not reduce salary simply because there is no attendance punch.
+    // Approved absences are handled explicitly below using the configured policy.
+    const earnedBaseSalary = Math.max(0, Math.round(Number(s.baseSalary) || 0));
+    const dailyValue=earnedBaseSalary/PAYROLL_RULES.calendarDays;
     const hourlyValue=dailyValue/PAYROLL_RULES.dailyHours;
+
+    // Resolve approved permissions before calculating absence deductions so a
+    // permitted absence is not penalized just because its note is added later.
+    const approvedPermissionDates = (await db.select().from(staffRequests)
+      .where(and(eq(staffRequests.staffAccountId,s.id),eq(staffRequests.type,"إذن"),eq(staffRequests.status,"مقبول"))))
+      .filter(r=>String(r.fromDate).startsWith(month))
+      .map(r=>String(r.fromDate));
+    for (const record of records) {
+      if (record.status === "غياب" && approvedPermissionDates.includes(String(record.date)) &&
+          !String(record.note || "").includes("بإذن")) {
+        record.note = [String(record.note || "").trim(), "بإذن"].filter(Boolean).join(" · ");
+      }
+    }
 
     // Attendance penalties are automatic. The manager/owner can still correct
     // the attendance record or waive a penalty before payroll is closed.
@@ -867,10 +876,12 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       }
 
       if (record.status === "غياب" && String(record.note || "").includes("تم اعتماد الغياب")) {
-        absenceCount++;
         const hasPermission = String(record.note || "").includes("بإذن");
-        const multiplier = absenceCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
-        absenceDeduction += baseDays * dailyValue * multiplier;
+        if (!hasPermission) {
+          absenceCount++;
+          const multiplier = absenceCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
+          absenceDeduction += PAYROLL_RULES.absencePenaltyDays * dailyValue * multiplier;
+        }
       }
     }
 
@@ -887,18 +898,6 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       return total + Math.max(0, scheduledEnd - actualCheckout);
     }, 0);
     const earlyDeduction=Math.round(hourlyValue*earlyMinutes/60);
-
-    const approvedPermissionDates = (await db.select().from(staffRequests)
-      .where(and(eq(staffRequests.staffAccountId,s.id),eq(staffRequests.type,"إذن"),eq(staffRequests.status,"مقبول"))))
-      .filter(r=>String(r.fromDate).startsWith(month))
-      .map(r=>String(r.fromDate));
-
-    for (const record of records) {
-      if (record.status === "غياب" && approvedPermissionDates.includes(String(record.date)) &&
-          !String(record.note || "").includes("تم اعتماد الغياب")) {
-        record.note = String(record.note || "") + " · بإذن";
-      }
-    }
 
     const approvedOvertimeHours=approvedOvertime
       .filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month))
