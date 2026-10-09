@@ -50,6 +50,7 @@ function HrToolsContent({ role }: { role: string }) {
   const addDoc = trpc.hrTools.addDocument.useMutation({ onSuccess: () => docs.refetch() });
   const deleteDoc = trpc.hrTools.deleteDocument.useMutation({ onSuccess: () => docs.refetch() });
   const addAdjustment = trpc.hrTools.addAdjustment.useMutation({ onSuccess: () => adjustments.refetch() });
+  const cancelPenalty = trpc.hrTools.cancelPenalty.useMutation({ onSuccess: () => { adjustments.refetch(); Alert.alert("تم", "تم إلغاء الخصم قبل اعتماد المسير."); } });
   const addAdvance = trpc.hrTools.addAdvance.useMutation({ onSuccess: () => advances.refetch() });
   const penaltyPolicies = trpc.hrTools.penaltyPolicies.useQuery(undefined, { enabled: canManageMoney, retry: false });
   const addPenaltyPolicy = trpc.hrTools.addPenaltyPolicy.useMutation({ onSuccess: () => penaltyPolicies.refetch() });
@@ -144,7 +145,20 @@ function HrToolsContent({ role }: { role: string }) {
           <TextInput style={styles.input} value={money.title} onChangeText={v => setMoney(x => ({ ...x, title: v }))} placeholder="وصف التعديل" placeholderTextColor="#8A98AA" textAlign="right" />
           <TextInput style={styles.input} value={money.amount} onChangeText={v => setMoney(x => ({ ...x, amount: v }))} placeholder="المبلغ بالجنيه" placeholderTextColor="#8A98AA" keyboardType="numeric" textAlign="right" />
           <Pressable style={styles.button} disabled={addAdjustment.isPending} onPress={saveAdjustment}><Text style={styles.buttonText}>{addAdjustment.isPending ? "جاري الحفظ..." : "حفظ التعديل"}</Text></Pressable>
-          {adjustmentRows.length ? adjustmentRows.map((a: any) => <View key={a.id} style={styles.item}><View style={styles.amount}><Text style={styles.money}>{formatMoney(Number(a.amount) || 0)}</Text></View><View style={styles.itemCopy}><Text style={styles.itemTitle}>{a.title}</Text><Text style={styles.itemSub}>{a.type}</Text></View></View>) : <Empty text={adjustments.isLoading ? "جاري التحميل..." : "لا توجد تعديلات لهذا الشهر."} />}
+          {adjustmentRows.length ? adjustmentRows.map((a: any) => {
+            const adjustmentEmployee = employees.find((x: any) => Number(x.id) === Number(a.staffAccountId));
+            return <View key={a.id} style={styles.item}>
+              <View style={styles.amount}><Text style={styles.money}>{formatMoney(Number(a.amount) || 0)}</Text></View>
+              <View style={styles.itemCopy}><Text style={styles.itemTitle}>{a.title}</Text><Text style={styles.itemSub}>{adjustmentEmployee?.name || ("موظف " + a.staffAccountId)} · {a.type}</Text></View>
+              <Pressable
+                disabled={cancelPenalty.isPending}
+                onPress={() => Alert.alert("إلغاء الخصم", "هل تريد إلغاء " + a.title + " بقيمة " + formatMoney(Number(a.amount) || 0) + "؟ لا يمكن الإلغاء بعد اعتماد مسير الموظف لهذا الشهر.", [
+                  { text: "رجوع", style: "cancel" },
+                  { text: "إلغاء الخصم", style: "destructive", onPress: () => cancelPenalty.mutate({ id: Number(a.id) }, { onError: (e) => Alert.alert("تعذر الإلغاء", e.message || "حاول مرة أخرى.") }) }
+                ])}
+              ><Text style={styles.delete}>{cancelPenalty.isPending ? "جاري الإلغاء..." : "إلغاء الخصم"}</Text></Pressable>
+            </View>;
+          }) : <Empty text={adjustments.isLoading ? "جاري التحميل..." : "لا توجد تعديلات لهذا الشهر."} />}
         </Section>}
 
         {canManageMoney && <Section title="السلف الحالية" hint="تسجيل ومتابعة السلف والأقساط.">
