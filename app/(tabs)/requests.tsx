@@ -72,10 +72,10 @@ export default function RequestsScreen() {
           <View style={styles.absenceReviewInfo}>
             <Text style={styles.absenceReviewName}>{item.staffName ?? "موظف"}</Text>
             <Text style={styles.absenceReviewDate}>{item.fromDate} · {item.title}{item.minutes ? ` · ${item.minutes} دقيقة` : ""}</Text>
-            <Text style={styles.absenceReviewHint}>قرار المدير مطلوب قبل احتساب أي خصم من الراتب.</Text>
+            <Text style={styles.absenceReviewHint}>{item.status === "معتمد" ? "الخصم معتمد، ويمكن إلغاؤه قبل اعتماد مسير الموظف." : "قرار المدير مطلوب قبل احتساب أي خصم من الراتب."}</Text>
           </View>
           <View style={styles.absenceReviewActions}>
-            <Pressable
+            {item.status !== "معتمد" ? <Pressable
               disabled={reviewAttendanceException.isPending}
               onPress={async () => {
                 try {
@@ -88,7 +88,7 @@ export default function RequestsScreen() {
                 }
               }}
               style={styles.absenceApproveButton}
-            ><Text style={styles.absenceApproveText}>{reviewAttendanceException.isPending ? "..." : "✓  اعتماد الخصم"}</Text></Pressable>
+            ><Text style={styles.absenceApproveText}>{reviewAttendanceException.isPending ? "..." : "✓  اعتماد الخصم"}</Text></Pressable> : null}
             <Pressable
               disabled={reviewAttendanceException.isPending}
               onPress={async () => {
@@ -96,13 +96,13 @@ export default function RequestsScreen() {
                   await reviewAttendanceException.mutateAsync({ staffAccountId: Number(item.staffAccountId), date: String(item.fromDate), kind: item.exceptionKind, action: "cancel" });
                   await penaltyRequests.refetch();
                   await refresh();
-                  showAlert("تم إلغاء الخصم", "لن يتم احتساب الخصم لهذا اليوم.");
+                  showAlert("تم إلغاء الخصم", "تم إلغاء الخصم ولن يُحتسب ما دام المسير غير معتمد.");
                 } catch (error) {
                   showAlert("تعذر إلغاء الخصم", error instanceof Error ? error.message : "حدث خطأ أثناء إلغاء الخصم.");
                 }
               }}
               style={styles.absenceCancelButton}
-            ><Text style={styles.absenceCancelText}>{reviewAttendanceException.isPending ? "..." : "✕  إلغاء الخصم"}</Text></Pressable>
+            ><Text style={styles.absenceCancelText}>{reviewAttendanceException.isPending ? "..." : "{item.status === "معتمد" ? "✕  إلغاء الخصم المعتمد" : "✕  إلغاء الخصم"}</Text></Pressable>
           </View>
         </View>
       ))}
