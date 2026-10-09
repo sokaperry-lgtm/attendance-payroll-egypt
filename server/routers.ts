@@ -115,7 +115,7 @@ export const appRouter = router({
     }),
   }),
   staff: router({
-    list: hrProcedure.query(async ({ ctx }) => { await enterprise.assertPermission(ctx.staffUser.id, "employees.view"); const canViewPayroll = (await enterprise.getEffectivePermissions(ctx.staffUser.id)).includes ? false : (await enterprise.getEffectivePermissions(ctx.staffUser.id))["payroll.view"]; return (await enterprise.listCompanyStaff(ctx.staffUser.id)).map((item) => { if (canViewPayroll) return { ...item }; const { baseSalary: _baseSalary, ...safeItem } = item; return safeItem; }); }),
+    list: hrProcedure.query(async ({ ctx }) => { await enterprise.assertPermission(ctx.staffUser.id, "employees.view"); const canViewPayroll = (await enterprise.getEffectivePermissions(ctx.staffUser.id))["payroll.view"]; return (await enterprise.listCompanyStaff(ctx.staffUser.id)).map((item) => { if (canViewPayroll) return { ...item }; const { baseSalary: _baseSalary, ...safeItem } = item; return safeItem; }); }),
     create: hrProcedure.input(z.object({ phone: z.string().min(3).max(32), password: z.string().min(6).max(120), name: z.string().min(2).max(160), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).default(0), role: z.enum(["manager","supervisor","employee"]).default("employee"), shiftStart: z.string().max(8).default("08:00"), shiftEnd: z.string().max(8).default("17:00") })).mutation(async ({ ctx, input }) => {
       await enterprise.assertPermission(ctx.staffUser.id, "employees.manage");
       const actorMembership = await enterprise.getMembership(ctx.staffUser.id);
