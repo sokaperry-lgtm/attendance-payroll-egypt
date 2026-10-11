@@ -4,7 +4,7 @@ export const PAYROLL_RULES = {
   paidLeaveDays: 4,
   calendarDays: 30,
   graceMinutes: 15,
-  absencePenaltyDays: 1,
+  absencePenaltyDays: 3,
   lateQuarterDayMinutes: 15,
   lateHalfDayMinutes: 30,
   lateFullDayMinutes: 60,
@@ -67,6 +67,18 @@ export function calculatePayroll(inputs: PayrollInputs) {
     totalDeductions,
     net: Math.max(0, gross - totalDeductions),
   };
+}
+
+/** Maps minutes beyond the 15-minute grace period to the requested disciplinary tier.
+ * 1-14 chargeable minutes means 16-29 minutes late in total; 15-44 means 30-59;
+ * 45+ means 60+ total minutes late. Approval is required before payroll applies it.
+ */
+export function calculateLatePenaltyDays(chargeableLateMinutes: number) {
+  const minutes = Math.max(0, Number(chargeableLateMinutes) || 0);
+  if (minutes <= 0) return 0;
+  if (minutes < 15) return 0.25;
+  if (minutes < 45) return 0.5;
+  return 1;
 }
 
 /** Caps disciplinary deductions at five basic-wage days per payroll month.
