@@ -69,6 +69,13 @@ export function calculatePayroll(inputs: PayrollInputs) {
   };
 }
 
+/** Caps disciplinary deductions at five basic-wage days per payroll month.
+ * Ordinary deductions (e.g. approved advances) must be calculated separately.
+ */
+export function capMonthlyDisciplinaryDeduction(amount: number, dailyBasicWage: number) {
+  return Math.min(Math.max(0, Number(amount) || 0), Math.max(0, Number(dailyBasicWage) || 0) * 5);
+}
+
 export function formatMoney(value: number) {
   return `${Math.round(value).toLocaleString("ar-EG")} ج.م`;
 }
