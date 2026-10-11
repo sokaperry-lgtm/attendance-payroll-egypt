@@ -313,7 +313,7 @@ export default function AttendanceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles: any = StyleSheet.create({
   managementDateCard: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#E8EDF3", flexDirection: "row", alignItems: "center", gap: 10 },
   dateNavButton: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#F2F5F8", alignItems: "center", justifyContent: "center" },
   dateNavText: { color: "#163A63", fontSize: 25, fontWeight: "700" },
