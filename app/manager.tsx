@@ -245,7 +245,7 @@ function ManagerScreenContent() {
   </ScreenContainer>;
 }
 
-const styles = StyleSheet.create({
+const styles: any = StyleSheet.create({
   analyticsHeader:{backgroundColor:"#163A63",borderRadius:22,padding:20,flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",gap:14,marginTop:4},
   analyticsEyebrow:{color:"#A9C7E3",fontSize:9,fontWeight:"900",letterSpacing:1,textAlign:"right"},
   analyticsTitle:{color:"#FFFFFF",fontSize:21,fontWeight:"900",textAlign:"right",marginTop:4},
