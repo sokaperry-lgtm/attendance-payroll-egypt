@@ -88,7 +88,7 @@ export default function PayrollScreen() {
   const printQuery = trpc.payroll.payslip.useQuery({ id: printPayrollId ?? 0 }, { enabled: printPayrollId !== null });
 
   const rows = query.data ?? [];
-  const payrollStaffMembers = (payrollStaffQuery.data ?? []).map((s) => ({ id: String(s.id), name: s.name, title: s.title ?? "موظف", department: s.department ?? "عام", baseSalary: Number(s.baseSalary ?? 0), initials: String(s.name).split(" ").slice(0, 2).map((part) => part[0] ?? "").join(""), active: s.active }));
+  const payrollStaffMembers = (payrollStaffQuery.data ?? []).map((s) => ({ id: String(s.id), name: s.name, title: s.title ?? "موظف", department: s.department ?? "عام", baseSalary: Number((s as any).baseSalary ?? 0), initials: String(s.name).split(" ").slice(0, 2).map((part) => part[0] ?? "").join(""), active: s.active }));
   const salaryRows = [employee, ...payrollStaffMembers.filter(s => s.id !== employee.id)].filter(s => s.active !== false);
   const printData = printQuery.data;
   useEffect(() => { if (printData) { const timer = setTimeout(() => { printPayslip(printData, month); setPrintPayrollId(null); }, 100); return () => clearTimeout(timer); } }, [printData, month]);
