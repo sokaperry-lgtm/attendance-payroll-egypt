@@ -131,7 +131,7 @@ export default function ReportsScreen() {
           <KpiCard label="أيام الحضور" value={summary.presentDays} caption="حضور أو مأمورية" tone="green" icon="checkmark" />
           <KpiCard label="دقائق التأخير" value={summary.lateMinutes} caption="تحتاج متابعة" tone="orange" icon="clock" />
           <KpiCard label="طلبات معلقة" value={summary.pendingRequests} caption="بانتظار المراجعة" tone="purple" icon="doc.text.fill" />
-        </View>}
+        </View>
 
         <View style={[styles.chartRow, compact && styles.chartRowCompact]}>
           <SurfaceCard style={styles.chartCard}>
