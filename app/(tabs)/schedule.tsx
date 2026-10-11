@@ -298,7 +298,7 @@ export default function ScheduleScreen() {
                   {adminRole && (
                     <Pressable onPress={() => setSelectedEmployee(person.id)} style={[styles.nameCell, person.id === selectedEmployee && styles.nameCellSelected]}>
                       <View style={styles.nameAvatar}><Text style={styles.nameAvatarText}>{person.name.slice(0, 1)}</Text></View>
-                      <View style={styles.nameCopy}><Text style={styles.nameText} numberOfLines={1}>{person.name}</Text><Text style={styles.nameRole} numberOfLines={1}>{person.jobTitle ?? "موظف"}</Text></View>
+                      <View style={styles.nameCopy}><Text style={styles.nameText} numberOfLines={1}>{person.name}</Text><Text style={styles.nameRole} numberOfLines={1}>{person.title ?? "موظف"}</Text></View>
                     </Pressable>
                   )}
                   {week.map(d => {
@@ -393,7 +393,7 @@ export default function ScheduleScreen() {
                 <View style={{flex:1}}>
                   <Text style={styles.detailEyebrow}>EMPLOYEE DAY DETAIL</Text>
                   <Text style={styles.detailTitle}>{member.name}</Text>
-                  <Text style={styles.detailSub}>{week.find(d => d.key === selectedDay)?.label} · {week.find(d => d.key === selectedDay)?.date} · {member.jobTitle ?? "موظف"}</Text>
+                  <Text style={styles.detailSub}>{week.find(d => d.key === selectedDay)?.label} · {week.find(d => d.key === selectedDay)?.date} · {member.title ?? "موظف"}</Text>
                 </View>
                 <Pressable disabled={detailSaving} onPress={() => setDetailOpen(false)} style={styles.detailClose}><Text style={styles.detailCloseText}>×</Text></Pressable>
               </View>
@@ -401,7 +401,7 @@ export default function ScheduleScreen() {
               <ScrollView contentContainerStyle={styles.detailBody} keyboardShouldPersistTaps="handled">
                 <View style={styles.detailHero}>
                   <View style={styles.detailHeroIcon}><Text style={styles.detailHeroInitial}>{member.name.slice(0,1)}</Text></View>
-                  <View style={{flex:1}}><Text style={styles.detailHeroName}>{member.name}</Text><Text style={styles.detailHeroRole}>{member.jobTitle ?? "موظف"} · {member.department ?? "عام"}</Text></View>
+                  <View style={{flex:1}}><Text style={styles.detailHeroName}>{member.name}</Text><Text style={styles.detailHeroRole}>{member.title ?? "موظف"} · {member.department ?? "عام"}</Text></View>
                   <View style={styles.detailStatusPill}><Text style={styles.detailStatusText}>{selectedAttendance?.status ?? "لا يوجد تسجيل"}</Text></View>
                 </View>
 
