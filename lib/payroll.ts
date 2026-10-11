@@ -62,6 +62,7 @@ export function calculatePayroll(inputs: PayrollInputs) {
     hourlyValue,
     absenceDeduction,
     lateDeduction,
+    earlyDeduction: 0,
     overtimeValue,
     gross,
     totalDeductions,
