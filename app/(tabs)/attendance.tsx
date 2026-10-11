@@ -255,7 +255,7 @@ export default function AttendanceScreen() {
               <View style={styles.rowHeader}>
                 <Text style={styles.rowDate}>{formatDate(item.date)}</Text>
                 <StatusBadge
-                  label={item.status === "غياب" && !(item.note || "").includes("تم اعتماد الغياب") && !(item.note || "").includes("تم إلغاء الغياب") ? "غياب · بانتظار الاعتماد" : item.status === "مستثنى" ? "مستثنى من الغياب" : item.status}
+                  label={item.status === "غياب" && !(item.note || "").includes("تم اعتماد الغياب") && !(item.note || "").includes("تم إلغاء الغياب") ? "غياب · بانتظار الاعتماد" : String(item.status) === "مستثنى" ? "مستثنى من الغياب" : item.status}
                   tone={item.status === "غياب" && !(item.note || "").includes("تم اعتماد الغياب") && !(item.note || "").includes("تم إلغاء الغياب") ? "warning" : statusTone[item.status] || "neutral"}
                 />
               </View>
@@ -266,7 +266,7 @@ export default function AttendanceScreen() {
               {item.lateMinutes > 0 && (
                 <Text style={styles.lateText}>تأخير {item.lateMinutes} دقيقة</Text>
               )}
-              {((role === "owner" || role === "manager") || role === "supervisor") &&
+              {role === "supervisor" &&
                 item.status === "غياب" &&
                 !(item.note || "").includes("تم اعتماد الغياب") &&
                 !(item.note || "").includes("تم إلغاء الغياب") ? (

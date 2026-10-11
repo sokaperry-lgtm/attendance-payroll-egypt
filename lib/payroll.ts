@@ -54,7 +54,7 @@ export function calculatePayroll(inputs: PayrollInputs) {
     lateMinutes >= PAYROLL_RULES.lateHalfDayMinutes ? 0.5 :
     lateMinutes >= PAYROLL_RULES.lateQuarterDayMinutes ? 0.25 : 0;
   const lateDeduction = latePenaltyDays * dailyValue;
-  const overtimeValue = overtimeHours * overtimeRate * PAYROLL_RULES.overtimeMultiplier;
+  const overtimeValue = overtimeHours * overtimeRate;
   const gross = inputs.baseSalary + allowances + bonuses + overtimeValue;
   const totalDeductions = absenceDeduction + lateDeduction + deductions + advances;
 
@@ -63,6 +63,7 @@ export function calculatePayroll(inputs: PayrollInputs) {
     hourlyValue,
     absenceDeduction,
     lateDeduction,
+    earlyDeduction: 0,
     overtimeValue,
     gross,
     totalDeductions,

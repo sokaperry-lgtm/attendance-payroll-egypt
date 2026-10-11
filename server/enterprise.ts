@@ -133,7 +133,7 @@ export async function getDailyAttendanceOverview(staffAccountId: number, date: s
 
   const byStaff = new Map(rows.map(row => [row.staffAccountId, row]));
   const employees = staff
-    .filter(s => s.active && s.role !== "owner")
+    .filter(s => s.active)
     .map(s => {
       const row = byStaff.get(s.id);
       return {
@@ -236,7 +236,7 @@ export async function getManagementDashboard(staffAccountId: number, month: stri
   const absent = todayRows.filter(row => row.status === "غياب").length;
   const lateMinutes = todayRows.reduce((sum, row) => sum + Number(row.lateMinutes || 0), 0);
   const openShifts = todayRows.filter(row => row.checkIn && !row.checkOut).length;
-  const expected = staff.filter(s => s.active && s.role !== "owner").length;
+  const expected = staff.filter(s => s.active).length;
   const attendanceRate = expected ? Math.round((present / expected) * 100) : 0;
 
   const requests = staffIds.length
@@ -263,7 +263,7 @@ export async function getManagementDashboard(staffAccountId: number, month: stri
     }));
 
   const departments = new Map<string, number>();
-  staff.filter(s => s.active && s.role !== "owner").forEach(s => {
+  staff.filter(s => s.active).forEach(s => {
     const key = s.department?.trim() || "غير محدد";
     departments.set(key, (departments.get(key) || 0) + 1);
   });
@@ -689,7 +689,7 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
           });
           markedLeaves++;
         } else if (record.status === "غياب" && !record.checkIn && !record.checkOut) {
-          await dbQueries.upsertAttendance({ ...record, status: "إجازة", note: "إجازة معتمدة", updatedAt: new Date() });
+          await dbQueries.upsertAttendance({ ...record, status: "إجازة", note: "إجازة معتمدة" });
           markedLeaves++;
         }
         continue;
@@ -1276,7 +1276,7 @@ export async function reviewLeaveRequest(actorId:number,id:number,status:"مقب
     consumed=true;
   }
   try {
-    const row=await db.approveRequest(id,actorId,status);
+    const row=await dbQueries.approveRequest(id,actorId,status);
     if(!row) throw new Error("تعذر تحديث طلب الإجازة.");
     if(status==="مقبول") {
       await syncMonthlyAttendance(actorId,existing.fromDate.slice(0,7));

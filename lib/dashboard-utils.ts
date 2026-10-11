@@ -1,7 +1,7 @@
 export type DashboardRecord = { date: string; status: string; lateMinutes: number };
 export type DashboardEmployee = { name: string; department?: string | null; lateMinutes: number; absentDays: number; presentDays: number; records: DashboardRecord[] };
 export type DashboardPayrollRow = { netSalary?: number | null; grossSalary?: number | null; absenceDeduction?: number | null; lateDeduction?: number | null; earlyDeduction?: number | null; otherDeductions?: number | null; advances?: number | null; employeeSocialInsurance?: number | null; employeeIncomeTax?: number | null; overtime?: number | null; status?: string | null };
-export type DashboardSummary = { presentDays: number; absentDays: number; lateMinutes: number; pendingRequests: number };
+export type DashboardSummary = { staffCount?: number; presentDays: number; absentDays: number; lateMinutes: number; pendingRequests: number };
 
 export function calculateAttendanceRate(summary: Pick<DashboardSummary, "presentDays" | "absentDays">) {
   const trackedDays = summary.presentDays + summary.absentDays;
@@ -49,13 +49,9 @@ export function summarizePayroll(rows: DashboardPayrollRow[]) {
   const sum = (selector: (row: DashboardPayrollRow) => number) => rows.reduce((total, row) => total + selector(row), 0);
   return {
     totalPayroll: sum((row) => Number(row.netSalary ?? 0)),
-    totalGross: sum((row) => Number(row.grossSalary ?? 0)),
     totalAbsenceDeductions: sum((row) => Number(row.absenceDeduction ?? 0)),
-    totalAttendanceDeductions: sum((row) => Number(row.absenceDeduction ?? 0) + Number(row.lateDeduction ?? 0) + Number(row.earlyDeduction ?? 0)),
-    totalOtherDeductions: sum((row) => Number(row.otherDeductions ?? 0) + Number(row.advances ?? 0) + Number(row.employeeSocialInsurance ?? 0) + Number(row.employeeIncomeTax ?? 0)),
     totalOvertime: sum((row) => Number(row.overtime ?? 0)),
     approvedPayroll: rows.filter((row) => row.status === "approved").length,
-    draftPayroll: rows.filter((row) => row.status === "draft").length,
     totalPayrollRows: rows.length,
   };
 }

@@ -15,7 +15,7 @@ export default function EmployeesScreen() {
   const compact = width < 600;
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", phone: "", password: "", title: "", department: "", baseSalary: "", role: "employee" as Role });
+  const [form, setForm] = useState({ name: "", phone: "", password: "", title: "", department: "", baseSalary: "", role: "employee" as "manager" | "supervisor" | "employee" });
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | Role>("all");
 
@@ -161,7 +161,7 @@ export default function EmployeesScreen() {
 
               <Text style={styles.label}>نوع الحساب والصلاحية</Text>
               <View style={styles.roleOptions}>
-                {(["manager", "supervisor", "employee"] as Role[]).map(item => (
+                {(["manager", "supervisor", "employee"] as ("manager" | "supervisor" | "employee")[]).map(item => (
                   <Pressable key={item} onPress={() => setForm(f => ({ ...f, role: item }))} style={[styles.roleOption, form.role === item && styles.roleOptionActive]}>
                     <IconSymbol name={"person.2.fill"} size={21} color={form.role === item ? "#FFF" : "#163A63"} />
                     <Text style={[styles.roleOptionTitle, form.role === item && styles.roleOptionTitleActive]}>{roleLabels[item]}</Text>

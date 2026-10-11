@@ -2,7 +2,7 @@ import { z } from "zod";
 import { parse as parseCookieHeader } from "cookie";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { INTERNAL_SESSION_COOKIE } from "../shared/const";
-import { companyAdminProcedure, payrollAdminProcedure, managerProcedure, supervisorProcedure, publicProcedure, router, staffProcedure, hrProcedure, payrollProcedure, reportsProcedure } from "./_core/trpc";
+import { companyAdminProcedure, payrollAdminProcedure, managerProcedure, supervisorProcedure, publicProcedure, router, staffProcedure, sessionStaffProcedure, hrProcedure, payrollProcedure, reportsProcedure } from "./_core/trpc";
 import * as enterprise from "./enterprise";
 import * as db from "./db";
 import { PAYROLL_RULES } from "../lib/payroll";
@@ -103,14 +103,14 @@ export const appRouter = router({
       if (membership) await enterprise.writeAudit(ctx.staffUser.id, membership.companyId, "auth.password_changed", "staff", String(ctx.staffUser.id));
       return { success: true };
     }),
-    logout: staffProcedure.mutation(async ({ ctx }) => {
+    logout: sessionStaffProcedure.mutation(async ({ ctx }) => {
       const authHeader = ctx.req.headers.authorization || ctx.req.headers.Authorization;
       const bearer = typeof authHeader === "string" && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
       const cookieToken = parseCookieHeader(ctx.req.headers.cookie ?? "")[INTERNAL_SESSION_COOKIE] ?? null;
       const membership = await enterprise.getCompanyForStaff(ctx.staffUser.id);
       if (membership) await enterprise.writeAudit(ctx.staffUser.id, membership.companyId, "auth.logout", "staff", String(ctx.staffUser.id));
       await db.deleteStaffSession(bearer || cookieToken);
-      ctx.res.clearCookie(INTERNAL_SESSION_COOKIE, getSessionCookieOptions(ctx.req));
+      ctx.res.clearCookie(INTERNAL_SESSION_COOKIE, { ...getSessionCookieOptions(ctx.req), secure: true, sameSite: "none", httpOnly: true, path: "/" });
       return { success: true };
     }),
   }),
@@ -558,7 +558,7 @@ listPenaltyRequests: managerProcedure.query(async ({ctx})=>{ await enterprise.as
     updateCompany: companyAdminProcedure.input(z.object({ name:z.string().min(2), legalName:z.string().max(200).optional(), email:z.string().max(320).optional(), phone:z.string().max(32).optional() })).mutation(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "company.manage"); return enterprise.updateCompanyProfile(ctx.staffUser.id,input); }),
     role: managerProcedure.input(z.object({ staffAccountId:z.number().int(), role:z.enum(["owner","hr","manager","supervisor","accountant","employee"]) })).mutation(async ({ ctx,input }) => { await enterprise.assertPermission(ctx.staffUser.id, "roles.manage"); return enterprise.setMemberRole(ctx.staffUser.id,input.staffAccountId,input.role); }),
     permissions: companyAdminProcedure.query(async ({ ctx }) => { await enterprise.assertPermission(ctx.staffUser.id, "roles.manage"); return enterprise.listPermissionMembers(ctx.staffUser.id); }),
-    updatePermissions: companyAdminProcedure.input(z.object({ staffAccountId:z.number().int(), permissions:z.record(z.boolean()) })).mutation(async ({ ctx,input }) => { await enterprise.assertPermission(ctx.staffUser.id, "roles.manage"); return enterprise.updateMemberPermissions(ctx.staffUser.id,input.staffAccountId,input.permissions as enterprise.PermissionMap); }),
+    updatePermissions: companyAdminProcedure.input(z.object({ staffAccountId:z.number().int(), permissions:z.record(z.string(), z.boolean()) })).mutation(async ({ ctx,input }) => { await enterprise.assertPermission(ctx.staffUser.id, "roles.manage"); return enterprise.updateMemberPermissions(ctx.staffUser.id,input.staffAccountId,input.permissions as enterprise.PermissionMap); }),
     subscription: staffProcedure.query(({ ctx }) => enterprise.getSubscription(ctx.staffUser.id)),
     changePlan: managerProcedure.input(z.object({ plan:z.enum(["trial","starter","growth","scale"]) })).mutation(async ({ ctx,input }) => { await enterprise.assertPermission(ctx.staffUser.id, "company.manage"); return enterprise.updateSubscription(ctx.staffUser.id,input.plan); }),
     security: staffProcedure.query(({ ctx }) => enterprise.getSecuritySummary(ctx.staffUser.id)),

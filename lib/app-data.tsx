@@ -19,8 +19,8 @@ export type Employee = { id: string; name: string; title: string; department: st
 export const defaultBranch: Branch = { name: "الفرع الرئيسي", address: "مدينة نصر، القاهرة", latitude: 30.0444, longitude: 31.2357, radiusMeters: 200 };
 
 function initials(name: string) { return name.split(" ").slice(0, 2).map((part) => part[0] ?? "").join(""); }
-function mapEmployee(staff: { id: number; name: string; title: string | null; department: string | null; baseSalary: number; phone?: string; role?: Role; active?: boolean }): Employee {
-  return { id: String(staff.id), name: staff.name, title: staff.title ?? "موظف", department: staff.department ?? "عام", baseSalary: staff.baseSalary, initials: initials(staff.name), phone: staff.phone, role: staff.role, active: staff.active };
+function mapEmployee(staff: { id: number; name: string; title: string | null; department: string | null; baseSalary?: number; phone?: string; role?: Role; active?: boolean }): Employee {
+  return { id: String(staff.id), name: staff.name, title: staff.title ?? "موظف", department: staff.department ?? "عام", baseSalary: Number(staff.baseSalary ?? 0), initials: initials(staff.name), phone: staff.phone, role: staff.role, active: staff.active };
 }
 
 export type AppDataContext = {
@@ -41,8 +41,8 @@ export type AppDataContext = {
   checkOut: (payload: { time: string; latitude: number; longitude: number }) => Promise<void>;
   submitRequest: (request: Omit<LeaveRequest, "id" | "status">) => Promise<void>;
   approveRequest: (id: string, status: RequestStatus) => Promise<void>;
-  createStaffAccount: (input: { phone: string; password: string; name: string; title?: string; department?: string; baseSalary: number; role: Role }) => Promise<void>;
-  updateStaffAccount: (input: { id: number; phone?: string; password?: string; name?: string; title?: string; department?: string; baseSalary?: number; role?: Role; shiftStart?: string; shiftEnd?: string; active?: boolean }) => Promise<void>;
+  createStaffAccount: (input: { phone: string; password: string; name: string; title?: string; department?: string; baseSalary: number; role: "manager" | "supervisor" | "employee" }) => Promise<void>;
+  updateStaffAccount: (input: { id: number; phone?: string; password?: string; name?: string; title?: string; department?: string; baseSalary?: number; role?: "manager" | "supervisor" | "employee"; shiftStart?: string; shiftEnd?: string; active?: boolean }) => Promise<void>;
   updateBranch: (input: { name: string; address: string; latitude: string; longitude: string; radiusMeters: number }) => Promise<void>;
   shiftTemplates: ShiftTemplate[];
   schedules: ScheduleEntry[];
@@ -121,7 +121,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     role, employee, branch, shift: { name: activeShift?.name ?? "الوردية الأساسية", start: activeShift?.startTime ?? meQuery.data?.shiftStart ?? "09:00", end: activeShift?.endTime ?? meQuery.data?.shiftEnd ?? "18:00", days: "حسب جدول الأسبوع", crossesMidnight: activeShift?.crossesMidnight, kind: activeShift?.kind as "shift" | "weekly_off" | undefined }, records, requests, staffMembers, payrollInputs, payroll, todayRecord: activeAttendanceRecord, checkedIn: Boolean(activeAttendanceRecord?.checkIn && !activeAttendanceRecord?.checkOut), loading: meQuery.isLoading || attendanceQuery.isLoading, refresh: invalidateAll, shiftTemplates, schedules, teamSchedules, teamAttendance,
     checkIn: async (payload) => { await checkInMutation.mutateAsync({ date: todayKey(), time: payload.time, status: payload.status, lateMinutes: payload.lateMinutes, latitude: payload.latitude, longitude: payload.longitude }); await invalidateAll(); },
     checkOut: async (payload) => { await checkOutMutation.mutateAsync({ date: activeAttendanceRecord?.date ?? todayKey(), time: payload.time, latitude: payload.latitude, longitude: payload.longitude }); await invalidateAll(); },
-    submitRequest: async (request) => { await requestMutation.mutateAsync({ type: request.type, fromDate: request.from, toDate: request.to, reason: request.reason, hours: request.hours ?? undefined }); await invalidateAll(); },
+    submitRequest: async (request) => { await requestMutation.mutateAsync({ type: request.type as "إجازة" | "إذن" | "إجازة مرضية" | "إجازة طارئة", fromDate: request.from, toDate: request.to, reason: request.reason, hours: request.hours ?? undefined }); await invalidateAll(); },
     approveRequest: async (id, status) => { await reviewMutation.mutateAsync({ id: Number(id), status: status as "مقبول" | "مرفوض" }); await invalidateAll(); },
     createStaffAccount: async (input) => { await createStaffMutation.mutateAsync({ ...input, shiftStart: "08:00", shiftEnd: "17:00" }); await invalidateAll(); },
     updateStaffAccount: async (input) => { await updateStaffMutation.mutateAsync(input); await invalidateAll(); },

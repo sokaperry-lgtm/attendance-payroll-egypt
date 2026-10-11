@@ -51,6 +51,11 @@ const requireReports = requireRole(["owner", "manager", "hr", "accountant", "sup
 
 export const protectedProcedure = t.procedure.use(requireUser);
 export const staffProcedure = t.procedure.use(requireStaff);
+const requireSessionStaff = t.middleware(async (opts) => {
+  if (!opts.ctx.staffUser) throw new TRPCError({ code: "UNAUTHORIZED", message: "يجب تسجيل الدخول بحساب الشركة." });
+  return opts.next({ ctx: { ...opts.ctx, staffUser: opts.ctx.staffUser } });
+});
+export const sessionStaffProcedure = t.procedure.use(requireSessionStaff);
 const requireCompanyAdmin = t.middleware(async (opts) => {
   if (!opts.ctx.staffUser) throw new TRPCError({ code: "UNAUTHORIZED", message: "يجب تسجيل الدخول بحساب الشركة." });
   const membership = await getMembership(opts.ctx.staffUser.id);
