@@ -287,7 +287,7 @@ function SmartInsight({ icon, title, text }: { icon: any; title: string; text: s
 function Kpi({icon,value,label,note}:{icon:any;value:string;label:string;note:string}){return <View style={styles.kpi}><View style={styles.kpiTop}><View style={styles.kpiIcon}><IconSymbol name={icon} size={17} color="#163A63"/></View><View style={styles.kpiLine}/></View><Text style={styles.kpiValue}>{value}</Text><Text style={styles.kpiLabel}>{label}</Text><Text style={styles.kpiNote}>{note}</Text></View>}
 function TimeRow({label,value}:{label:string;value:string}){return <View style={styles.timeRow}><Text style={styles.timeValue}>{value}</Text><Text style={styles.timeLabel}>{label}</Text></View>}
 
-const styles=StyleSheet.create({
+const styles: any = StyleSheet.create({
   managementPanel:{backgroundColor:"#F8FAFC",borderRadius:22,borderWidth:1,borderColor:"#E4E7EC",padding:18,gap:12},
   managementHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"flex-start",gap:12},
   managementEyebrow:{fontSize:9,fontWeight:"900",letterSpacing:1.1,color:"#98A2B3",textAlign:"right"},
