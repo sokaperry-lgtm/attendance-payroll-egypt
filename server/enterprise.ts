@@ -1400,8 +1400,8 @@ export async function listAttendancePenaltyRequests(staffAccountId:number) {
   const rows=await db.select().from(attendanceRecords).orderBy(desc(attendanceRecords.date));
   return rows.filter(r=>names.has(r.staffAccountId)).flatMap(r=>{
     const note=String(r.note||"");
-    const latePending=Number(r.lateMinutes||0)>=PAYROLL_RULES.lateQuarterDayMinutes && !note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
-    const lateApproved=Number(r.lateMinutes||0)>=PAYROLL_RULES.lateQuarterDayMinutes && note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
+    const latePending=Number(r.lateMinutes||0)>0 && !note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
+    const lateApproved=Number(r.lateMinutes||0)>0 && note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
     const earlyPending=note.includes("انصراف مبكر:") && !note.includes("تم اعتماد الانصراف المبكر") && !note.includes("تم إلغاء الانصراف المبكر");
     const earlyApproved=note.includes("انصراف مبكر:") && note.includes("تم اعتماد الانصراف المبكر") && !note.includes("تم إلغاء الانصراف المبكر");
     const absencePending=r.status==="غياب" && !note.includes("تم اعتماد الغياب") && !note.includes("تم إلغاء الغياب");
