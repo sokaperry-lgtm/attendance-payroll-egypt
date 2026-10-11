@@ -234,7 +234,7 @@ export default function ScheduleScreen() {
 
         {adminRole && <View style={styles.filterBar}>
           <Text style={styles.filterTitle}>تصفية الجدول</Text>
-          <ScrollView horizontal inverted showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
             {(["all","حاضر","متأخر","غياب","إجازة","فارغ"] as const).map(filter => <Pressable key={filter} onPress={() => setStatusFilter(filter)} style={[styles.filterChip,statusFilter===filter&&styles.filterChipActive]}><Text style={[styles.filterChipText,statusFilter===filter&&styles.filterChipTextActive]}>{filter === "all" ? "الكل" : filter} · {statusCounts[filter]}</Text></Pressable>)}
           </ScrollView>
         </View>}
@@ -260,7 +260,7 @@ export default function ScheduleScreen() {
               <View><Text style={styles.sectionTitle}>فريق العمل</Text><Text style={styles.sectionHint}>اختار موظفًا لفتح خلايا جدوله وتعديلها</Text></View>
               <Text style={styles.count}>{staffMembers.length}</Text>
             </View>
-            <ScrollView horizontal inverted showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teamScroll}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teamScroll}>
               {staffMembers.map(item => (
                 <Pressable key={item.id} onPress={() => setSelectedEmployee(item.id)} style={[styles.employeeChip, item.id === selectedEmployee && styles.employeeChipActive]}>
                   <View style={[styles.avatar, item.id === selectedEmployee && styles.avatarActive]}><Text style={[styles.avatarText, item.id === selectedEmployee && styles.avatarTextActive]}>{item.name.slice(0, 1)}</Text></View>
