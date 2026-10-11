@@ -102,7 +102,7 @@ export default function RequestsScreen() {
                 }
               }}
               style={styles.absenceCancelButton}
-            ><Text style={styles.absenceCancelText}>{reviewAttendanceException.isPending ? "..." : "{item.status === "معتمد" ? "✕  إلغاء الخصم المعتمد" : "✕  إلغاء الخصم"}</Text></Pressable>
+            ><Text style={styles.absenceCancelText}>{reviewAttendanceException.isPending ? "..." : item.status === "مقبول" ? "✕  إلغاء الخصم المعتمد" : "✕  إلغاء الخصم"}</Text></Pressable>
           </View>
         </View>
       ))}
