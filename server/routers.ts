@@ -229,7 +229,7 @@ export const appRouter = router({
         effectiveStatus = effectiveLateMinutes > 0 ? "متأخر" : "حاضر";
       }
       const effectiveNote = effectiveLateMinutes > 0
-        ? ((input.note ?? "").includes("تم اعتماد التأخير") ? input.note : [input.note, "تم اعتماد التأخير تلقائيًا من تعديل الحضور"].filter(Boolean).join(" · "))
+        ? ((input.note ?? "").includes("تم اعتماد التأخير") ? input.note : [input.note, "تم تسجيل التأخير من تعديل الحضور — يحتاج مراجعة المدير"].filter(Boolean).join(" · "))
         : input.note;
       const row = await db.updateAttendanceByManager({
         ...input,
