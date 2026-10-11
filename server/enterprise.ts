@@ -657,12 +657,9 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
       // An explicit weekly-off schedule always wins.
       if (shift?.kind === "weekly_off") continue;
 
-      const day = new Date(`${date}T12:00:00`).getDay();
       // Weekly schedules are employee-specific. Do not infer a workday (or
       // create an absence) when no shift was assigned for this date.
       if (!scheduled) continue;
-      const isWorkday = true;
-      if (!isWorkday) continue;
 
       const record = existing.find(x => x.staffAccountId === employee.id && x.date === date);
       const onLeave = isApprovedLeave(requests, employee.id, date);
@@ -874,9 +871,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     // Payroll may deduct only reviewed, approved exceptions; no automatic
     // disciplinary multiplier is applied here.
     let lateDeduction=0;
-    let lateCount=0;
     let absenceDeduction=0;
-    let absenceCount=0;
 
     for (const record of records) {
       const lateMinutes=Math.max(0, Number(record.lateMinutes || 0));
