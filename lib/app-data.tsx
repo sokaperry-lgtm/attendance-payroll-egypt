@@ -5,7 +5,7 @@ import { calculatePayroll, type PayrollInputs, todayKey } from "@/lib/payroll";
 
 export type Role = "owner" | "manager" | "hr" | "supervisor" | "accountant" | "employee";
 export type AttendanceState = "حاضر" | "متأخر" | "إجازة" | "غياب" | "مأمورية";
-export type RequestType = "إجازة" | "إذن" | "إجازة مرضية" | "إجازة طارئة" | "مأمورية";
+export type RequestType = "إجازة" | "إذن" | "إجازة مرضية" | "إجازة طارئة" | "مأمورية" | "أوفر تايم";
 export type RequestStatus = "قيد المراجعة" | "مقبول" | "مرفوض";
 
 export type Branch = { name: string; address: string; latitude: number; longitude: number; radiusMeters: number };
@@ -79,7 +79,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const employee = meQuery.data ? mapEmployee(meQuery.data) : { id: "", name: "", title: "", department: "", baseSalary: 0, initials: "" };
   const branch: Branch = companyQuery.data ? { name: companyQuery.data.name, address: companyQuery.data.address, latitude: Number(companyQuery.data.latitude), longitude: Number(companyQuery.data.longitude), radiusMeters: companyQuery.data.radiusMeters } : defaultBranch;
   const records: AttendanceRecord[] = (attendanceQuery.data ?? []).map((record) => ({ id: String(record.id), date: record.date, checkIn: record.checkIn, checkOut: record.checkOut, status: record.status as AttendanceState, lateMinutes: record.lateMinutes, distanceMeters: record.distanceMeters, note: record.note }));
-  const requests: LeaveRequest[] = (requestsQuery.data ?? []).map((request: any) => ({ id: String(request.id), type: request.type as RequestType, from: request.fromDate, to: request.toDate, reason: request.reason, status: request.status as RequestStatus | string, staffAccountId: request.staffAccountId, staffName: request.staffName, source: request.source, exceptionKind: request.exceptionKind, fromDate: request.fromDate, adjustmentId: request.adjustmentId, actionable: request.actionable, hours: request.hours != null ? Number(request.hours) : null }));
+  const requests: LeaveRequest[] = (requestsQuery.data ?? []).map((request: any) => ({ id: String(request.id), type: request.type as RequestType, from: request.fromDate, to: request.toDate, reason: request.reason, status: request.status as RequestStatus, staffAccountId: request.staffAccountId, staffName: request.staffName, source: request.source, exceptionKind: request.exceptionKind, fromDate: request.fromDate, adjustmentId: request.adjustmentId, actionable: request.actionable, hours: request.hours != null ? Number(request.hours) : null }));
   const staffMembers: Employee[] = (staffQuery.data ?? []).map((staff) => mapEmployee(staff as any));
   const shiftTemplates: ShiftTemplate[] = (shiftTemplatesQuery.data ?? []).map((item) => ({ id: item.id, name: item.name, kind: item.kind as "shift" | "weekly_off", startTime: item.startTime, endTime: item.endTime, crossesMidnight: item.crossesMidnight, active: item.active }));
   const schedules: ScheduleEntry[] = (mineScheduleQuery.data ?? []) as ScheduleEntry[];
