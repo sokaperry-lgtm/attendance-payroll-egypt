@@ -22,7 +22,7 @@ export default function MoreScreen() {
   const { role } = useAppData();
   const { width } = useWindowDimensions();
   const compact = width < 420;
-  const visible = items.filter((item) => item.roles.includes(role));
+  const visible = items.filter((item) => item.roles.some((allowedRole: string) => allowedRole === String(role)));
   const management = ["owner", "manager", "hr", "accountant"].includes(role);
 
   return (
