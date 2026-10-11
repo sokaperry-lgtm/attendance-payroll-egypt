@@ -13,7 +13,7 @@ export type Shift = { name: string; start: string; end: string; days: string; cr
 export type ShiftTemplate = { id: number; name: string; kind: "shift" | "weekly_off"; startTime: string; endTime: string; crossesMidnight: boolean; active: boolean };
 export type ScheduleEntry = { id: number; staffAccountId: number; scheduleDate: string; shiftTemplateId: number; note?: string | null; shift: ShiftTemplate | null };
 export type AttendanceRecord = { id: string; date: string; checkIn?: string | null; checkOut?: string | null; status: AttendanceState; lateMinutes: number; distanceMeters?: number | null; note?: string | null };
-export type LeaveRequest = { id: string; type: RequestType | string; from: string; to: string; reason: string; status: RequestStatus | string; staffAccountId?: number; staffName?: string; source?: "request" | "attendance" | "penalty"; exceptionKind?: "late" | "early" | "absence"; fromDate?: string; adjustmentId?: number; actionable?: boolean; hours?: number | null };
+export type LeaveRequest = { id: string; type: RequestType; from: string; to: string; reason: string; status: RequestStatus; staffAccountId?: number; staffName?: string; source?: "request" | "attendance" | "penalty"; exceptionKind?: "late" | "early" | "absence"; fromDate?: string; adjustmentId?: number; actionable?: boolean; hours?: number | null };
 export type Employee = { id: string; name: string; title: string; department: string; baseSalary: number; initials: string; phone?: string; role?: Role; active?: boolean };
 
 export const defaultBranch: Branch = { name: "الفرع الرئيسي", address: "مدينة نصر، القاهرة", latitude: 30.0444, longitude: 31.2357, radiusMeters: 200 };
