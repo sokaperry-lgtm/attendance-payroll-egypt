@@ -906,7 +906,8 @@ export async function generatePayroll(staffAccountId: number, month: string) {
         let actualCheckout = minutesOf(record.checkOut);
         if (crossesMidnight && actualCheckout < minutesOf(shiftStart)) actualCheckout += 24 * 60;
         const earlyMinutes = Math.max(0, scheduledEnd - actualCheckout);
-        rawEarlyDeduction += calculateLatePenaltyDays(earlyMinutes) * dailyValue;
+        const chargeableEarlyMinutes = Math.max(0, earlyMinutes - PAYROLL_RULES.graceMinutes);
+        rawEarlyDeduction += calculateLatePenaltyDays(chargeableEarlyMinutes) * dailyValue;
       }
     }
     // Rest-day work earns an additional day of pay (the monthly base already
