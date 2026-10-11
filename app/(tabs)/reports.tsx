@@ -61,7 +61,7 @@ export default function ReportsScreen() {
   const departmentStats = useMemo(() => buildDepartmentStats(employees), [employees]);
 
   const topLate = [...employees].sort((a, b) => b.lateMinutes - a.lateMinutes).slice(0, 5);
-  const attendanceByEmployee = employees.map((employee) => ({ ...employee, rate: calculateAttendanceRate({ staffCount: 1, presentDays: employee.presentDays, absentDays: employee.absentDays, lateMinutes: 0, pendingRequests: 0 }) }));
+  const attendanceByEmployee = employees.map((employee) => ({ ...employee, rate: calculateAttendanceRate({ presentDays: employee.presentDays, absentDays: employee.absentDays }) }));
   const topAttendance = [...attendanceByEmployee].sort((a, b) => b.rate - a.rate).slice(0, 8);
   const reportTabs = [{ id: "overview", label: "نظرة عامة", icon: "chart.bar.fill" }, { id: "attendance", label: "الحضور", icon: "clock" }, { id: "payroll", label: "الرواتب", icon: "banknote.fill" }, { id: "team", label: "الفريق", icon: "person.3.fill" }] as const;
 
@@ -197,7 +197,7 @@ function MetricCard({ label, value, tone }: { label: string; value: string; tone
   return <View style={[styles.metricCard, { borderTopColor: palette.color }]}><Text style={styles.metricLabel}>{label}</Text><Text style={[styles.metricValue, { color: palette.color }]}>{value}</Text></View>;
 }
 
-const styles = StyleSheet.create({
+const styles: any = StyleSheet.create({
   content: { padding: 22, paddingBottom: 60, gap: 14, maxWidth: 1240, width: "100%", alignSelf: "center" },
   state: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }, stateText: { color: UI.muted, fontSize: 13 },
   toolbarCompact: { flexDirection: "column", alignItems: "stretch" }, toolbar: { flexDirection: "row-reverse", justifyContent: "space-between", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 16, padding: 13, borderWidth: 1, borderColor: "#DCE5EF" }, toolbarActionsCompact: { flexWrap: "wrap", justifyContent: "stretch" }, toolbarActions: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
