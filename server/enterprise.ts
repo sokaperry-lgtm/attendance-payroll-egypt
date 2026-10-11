@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, getStaffAccountById } from "./db";
 import * as dbQueries from "./db";
 import { calculateEgyptPayroll } from "./egypt-payroll";
-import { PAYROLL_RULES } from "../lib/payroll";
+import { PAYROLL_RULES, capMonthlyDisciplinaryDeduction } from "../lib/payroll";
 import {
   companies, branches, companyMembers, leaveBalances,
   payrollRecords, notifications, subscriptions, auditLogs, staffAccounts,
@@ -920,7 +920,11 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     ));
     const allowances=adjustments.filter(a=>a.type==="allowance").reduce((sum,a)=>sum+a.amount,0);
     const bonuses=adjustments.filter(a=>a.type==="bonus"||a.type==="incentive").reduce((sum,a)=>sum+a.amount,0);
-    const extraDeductions=adjustments.filter(a=>a.type==="penalty"||a.type==="deduction").reduce((sum,a)=>sum+a.amount,0);
+    const disciplinaryDeductions=adjustments.filter(a=>a.type==="penalty").reduce((sum,a)=>sum+a.amount,0);
+    const ordinaryDeductions=adjustments.filter(a=>a.type==="deduction").reduce((sum,a)=>sum+a.amount,0);
+    // Article 143 limits disciplinary wage deductions to five basic-wage days
+    // in a month. Ordinary approved deductions remain itemized separately.
+    const extraDeductions=capMonthlyDisciplinaryDeduction(disciplinaryDeductions,dailyValue)+ordinaryDeductions;
     const activeAdvances=await db.select().from(salaryAdvances).where(and(
       eq(salaryAdvances.companyId,m.companyId),
       eq(salaryAdvances.staffAccountId,s.id),
