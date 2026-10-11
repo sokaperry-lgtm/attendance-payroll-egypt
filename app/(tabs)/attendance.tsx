@@ -255,7 +255,7 @@ export default function AttendanceScreen() {
               <View style={styles.rowHeader}>
                 <Text style={styles.rowDate}>{formatDate(item.date)}</Text>
                 <StatusBadge
-                  label={item.status === "غياب" && !(item.note || "").includes("تم اعتماد الغياب") && !(item.note || "").includes("تم إلغاء الغياب") ? "غياب · بانتظار الاعتماد" : item.status === "مستثنى" ? "مستثنى من الغياب" : item.status}
+                  label={item.status === "غياب" && !(item.note || "").includes("تم اعتماد الغياب") && !(item.note || "").includes("تم إلغاء الغياب") ? "غياب · بانتظار الاعتماد" : String(item.status) === "مستثنى" ? "مستثنى من الغياب" : item.status}
                   tone={item.status === "غياب" && !(item.note || "").includes("تم اعتماد الغياب") && !(item.note || "").includes("تم إلغاء الغياب") ? "warning" : statusTone[item.status] || "neutral"}
                 />
               </View>
@@ -266,7 +266,7 @@ export default function AttendanceScreen() {
               {item.lateMinutes > 0 && (
                 <Text style={styles.lateText}>تأخير {item.lateMinutes} دقيقة</Text>
               )}
-              {((role === "owner" || role === "manager") || role === "supervisor") &&
+              {(["owner", "manager", "supervisor"].includes(String(role))) &&
                 item.status === "غياب" &&
                 !(item.note || "").includes("تم اعتماد الغياب") &&
                 !(item.note || "").includes("تم إلغاء الغياب") ? (
@@ -313,7 +313,7 @@ export default function AttendanceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles: any = StyleSheet.create({
   managementDateCard: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#E8EDF3", flexDirection: "row", alignItems: "center", gap: 10 },
   dateNavButton: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#F2F5F8", alignItems: "center", justifyContent: "center" },
   dateNavText: { color: "#163A63", fontSize: 25, fontWeight: "700" },

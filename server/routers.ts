@@ -225,11 +225,11 @@ export const appRouter = router({
         const scheduled = (await db.listSchedules(input.staffAccountId)).find(r => r.scheduleDate === input.date);
         const shiftStart = scheduled?.shift?.startTime ?? target?.shiftStart ?? "08:00";
         const rawLate = Math.max(0, timeMinutes(input.checkIn) - timeMinutes(shiftStart));
-        effectiveLateMinutes = rawLate;
-        effectiveStatus = rawLate > 0 ? "متأخر" : "حاضر";
+        effectiveLateMinutes = Math.max(0, rawLate - PAYROLL_RULES.graceMinutes);
+        effectiveStatus = effectiveLateMinutes > 0 ? "متأخر" : "حاضر";
       }
       const effectiveNote = effectiveLateMinutes > 0
-        ? ((input.note ?? "").includes("تم اعتماد التأخير") ? input.note : [input.note, "تم اعتماد التأخير تلقائيًا من تعديل الحضور"].filter(Boolean).join(" · "))
+        ? ((input.note ?? "").includes("تم اعتماد التأخير") ? input.note : [input.note, "تم تسجيل التأخير من تعديل الحضور — يحتاج مراجعة المدير"].filter(Boolean).join(" · "))
         : input.note;
       const row = await db.updateAttendanceByManager({
         ...input,
@@ -333,12 +333,15 @@ export const appRouter = router({
       if (existing?.checkIn) throw new Error("تم تسجيل الحضور بالفعل لهذا اليوم.");
 
       const scheduled = (await db.listSchedules(ctx.staffUser.id)).find(r => r.scheduleDate === input.date);
-      if (scheduled?.shift?.kind === "weekly_off") throw new Error("هذا اليوم إجازة أسبوعية حسب الجدول.");
+      const isWeeklyRestDay = scheduled?.shift?.kind === "weekly_off";
       const shiftStart = scheduled?.shift?.startTime ?? ctx.staffUser.shiftStart;
-      const rawLate = Math.max(0, timeMinutes(input.time) - timeMinutes(shiftStart));
+      const rawLate = isWeeklyRestDay ? 0 : Math.max(0, timeMinutes(input.time) - timeMinutes(shiftStart));
       const late = Math.max(0, rawLate - PAYROLL_RULES.graceMinutes);
       const status = late > 0 ? "متأخر" : "حاضر";
-      return db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status, lateMinutes: late, distanceMeters, note: scheduled?.shift ? `حسب جدول: ${scheduled.shift.name}` : null });
+      const note = isWeeklyRestDay
+        ? "عمل في يوم الراحة الأسبوعية — يتطلب مراجعة التعويض وتحديد يوم راحة بديل"
+        : scheduled?.shift ? `حسب جدول: ${scheduled.shift.name}` : null;
+      return db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status, lateMinutes: late, distanceMeters, note });
     }),
     checkOut: staffProcedure.input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), time: z.string().max(8), latitude: gpsCoordinate.min(-90).max(90), longitude: gpsCoordinate.min(-180).max(180) })).mutation(async ({ ctx, input }) => {
       timeMinutes(input.time);
@@ -459,7 +462,7 @@ export const appRouter = router({
       }
       return db.listRequests(ctx.staffUser.id);
     }),
-    create: staffProcedure.input(z.object({ type: z.enum(["إجازة","إجازة مرضية","إجازة طارئة","إذن"]), fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), reason: z.string().min(2).max(1000), hours: z.number().min(0.5).max(3).optional() })).mutation(async ({ ctx, input }) => {
+    create: staffProcedure.input(z.object({ type: z.enum(["إجازة","إجازة مرضية","إجازة طارئة","إذن","مأمورية","أوفر تايم"]), fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), reason: z.string().min(2).max(1000), hours: z.number().min(0.5).max(3).optional() })).mutation(async ({ ctx, input }) => {
       if (input.fromDate > input.toDate) throw new Error("تاريخ بداية الإجازة يجب أن يكون قبل أو مساويًا لتاريخ النهاية.");
       if (!input.fromDate || !input.toDate) throw new Error("تواريخ الطلب غير صحيحة.");
       if (input.type === "إذن") {
@@ -558,7 +561,7 @@ listPenaltyRequests: managerProcedure.query(async ({ctx})=>{ await enterprise.as
     updateCompany: companyAdminProcedure.input(z.object({ name:z.string().min(2), legalName:z.string().max(200).optional(), email:z.string().max(320).optional(), phone:z.string().max(32).optional() })).mutation(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "company.manage"); return enterprise.updateCompanyProfile(ctx.staffUser.id,input); }),
     role: managerProcedure.input(z.object({ staffAccountId:z.number().int(), role:z.enum(["owner","hr","manager","supervisor","accountant","employee"]) })).mutation(async ({ ctx,input }) => { await enterprise.assertPermission(ctx.staffUser.id, "roles.manage"); return enterprise.setMemberRole(ctx.staffUser.id,input.staffAccountId,input.role); }),
     permissions: companyAdminProcedure.query(async ({ ctx }) => { await enterprise.assertPermission(ctx.staffUser.id, "roles.manage"); return enterprise.listPermissionMembers(ctx.staffUser.id); }),
-    updatePermissions: companyAdminProcedure.input(z.object({ staffAccountId:z.number().int(), permissions:z.record(z.boolean()) })).mutation(async ({ ctx,input }) => { await enterprise.assertPermission(ctx.staffUser.id, "roles.manage"); return enterprise.updateMemberPermissions(ctx.staffUser.id,input.staffAccountId,input.permissions as enterprise.PermissionMap); }),
+    updatePermissions: companyAdminProcedure.input(z.object({ staffAccountId:z.number().int(), permissions:z.record(z.string(),z.boolean()) })).mutation(async ({ ctx,input }) => { await enterprise.assertPermission(ctx.staffUser.id, "roles.manage"); return enterprise.updateMemberPermissions(ctx.staffUser.id,input.staffAccountId,input.permissions as enterprise.PermissionMap); }),
     subscription: staffProcedure.query(({ ctx }) => enterprise.getSubscription(ctx.staffUser.id)),
     changePlan: managerProcedure.input(z.object({ plan:z.enum(["trial","starter","growth","scale"]) })).mutation(async ({ ctx,input }) => { await enterprise.assertPermission(ctx.staffUser.id, "company.manage"); return enterprise.updateSubscription(ctx.staffUser.id,input.plan); }),
     security: staffProcedure.query(({ ctx }) => enterprise.getSecuritySummary(ctx.staffUser.id)),

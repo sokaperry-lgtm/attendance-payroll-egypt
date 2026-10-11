@@ -234,7 +234,7 @@ export default function ScheduleScreen() {
 
         {adminRole && <View style={styles.filterBar}>
           <Text style={styles.filterTitle}>تصفية الجدول</Text>
-          <ScrollView horizontal inverted showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
             {(["all","حاضر","متأخر","غياب","إجازة","فارغ"] as const).map(filter => <Pressable key={filter} onPress={() => setStatusFilter(filter)} style={[styles.filterChip,statusFilter===filter&&styles.filterChipActive]}><Text style={[styles.filterChipText,statusFilter===filter&&styles.filterChipTextActive]}>{filter === "all" ? "الكل" : filter} · {statusCounts[filter]}</Text></Pressable>)}
           </ScrollView>
         </View>}
@@ -260,7 +260,7 @@ export default function ScheduleScreen() {
               <View><Text style={styles.sectionTitle}>فريق العمل</Text><Text style={styles.sectionHint}>اختار موظفًا لفتح خلايا جدوله وتعديلها</Text></View>
               <Text style={styles.count}>{staffMembers.length}</Text>
             </View>
-            <ScrollView horizontal inverted showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teamScroll}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teamScroll}>
               {staffMembers.map(item => (
                 <Pressable key={item.id} onPress={() => setSelectedEmployee(item.id)} style={[styles.employeeChip, item.id === selectedEmployee && styles.employeeChipActive]}>
                   <View style={[styles.avatar, item.id === selectedEmployee && styles.avatarActive]}><Text style={[styles.avatarText, item.id === selectedEmployee && styles.avatarTextActive]}>{item.name.slice(0, 1)}</Text></View>
@@ -298,7 +298,7 @@ export default function ScheduleScreen() {
                   {adminRole && (
                     <Pressable onPress={() => setSelectedEmployee(person.id)} style={[styles.nameCell, person.id === selectedEmployee && styles.nameCellSelected]}>
                       <View style={styles.nameAvatar}><Text style={styles.nameAvatarText}>{person.name.slice(0, 1)}</Text></View>
-                      <View style={styles.nameCopy}><Text style={styles.nameText} numberOfLines={1}>{person.name}</Text><Text style={styles.nameRole} numberOfLines={1}>{person.jobTitle ?? "موظف"}</Text></View>
+                      <View style={styles.nameCopy}><Text style={styles.nameText} numberOfLines={1}>{person.name}</Text><Text style={styles.nameRole} numberOfLines={1}>{person.title ?? "موظف"}</Text></View>
                     </Pressable>
                   )}
                   {week.map(d => {
@@ -393,7 +393,7 @@ export default function ScheduleScreen() {
                 <View style={{flex:1}}>
                   <Text style={styles.detailEyebrow}>EMPLOYEE DAY DETAIL</Text>
                   <Text style={styles.detailTitle}>{member.name}</Text>
-                  <Text style={styles.detailSub}>{week.find(d => d.key === selectedDay)?.label} · {week.find(d => d.key === selectedDay)?.date} · {member.jobTitle ?? "موظف"}</Text>
+                  <Text style={styles.detailSub}>{week.find(d => d.key === selectedDay)?.label} · {week.find(d => d.key === selectedDay)?.date} · {member.title ?? "موظف"}</Text>
                 </View>
                 <Pressable disabled={detailSaving} onPress={() => setDetailOpen(false)} style={styles.detailClose}><Text style={styles.detailCloseText}>×</Text></Pressable>
               </View>
@@ -401,7 +401,7 @@ export default function ScheduleScreen() {
               <ScrollView contentContainerStyle={styles.detailBody} keyboardShouldPersistTaps="handled">
                 <View style={styles.detailHero}>
                   <View style={styles.detailHeroIcon}><Text style={styles.detailHeroInitial}>{member.name.slice(0,1)}</Text></View>
-                  <View style={{flex:1}}><Text style={styles.detailHeroName}>{member.name}</Text><Text style={styles.detailHeroRole}>{member.jobTitle ?? "موظف"} · {member.department ?? "عام"}</Text></View>
+                  <View style={{flex:1}}><Text style={styles.detailHeroName}>{member.name}</Text><Text style={styles.detailHeroRole}>{member.title ?? "موظف"} · {member.department ?? "عام"}</Text></View>
                   <View style={styles.detailStatusPill}><Text style={styles.detailStatusText}>{selectedAttendance?.status ?? "لا يوجد تسجيل"}</Text></View>
                 </View>
 
@@ -477,7 +477,7 @@ export default function ScheduleScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles: any = StyleSheet.create({
   content:{padding:20,paddingBottom:50,gap:14},  quickScheduleCard:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,padding:14},quickScheduleHeader:{flexDirection:"row-reverse",alignItems:"center",gap:12},bulkButton:{backgroundColor:"#163A63",borderRadius:13,paddingHorizontal:14,paddingVertical:11,flexDirection:"row",alignItems:"center",gap:7},bulkButtonText:{color:"#FFF",fontSize:10,fontWeight:"900"},bulkCard:{backgroundColor:"#FFF",borderRadius:24,padding:18,width:"94%",maxWidth:620,alignSelf:"center"},bulkSectionTitle:{color:"#172033",fontSize:13,fontWeight:"900",textAlign:"right",marginTop:18,marginBottom:9},bulkShiftGrid:{flexDirection:"row-reverse",flexWrap:"wrap",gap:8},bulkShiftOption:{flex:1,minWidth:140,borderWidth:1,borderColor:"#E1E7EF",borderRadius:14,padding:12,backgroundColor:"#F7F9FC"},bulkShiftOptionActive:{backgroundColor:"#EEF5FB",borderColor:"#163A63"},bulkShiftName:{color:"#172033",fontSize:11,fontWeight:"900",textAlign:"right"},bulkShiftTime:{color:"#667085",fontSize:9,marginTop:3,textAlign:"right"},bulkShiftTextActive:{color:"#163A63"},bulkModeRow:{gap:8},bulkMode:{borderWidth:1,borderColor:"#E1E7EF",borderRadius:14,padding:12,backgroundColor:"#F7F9FC"},bulkModeActive:{backgroundColor:"#EEF5FB",borderColor:"#163A63"},bulkModeTitle:{color:"#172033",fontSize:12,fontWeight:"900",textAlign:"right"},bulkModeTextActive:{color:"#163A63"},bulkModeHint:{color:"#667085",fontSize:9,marginTop:3,textAlign:"right"},bulkSaveButton:{marginTop:18,minHeight:48,borderRadius:14,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center",flexDirection:"row",gap:8},bulkSaveText:{color:"#FFF",fontSize:11,fontWeight:"900"},
   weekNavigator:{flexDirection:"row",alignItems:"stretch",justifyContent:"space-between",gap:8},
   weekNavButton:{flex:1,minHeight:52,backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E1E7EF",borderRadius:15,paddingHorizontal:10,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:5},

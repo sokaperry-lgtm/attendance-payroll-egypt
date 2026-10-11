@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, getStaffAccountById } from "./db";
 import * as dbQueries from "./db";
 import { calculateEgyptPayroll } from "./egypt-payroll";
-import { PAYROLL_RULES } from "../lib/payroll";
+import { PAYROLL_RULES, capMonthlyDisciplinaryDeduction, calculateLatePenaltyDays } from "../lib/payroll";
 import {
   companies, branches, companyMembers, leaveBalances,
   payrollRecords, notifications, subscriptions, auditLogs, staffAccounts,
@@ -36,7 +36,7 @@ export async function assertPermission(staffAccountId: number, permission: Permi
 export async function listPermissionMembers(actorId: number) { const actor = await getCompanyForStaff(actorId); if (!actor || actor.role !== "owner") throw new Error("إدارة الصلاحيات متاحة لمالك الشركة فقط."); const members = await listCompanyMembers(actorId); return Promise.all(members.map(async (member:any) => ({ ...member, permissions: await getEffectivePermissions(Number(member.id)) }))); }
 export async function updateMemberPermissions(actorId: number, staffAccountId: number, permissions: Partial<PermissionMap>) {
   const actor = await getCompanyForStaff(actorId); if (!actor || actor.role !== "owner") throw new Error("إدارة الصلاحيات متاحة لمالك الشركة فقط."); const access = await assertStaffInCompany(actorId, staffAccountId);
-  if (access.target.role === "owner") throw new Error("لا يمكن تعديل صلاحيات المالك."); await ensurePermissionStore(); const db = await getDb(); if (!db) throw new Error("Database not available");
+  if (String(access.target.role) === "owner") throw new Error("لا يمكن تعديل صلاحيات المالك."); await ensurePermissionStore(); const db = await getDb(); if (!db) throw new Error("Database not available");
   const current = await getEffectivePermissions(staffAccountId);
   const next = { ...current } as PermissionMap;
   for (const key of PERMISSION_KEYS) {
@@ -133,7 +133,7 @@ export async function getDailyAttendanceOverview(staffAccountId: number, date: s
 
   const byStaff = new Map(rows.map(row => [row.staffAccountId, row]));
   const employees = staff
-    .filter(s => s.active && s.role !== "owner")
+    .filter(s => s.active)
     .map(s => {
       const row = byStaff.get(s.id);
       return {
@@ -236,7 +236,7 @@ export async function getManagementDashboard(staffAccountId: number, month: stri
   const absent = todayRows.filter(row => row.status === "غياب").length;
   const lateMinutes = todayRows.reduce((sum, row) => sum + Number(row.lateMinutes || 0), 0);
   const openShifts = todayRows.filter(row => row.checkIn && !row.checkOut).length;
-  const expected = staff.filter(s => s.active && s.role !== "owner").length;
+  const expected = staff.filter(s => s.active && String(s.role) !== "owner").length;
   const attendanceRate = expected ? Math.round((present / expected) * 100) : 0;
 
   const requests = staffIds.length
@@ -263,7 +263,7 @@ export async function getManagementDashboard(staffAccountId: number, month: stri
     }));
 
   const departments = new Map<string, number>();
-  staff.filter(s => s.active && s.role !== "owner").forEach(s => {
+  staff.filter(s => s.active && String(s.role) !== "owner").forEach(s => {
     const key = s.department?.trim() || "غير محدد";
     departments.set(key, (departments.get(key) || 0) + 1);
   });
@@ -364,7 +364,7 @@ export async function updateBranch(staffAccountId: number, branchId: number, inp
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
     throw new Error("إحداثيات GPS غير صالحة.");
   }
-  await db.update(branches).set({ ...input, name: input.name.trim(), address: input.address.trim(), updatedAt: new Date() }).where(eq(branches.id, branchId));
+  await db.update(branches).set({ ...input, name: input.name.trim(), address: input.address.trim() }).where(eq(branches.id, branchId));
   await writeAudit(staffAccountId, m.companyId, "branch.updated", "branch", String(branchId), input);
   return (await db.select().from(branches).where(eq(branches.id, branchId)).limit(1))[0];
 }
@@ -657,10 +657,9 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
       // An explicit weekly-off schedule always wins.
       if (shift?.kind === "weekly_off") continue;
 
-      const day = new Date(`${date}T12:00:00`).getDay();
-      // If no explicit schedule exists, use the employee's normal Mon-Fri work week.
-      const isWorkday = scheduled ? true : day !== 5 && day !== 6;
-      if (!isWorkday) continue;
+      // Weekly schedules are employee-specific. Do not infer a workday (or
+      // create an absence) when no shift was assigned for this date.
+      if (!scheduled) continue;
 
       const record = existing.find(x => x.staffAccountId === employee.id && x.date === date);
       const onLeave = isApprovedLeave(requests, employee.id, date);
@@ -689,7 +688,7 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
           });
           markedLeaves++;
         } else if (record.status === "غياب" && !record.checkIn && !record.checkOut) {
-          await dbQueries.upsertAttendance({ ...record, status: "إجازة", note: "إجازة معتمدة", updatedAt: new Date() });
+          await dbQueries.upsertAttendance({ ...record, status: "إجازة", note: "إجازة معتمدة" });
           markedLeaves++;
         }
         continue;
@@ -868,61 +867,64 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       }
     }
 
-    // Attendance penalties are automatic. The manager/owner can still correct
-    // the attendance record or waive a penalty before payroll is closed.
-    let lateDeduction=0;
-    let lateCount=0;
+    // Attendance exceptions remain pending until a manager/owner approves them.
+    // Only approved events create disciplinary deductions; the monthly legal cap
+    // is applied across attendance sanctions and manually entered penalty rows.
+    let rawLateDeduction=0;
     let absenceDeduction=0;
-    let absenceCount=0;
+    let absenceDisciplinaryPenalty=0;
+    let rawEarlyDeduction=0;
 
     for (const record of records) {
+      const note=String(record.note || "");
       const lateMinutes=Math.max(0, Number(record.lateMinutes || 0));
-      const lateApproved=String(record.note || "").includes("تم اعتماد التأخير");
-      if (lateApproved && lateMinutes >= PAYROLL_RULES.lateQuarterDayMinutes) {
-        lateCount++;
-        const baseDays =
-          lateMinutes >= PAYROLL_RULES.lateFullDayMinutes ? 1 :
-          lateMinutes >= PAYROLL_RULES.lateHalfDayMinutes ? 0.5 :
-          0.25;
-        const multiplier = lateCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
-        lateDeduction += baseDays * dailyValue * multiplier;
+      const lateApproved=note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
+      if (lateApproved && lateMinutes > 0) {
+        rawLateDeduction += calculateLatePenaltyDays(lateMinutes) * dailyValue;
       }
 
       if (record.status === "غياب") {
-        const hasPermission = String(record.note || "").includes("بإذن");
-        if (!hasPermission) {
-          // Deduct the normal daily wage for every recorded absence. A reviewed
-          // disciplinary absence may additionally apply the configured penalty.
+        const hasPermission = note.includes("بإذن");
+        const absenceApproved = note.includes("تم اعتماد الغياب") && !note.includes("تم إلغاء الغياب");
+        if (absenceApproved && hasPermission) {
+          // Approved permission absence follows the configured one-day sanction.
+          absenceDisciplinaryPenalty += dailyValue;
+        } else if (absenceApproved && !hasPermission) {
+          // One unpaid day is separate from the three-day disciplinary sanction.
           absenceDeduction += dailyValue;
-          if (String(record.note || "").includes("تم اعتماد الغياب")) {
-            absenceCount++;
-            const multiplier = absenceCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
-            absenceDeduction += PAYROLL_RULES.absencePenaltyDays * dailyValue * multiplier;
-          }
+          absenceDisciplinaryPenalty += PAYROLL_RULES.absencePenaltyDays * dailyValue;
         }
       }
-    }
 
-    const earlyMinutes=records.reduce((total, record) => {
-      if (!record.checkOut || !String(record.note || "").includes("تم اعتماد الانصراف المبكر")) return total;
-      const schedule = schedules.find(item => item.staffAccountId === s.id && item.scheduleDate === record.date);
-      const shift = schedule ? shifts.find(item => item.id === schedule.shiftTemplateId) : undefined;
-      const shiftStart = shift?.startTime ?? s.shiftStart;
-      const shiftEnd = shift?.endTime ?? s.shiftEnd;
-      const crossesMidnight = (shift?.crossesMidnight ?? false) || minutesOf(shiftEnd) < minutesOf(shiftStart);
-      const scheduledEnd = minutesOf(shiftEnd) + (crossesMidnight ? 24 * 60 : 0);
-      let actualCheckout = minutesOf(record.checkOut);
-      if (crossesMidnight && actualCheckout < minutesOf(shiftStart)) actualCheckout += 24 * 60;
-      return total + Math.max(0, scheduledEnd - actualCheckout);
-    }, 0);
-    const earlyDeduction=Math.round(hourlyValue*earlyMinutes/60);
+      if (record.checkOut && note.includes("تم اعتماد الانصراف المبكر") && !note.includes("تم إلغاء الانصراف المبكر")) {
+        const schedule = schedules.find(item => item.staffAccountId === s.id && item.scheduleDate === record.date);
+        const shift = schedule ? shifts.find(item => item.id === schedule.shiftTemplateId) : undefined;
+        const shiftStart = shift?.startTime ?? s.shiftStart;
+        const shiftEnd = shift?.endTime ?? s.shiftEnd;
+        const crossesMidnight = (shift?.crossesMidnight ?? false) || minutesOf(shiftEnd) < minutesOf(shiftStart);
+        const scheduledEnd = minutesOf(shiftEnd) + (crossesMidnight ? 24 * 60 : 0);
+        let actualCheckout = minutesOf(record.checkOut);
+        if (crossesMidnight && actualCheckout < minutesOf(shiftStart)) actualCheckout += 24 * 60;
+        const earlyMinutes = Math.max(0, scheduledEnd - actualCheckout);
+        const chargeableEarlyMinutes = Math.max(0, earlyMinutes - PAYROLL_RULES.graceMinutes);
+        rawEarlyDeduction += calculateLatePenaltyDays(chargeableEarlyMinutes) * dailyValue;
+      }
+    }
+    // Rest-day work earns an additional day of pay (the monthly base already
+    // includes the paid weekly rest day). Regeneration is idempotent because
+    // this is derived from the attendance record, not inserted as an adjustment.
+    const workedWeeklyRestDays = records.filter(record =>
+      String(record.note || "").includes("عمل في يوم الراحة الأسبوعية") &&
+      Boolean(record.checkIn) && Boolean(record.checkOut)
+    ).length;
 
     const approvedOvertimeHours=approvedOvertime
       .filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month))
       .reduce((sum,r)=>sum+Math.max(0, Number(r.hours ?? 0)),0);
     const overtimeHours=approvedOvertimeHours;
     const overtimeRate=hourlyValue;
-    const overtimeValue=Math.round(overtimeHours*overtimeRate*PAYROLL_RULES.overtimeMultiplier);
+    const restDayCompensation=workedWeeklyRestDays*dailyValue;
+    const overtimeValue=Math.round(overtimeHours*overtimeRate*PAYROLL_RULES.overtimeMultiplier+restDayCompensation);
     const adjustments=await db.select().from(salaryAdjustments).where(and(
       eq(salaryAdjustments.companyId,m.companyId),
       eq(salaryAdjustments.staffAccountId,s.id),
@@ -930,7 +932,16 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     ));
     const allowances=adjustments.filter(a=>a.type==="allowance").reduce((sum,a)=>sum+a.amount,0);
     const bonuses=adjustments.filter(a=>a.type==="bonus"||a.type==="incentive").reduce((sum,a)=>sum+a.amount,0);
-    const extraDeductions=adjustments.filter(a=>a.type==="penalty"||a.type==="deduction").reduce((sum,a)=>sum+a.amount,0);
+    const adjustmentPenalties=adjustments.filter(a=>a.type==="penalty").reduce((sum,a)=>sum+a.amount,0);
+    const ordinaryDeductions=adjustments.filter(a=>a.type==="deduction").reduce((sum,a)=>sum+a.amount,0);
+    const rawDisciplinaryTotal=rawLateDeduction+rawEarlyDeduction+absenceDisciplinaryPenalty+adjustmentPenalties;
+    const cappedDisciplinaryTotal=capMonthlyDisciplinaryDeduction(rawDisciplinaryTotal,dailyValue);
+    const disciplinaryScale=rawDisciplinaryTotal>0 ? cappedDisciplinaryTotal/rawDisciplinaryTotal : 1;
+    const lateDeduction=Math.round(rawLateDeduction*disciplinaryScale);
+    const earlyDeduction=Math.round(rawEarlyDeduction*disciplinaryScale);
+    // The remaining capped disciplinary amount contains absence sanctions and
+    // manual penalty rows; ordinary approved deductions and advances stay separate.
+    const extraDeductions=Math.max(0,cappedDisciplinaryTotal-lateDeduction-earlyDeduction)+ordinaryDeductions;
     const activeAdvances=await db.select().from(salaryAdvances).where(and(
       eq(salaryAdvances.companyId,m.companyId),
       eq(salaryAdvances.staffAccountId,s.id),
@@ -1276,7 +1287,7 @@ export async function reviewLeaveRequest(actorId:number,id:number,status:"مقب
     consumed=true;
   }
   try {
-    const row=await db.approveRequest(id,actorId,status);
+    const row=await dbQueries.approveRequest(id,actorId,status);
     if(!row) throw new Error("تعذر تحديث طلب الإجازة.");
     if(status==="مقبول") {
       await syncMonthlyAttendance(actorId,existing.fromDate.slice(0,7));
@@ -1390,8 +1401,8 @@ export async function listAttendancePenaltyRequests(staffAccountId:number) {
   const rows=await db.select().from(attendanceRecords).orderBy(desc(attendanceRecords.date));
   return rows.filter(r=>names.has(r.staffAccountId)).flatMap(r=>{
     const note=String(r.note||"");
-    const latePending=Number(r.lateMinutes||0)>=PAYROLL_RULES.lateQuarterDayMinutes && !note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
-    const lateApproved=Number(r.lateMinutes||0)>=PAYROLL_RULES.lateQuarterDayMinutes && note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
+    const latePending=Number(r.lateMinutes||0)>0 && !note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
+    const lateApproved=Number(r.lateMinutes||0)>0 && note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
     const earlyPending=note.includes("انصراف مبكر:") && !note.includes("تم اعتماد الانصراف المبكر") && !note.includes("تم إلغاء الانصراف المبكر");
     const earlyApproved=note.includes("انصراف مبكر:") && note.includes("تم اعتماد الانصراف المبكر") && !note.includes("تم إلغاء الانصراف المبكر");
     const absencePending=r.status==="غياب" && !note.includes("تم اعتماد الغياب") && !note.includes("تم إلغاء الغياب");

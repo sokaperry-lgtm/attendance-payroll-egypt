@@ -3,7 +3,7 @@ export const PAYROLL_RULES = {
   workDays: 26,
   paidLeaveDays: 4,
   calendarDays: 30,
-  graceMinutes: 0,
+  graceMinutes: 15,
   absencePenaltyDays: 3,
   lateQuarterDayMinutes: 15,
   lateHalfDayMinutes: 30,
@@ -48,12 +48,11 @@ export function calculatePayroll(inputs: PayrollInputs) {
 
   const dailyValue = inputs.baseSalary / PAYROLL_RULES.calendarDays;
   const hourlyValue = dailyValue / PAYROLL_RULES.dailyHours;
-  const absenceDeduction = absences * PAYROLL_RULES.absencePenaltyDays * dailyValue;
-  const latePenaltyDays =
-    lateMinutes >= PAYROLL_RULES.lateFullDayMinutes ? 1 :
-    lateMinutes >= PAYROLL_RULES.lateHalfDayMinutes ? 0.5 :
-    lateMinutes >= PAYROLL_RULES.lateQuarterDayMinutes ? 0.25 : 0;
-  const lateDeduction = latePenaltyDays * dailyValue;
+  // Deduct only the actual unpaid absence day; disciplinary sanctions are
+  // handled separately after review and must never be auto-multiplied here.
+  const absenceDeduction = absences * dailyValue;
+  // lateMinutes represents minutes beyond the configured grace period.
+  const lateDeduction = (lateMinutes / 60) * hourlyValue;
   const overtimeValue = overtimeHours * overtimeRate * PAYROLL_RULES.overtimeMultiplier;
   const gross = inputs.baseSalary + allowances + bonuses + overtimeValue;
   const totalDeductions = absenceDeduction + lateDeduction + deductions + advances;
@@ -63,11 +62,31 @@ export function calculatePayroll(inputs: PayrollInputs) {
     hourlyValue,
     absenceDeduction,
     lateDeduction,
+    earlyDeduction: 0,
     overtimeValue,
     gross,
     totalDeductions,
     net: Math.max(0, gross - totalDeductions),
   };
+}
+
+/** Maps minutes beyond the 15-minute grace period to the requested disciplinary tier.
+ * 1-14 chargeable minutes means 16-29 minutes late in total; 15-44 means 30-59;
+ * 45+ means 60+ total minutes late. Approval is required before payroll applies it.
+ */
+export function calculateLatePenaltyDays(chargeableLateMinutes: number) {
+  const minutes = Math.max(0, Number(chargeableLateMinutes) || 0);
+  if (minutes <= 0) return 0;
+  if (minutes < 15) return 0.25;
+  if (minutes < 45) return 0.5;
+  return 1;
+}
+
+/** Caps disciplinary deductions at five basic-wage days per payroll month.
+ * Ordinary deductions (e.g. approved advances) must be calculated separately.
+ */
+export function capMonthlyDisciplinaryDeduction(amount: number, dailyBasicWage: number) {
+  return Math.min(Math.max(0, Number(amount) || 0), Math.max(0, Number(dailyBasicWage) || 0) * 5);
 }
 
 export function formatMoney(value: number) {

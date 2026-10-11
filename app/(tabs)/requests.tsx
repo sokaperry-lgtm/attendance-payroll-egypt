@@ -102,7 +102,7 @@ export default function RequestsScreen() {
                 }
               }}
               style={styles.absenceCancelButton}
-            ><Text style={styles.absenceCancelText}>{reviewAttendanceException.isPending ? "..." : "{item.status === "معتمد" ? "✕  إلغاء الخصم المعتمد" : "✕  إلغاء الخصم"}</Text></Pressable>
+            ><Text style={styles.absenceCancelText}>{reviewAttendanceException.isPending ? "..." : item.status === "مقبول" ? "✕  إلغاء الخصم المعتمد" : "✕  إلغاء الخصم"}</Text></Pressable>
           </View>
         </View>
       ))}
@@ -161,7 +161,7 @@ export default function RequestsScreen() {
   </ScreenContainer>;
 }
 
-const styles = StyleSheet.create({
+const styles: any = StyleSheet.create({
   absenceReviewPanel: { backgroundColor: "#FFFFFF", borderRadius: 22, padding: 16, borderWidth: 1, borderColor: "#D9E6F2", gap: 11, marginBottom: 2 },
   absenceReviewHeader: { flexDirection: "row-reverse", alignItems: "center", gap: 11 },
   absenceReviewBadge: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#163A63", alignItems: "center", justifyContent: "center" },

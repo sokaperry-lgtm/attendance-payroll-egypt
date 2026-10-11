@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculatePayroll, calculateEarnedSalary, PAYROLL_RULES } from "../lib/payroll";
+import { calculatePayroll, calculateEarnedSalary, PAYROLL_RULES, capMonthlyDisciplinaryDeduction, calculateLatePenaltyDays } from "../lib/payroll";
 
 describe("قواعد المرتب الداخلية", () => {
   it("تحسب قيمة اليوم والساعة من 30 يوم و9 ساعات مع 26 يوم عمل و4 إجازة مدفوعة", () => {
@@ -9,10 +9,33 @@ describe("قواعد المرتب الداخلية", () => {
     expect(result.hourlyValue).toBeCloseTo(12000 / 30 / 9);
   });
 
-  it("تطبق خصم الغياب ثلاثة أيام لكل يوم غياب", () => {
+  it("تخصم أجر يوم الغياب الفعلي فقط ولا تضاعف الجزاء تلقائيًا", () => {
     const result = calculatePayroll({ baseSalary: 12000, absences: 1 });
-    expect(result.absenceDeduction).toBeCloseTo((12000 / 30) * 3);
-    expect(result.net).toBeCloseTo(12000 - (12000 / 30) * 3);
+    expect(result.absenceDeduction).toBeCloseTo(12000 / 30);
+    expect(result.net).toBeCloseTo(12000 - 12000 / 30);
+  });
+
+  it("تطبق شرائح جزاء التأخير بعد سماح 15 دقيقة فقط وبعد اعتماد المدير", () => {
+    expect(PAYROLL_RULES.graceMinutes).toBe(15);
+    expect(calculateLatePenaltyDays(0)).toBe(0);
+    expect(calculateLatePenaltyDays(1)).toBe(0.25); // 16-29 دقيقة تأخير إجمالي
+    expect(calculateLatePenaltyDays(14)).toBe(0.25);
+    expect(calculateLatePenaltyDays(15)).toBe(0.5); // 30-59 دقيقة إجمالي
+    expect(calculateLatePenaltyDays(44)).toBe(0.5);
+    expect(calculateLatePenaltyDays(45)).toBe(1); // ساعة أو أكثر إجمالي
+    expect(PAYROLL_RULES.absencePenaltyDays).toBe(3);
+  });
+
+  it("لا تسمح بتجاوز خصم الجزاءات التأديبية خمسة أيام من الأجر الأساسي في الشهر", () => {
+    expect(capMonthlyDisciplinaryDeduction(9000, 400)).toBe(2000);
+    expect(capMonthlyDisciplinaryDeduction(1200, 400)).toBe(1200);
+    expect(capMonthlyDisciplinaryDeduction(-500, 400)).toBe(0);
+  });
+
+  it("تعتمد سماح 15 دقيقة وتخصم التأخير الفعلي المسجل بعدها بسعر الساعة", () => {
+    expect(PAYROLL_RULES.graceMinutes).toBe(15);
+    const result = calculatePayroll({ baseSalary: 12000, lateMinutes: 10 });
+    expect(result.lateDeduction).toBeCloseTo((12000 / 30 / 9) * 10 / 60);
   });
 
   it("تجمع الإضافي وتخصم التأخير والخصومات والسلف", () => {

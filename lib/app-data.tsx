@@ -5,7 +5,7 @@ import { calculatePayroll, type PayrollInputs, todayKey } from "@/lib/payroll";
 
 export type Role = "owner" | "manager" | "hr" | "supervisor" | "accountant" | "employee";
 export type AttendanceState = "حاضر" | "متأخر" | "إجازة" | "غياب" | "مأمورية";
-export type RequestType = "إجازة" | "إذن" | "إجازة مرضية" | "إجازة طارئة";
+export type RequestType = "إجازة" | "إذن" | "إجازة مرضية" | "إجازة طارئة" | "مأمورية" | "أوفر تايم";
 export type RequestStatus = "قيد المراجعة" | "مقبول" | "مرفوض";
 
 export type Branch = { name: string; address: string; latitude: number; longitude: number; radiusMeters: number };
@@ -13,7 +13,7 @@ export type Shift = { name: string; start: string; end: string; days: string; cr
 export type ShiftTemplate = { id: number; name: string; kind: "shift" | "weekly_off"; startTime: string; endTime: string; crossesMidnight: boolean; active: boolean };
 export type ScheduleEntry = { id: number; staffAccountId: number; scheduleDate: string; shiftTemplateId: number; note?: string | null; shift: ShiftTemplate | null };
 export type AttendanceRecord = { id: string; date: string; checkIn?: string | null; checkOut?: string | null; status: AttendanceState; lateMinutes: number; distanceMeters?: number | null; note?: string | null };
-export type LeaveRequest = { id: string; type: RequestType | string; from: string; to: string; reason: string; status: RequestStatus | string; staffAccountId?: number; staffName?: string; source?: "request" | "attendance" | "penalty"; exceptionKind?: "late" | "early" | "absence"; fromDate?: string; adjustmentId?: number; actionable?: boolean; hours?: number | null };
+export type LeaveRequest = { id: string; type: RequestType; from: string; to: string; reason: string; status: RequestStatus; staffAccountId?: number; staffName?: string; source?: "request" | "attendance" | "penalty"; exceptionKind?: "late" | "early" | "absence"; fromDate?: string; adjustmentId?: number; actionable?: boolean; hours?: number | null };
 export type Employee = { id: string; name: string; title: string; department: string; baseSalary: number; initials: string; phone?: string; role?: Role; active?: boolean };
 
 export const defaultBranch: Branch = { name: "الفرع الرئيسي", address: "مدينة نصر، القاهرة", latitude: 30.0444, longitude: 31.2357, radiusMeters: 200 };
@@ -79,8 +79,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const employee = meQuery.data ? mapEmployee(meQuery.data) : { id: "", name: "", title: "", department: "", baseSalary: 0, initials: "" };
   const branch: Branch = companyQuery.data ? { name: companyQuery.data.name, address: companyQuery.data.address, latitude: Number(companyQuery.data.latitude), longitude: Number(companyQuery.data.longitude), radiusMeters: companyQuery.data.radiusMeters } : defaultBranch;
   const records: AttendanceRecord[] = (attendanceQuery.data ?? []).map((record) => ({ id: String(record.id), date: record.date, checkIn: record.checkIn, checkOut: record.checkOut, status: record.status as AttendanceState, lateMinutes: record.lateMinutes, distanceMeters: record.distanceMeters, note: record.note }));
-  const requests: LeaveRequest[] = (requestsQuery.data ?? []).map((request: any) => ({ id: String(request.id), type: request.type as RequestType | string, from: request.fromDate, to: request.toDate, reason: request.reason, status: request.status as RequestStatus | string, staffAccountId: request.staffAccountId, staffName: request.staffName, source: request.source, exceptionKind: request.exceptionKind, fromDate: request.fromDate, adjustmentId: request.adjustmentId, actionable: request.actionable, hours: request.hours != null ? Number(request.hours) : null }));
-  const staffMembers: Employee[] = (staffQuery.data ?? []).map((staff) => mapEmployee(staff));
+  const requests: LeaveRequest[] = (requestsQuery.data ?? []).map((request: any) => ({ id: String(request.id), type: request.type as RequestType, from: request.fromDate, to: request.toDate, reason: request.reason, status: request.status as RequestStatus, staffAccountId: request.staffAccountId, staffName: request.staffName, source: request.source, exceptionKind: request.exceptionKind, fromDate: request.fromDate, adjustmentId: request.adjustmentId, actionable: request.actionable, hours: request.hours != null ? Number(request.hours) : null }));
+  const staffMembers: Employee[] = (staffQuery.data ?? []).map((staff) => mapEmployee(staff as any));
   const shiftTemplates: ShiftTemplate[] = (shiftTemplatesQuery.data ?? []).map((item) => ({ id: item.id, name: item.name, kind: item.kind as "shift" | "weekly_off", startTime: item.startTime, endTime: item.endTime, crossesMidnight: item.crossesMidnight, active: item.active }));
   const schedules: ScheduleEntry[] = (mineScheduleQuery.data ?? []) as ScheduleEntry[];
   const teamSchedules: ScheduleEntry[] = (teamScheduleQuery.data ?? []) as ScheduleEntry[];
@@ -123,8 +123,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     checkOut: async (payload) => { await checkOutMutation.mutateAsync({ date: activeAttendanceRecord?.date ?? todayKey(), time: payload.time, latitude: payload.latitude, longitude: payload.longitude }); await invalidateAll(); },
     submitRequest: async (request) => { await requestMutation.mutateAsync({ type: request.type, fromDate: request.from, toDate: request.to, reason: request.reason, hours: request.hours ?? undefined }); await invalidateAll(); },
     approveRequest: async (id, status) => { await reviewMutation.mutateAsync({ id: Number(id), status: status as "مقبول" | "مرفوض" }); await invalidateAll(); },
-    createStaffAccount: async (input) => { await createStaffMutation.mutateAsync({ ...input, shiftStart: "08:00", shiftEnd: "17:00" }); await invalidateAll(); },
-    updateStaffAccount: async (input) => { await updateStaffMutation.mutateAsync(input); await invalidateAll(); },
+    createStaffAccount: async (input) => { await createStaffMutation.mutateAsync({ ...input, role: input.role as "manager" | "supervisor" | "employee", shiftStart: "08:00", shiftEnd: "17:00" } as any); await invalidateAll(); },
+    updateStaffAccount: async (input) => { await updateStaffMutation.mutateAsync({ ...input, role: input.role as "manager" | "supervisor" | "employee" } as any); await invalidateAll(); },
     updateBranch: async (input) => { await updateCompanyMutation.mutateAsync(input); await invalidateAll(); },
     saveSchedule: async (input) => { await saveScheduleMutation.mutateAsync(input); await invalidateAll(); },
   }), [role, employee, branch, meQuery.data?.shiftStart, meQuery.data?.shiftEnd, records, requests, staffMembers, payrollInputs, payroll, todayRecord, activeAttendanceRecord, previousRecord, previousSchedule, meQuery.isLoading, attendanceQuery.isLoading, teamAttendanceQuery.isLoading, shiftTemplates, schedules, teamSchedules, teamAttendance, activeShift, checkInMutation, checkOutMutation, requestMutation, reviewMutation, createStaffMutation, updateStaffMutation, updateCompanyMutation, saveScheduleMutation]);
