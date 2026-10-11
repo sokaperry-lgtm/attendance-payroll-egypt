@@ -3,8 +3,8 @@ export const PAYROLL_RULES = {
   workDays: 26,
   paidLeaveDays: 4,
   calendarDays: 30,
-  graceMinutes: 0,
-  absencePenaltyDays: 3,
+  graceMinutes: 15,
+  absencePenaltyDays: 1,
   lateQuarterDayMinutes: 15,
   lateHalfDayMinutes: 30,
   lateFullDayMinutes: 60,
@@ -48,12 +48,11 @@ export function calculatePayroll(inputs: PayrollInputs) {
 
   const dailyValue = inputs.baseSalary / PAYROLL_RULES.calendarDays;
   const hourlyValue = dailyValue / PAYROLL_RULES.dailyHours;
-  const absenceDeduction = absences * PAYROLL_RULES.absencePenaltyDays * dailyValue;
-  const latePenaltyDays =
-    lateMinutes >= PAYROLL_RULES.lateFullDayMinutes ? 1 :
-    lateMinutes >= PAYROLL_RULES.lateHalfDayMinutes ? 0.5 :
-    lateMinutes >= PAYROLL_RULES.lateQuarterDayMinutes ? 0.25 : 0;
-  const lateDeduction = latePenaltyDays * dailyValue;
+  // Deduct only the actual unpaid absence day; disciplinary sanctions are
+  // handled separately after review and must never be auto-multiplied here.
+  const absenceDeduction = absences * dailyValue;
+  // lateMinutes represents minutes beyond the configured grace period.
+  const lateDeduction = (lateMinutes / 60) * hourlyValue;
   const overtimeValue = overtimeHours * overtimeRate * PAYROLL_RULES.overtimeMultiplier;
   const gross = inputs.baseSalary + allowances + bonuses + overtimeValue;
   const totalDeductions = absenceDeduction + lateDeduction + deductions + advances;
