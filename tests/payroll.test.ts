@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculatePayroll, calculateEarnedSalary, PAYROLL_RULES } from "../lib/payroll";
+import { calculatePayroll, calculateEarnedSalary, PAYROLL_RULES, capMonthlyDisciplinaryDeduction } from "../lib/payroll";
 
 describe("قواعد المرتب الداخلية", () => {
   it("تحسب قيمة اليوم والساعة من 30 يوم و9 ساعات مع 26 يوم عمل و4 إجازة مدفوعة", () => {
@@ -13,6 +13,12 @@ describe("قواعد المرتب الداخلية", () => {
     const result = calculatePayroll({ baseSalary: 12000, absences: 1 });
     expect(result.absenceDeduction).toBeCloseTo(12000 / 30);
     expect(result.net).toBeCloseTo(12000 - 12000 / 30);
+  });
+
+  it("لا تسمح بتجاوز خصم الجزاءات التأديبية خمسة أيام من الأجر الأساسي في الشهر", () => {
+    expect(capMonthlyDisciplinaryDeduction(9000, 400)).toBe(2000);
+    expect(capMonthlyDisciplinaryDeduction(1200, 400)).toBe(1200);
+    expect(capMonthlyDisciplinaryDeduction(-500, 400)).toBe(0);
   });
 
   it("تعتمد سماح 15 دقيقة وتخصم التأخير الفعلي المسجل بعدها بسعر الساعة", () => {
