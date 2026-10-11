@@ -36,7 +36,7 @@ export async function assertPermission(staffAccountId: number, permission: Permi
 export async function listPermissionMembers(actorId: number) { const actor = await getCompanyForStaff(actorId); if (!actor || actor.role !== "owner") throw new Error("إدارة الصلاحيات متاحة لمالك الشركة فقط."); const members = await listCompanyMembers(actorId); return Promise.all(members.map(async (member:any) => ({ ...member, permissions: await getEffectivePermissions(Number(member.id)) }))); }
 export async function updateMemberPermissions(actorId: number, staffAccountId: number, permissions: Partial<PermissionMap>) {
   const actor = await getCompanyForStaff(actorId); if (!actor || actor.role !== "owner") throw new Error("إدارة الصلاحيات متاحة لمالك الشركة فقط."); const access = await assertStaffInCompany(actorId, staffAccountId);
-  if (access.String(target.role) === "owner") throw new Error("لا يمكن تعديل صلاحيات المالك."); await ensurePermissionStore(); const db = await getDb(); if (!db) throw new Error("Database not available");
+  if (String(access.target.role) === "owner") throw new Error("لا يمكن تعديل صلاحيات المالك."); await ensurePermissionStore(); const db = await getDb(); if (!db) throw new Error("Database not available");
   const current = await getEffectivePermissions(staffAccountId);
   const next = { ...current } as PermissionMap;
   for (const key of PERMISSION_KEYS) {
@@ -133,7 +133,7 @@ export async function getDailyAttendanceOverview(staffAccountId: number, date: s
 
   const byStaff = new Map(rows.map(row => [row.staffAccountId, row]));
   const employees = staff
-    .filter(s => s.active && s.role !== "owner")
+    .filter(s => s.active)
     .map(s => {
       const row = byStaff.get(s.id);
       return {
@@ -688,7 +688,7 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
           });
           markedLeaves++;
         } else if (record.status === "غياب" && !record.checkIn && !record.checkOut) {
-          await dbQueries.upsertAttendance({ ...record, status: "إجازة", note: "إجازة معتمدة", updatedAt: new Date() });
+          await dbQueries.upsertAttendance({ ...record, status: "إجازة", note: "إجازة معتمدة" });
           markedLeaves++;
         }
         continue;
