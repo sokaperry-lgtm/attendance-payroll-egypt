@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import { trpc } from "@/lib/trpc";
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { showAlert } from "@/lib/alert";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -52,6 +52,8 @@ function tone(s: ShiftTemplate | null | undefined, paletteIndex?: number) {
 }
 
 export default function ScheduleScreen() {
+  const { width } = useWindowDimensions();
+  const compact = width < 560;
   const { role, employee, records, staffMembers, shiftTemplates, schedules, teamSchedules, teamAttendance, saveSchedule } = useAppData();
   const router = useRouter();
   const updateAttendance = trpc.attendance.managerUpdate.useMutation();
@@ -190,7 +192,7 @@ export default function ScheduleScreen() {
 
   return (
     <ScreenContainer>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, compact && styles.contentCompact]}>
         <View style={styles.header}>
           <View style={styles.headerIcon}><IconSymbol name="calendar" size={24} color="#FFF" /></View>
           <View style={styles.headerCopy}>
@@ -215,7 +217,7 @@ export default function ScheduleScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.dayStrip}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayStripScroll} contentContainerStyle={styles.dayStrip}>
           {weekDayStats.map((day) => (
             <Pressable key={day.key} onPress={() => adminRole && setSelectedDay(day.key)} style={[styles.dayMini, day.isToday && styles.dayMiniToday, day.key === selectedDay && adminRole && styles.dayMiniSelected]}>
               <Text style={styles.dayMiniLabel}>{day.label.slice(0, 2)}</Text>
@@ -223,7 +225,7 @@ export default function ScheduleScreen() {
               <Text style={styles.dayMiniCount}>{day.scheduled} {day.scheduled === 1 ? "وردية" : "ورديات"}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
 
         {adminRole && <View style={styles.workforceSummary}>
           <View style={styles.summaryTitleRow}><View><Text style={styles.sectionTitle}>ملخص التشغيل</Text><Text style={styles.sectionHint}>حالة الفريق خلال الأسبوع المحدد</Text></View><View style={styles.liveBadge}><View style={styles.liveDot} /><Text style={styles.liveText}>LIVE</Text></View></View>
@@ -478,14 +480,14 @@ export default function ScheduleScreen() {
 }
 
 const styles = StyleSheet.create<any>({
-  content:{padding:20,paddingBottom:50,gap:14},  quickScheduleCard:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,padding:14},quickScheduleHeader:{flexDirection:"row-reverse",alignItems:"center",gap:12},bulkButton:{backgroundColor:"#163A63",borderRadius:13,paddingHorizontal:14,paddingVertical:11,flexDirection:"row",alignItems:"center",gap:7},bulkButtonText:{color:"#FFF",fontSize:10,fontWeight:"900"},bulkCard:{backgroundColor:"#FFF",borderRadius:24,padding:18,width:"94%",maxWidth:620,alignSelf:"center"},bulkSectionTitle:{color:"#172033",fontSize:13,fontWeight:"900",textAlign:"right",marginTop:18,marginBottom:9},bulkShiftGrid:{flexDirection:"row-reverse",flexWrap:"wrap",gap:8},bulkShiftOption:{flex:1,minWidth:140,borderWidth:1,borderColor:"#E1E7EF",borderRadius:14,padding:12,backgroundColor:"#F7F9FC"},bulkShiftOptionActive:{backgroundColor:"#EEF5FB",borderColor:"#163A63"},bulkShiftName:{color:"#172033",fontSize:11,fontWeight:"900",textAlign:"right"},bulkShiftTime:{color:"#667085",fontSize:9,marginTop:3,textAlign:"right"},bulkShiftTextActive:{color:"#163A63"},bulkModeRow:{gap:8},bulkMode:{borderWidth:1,borderColor:"#E1E7EF",borderRadius:14,padding:12,backgroundColor:"#F7F9FC"},bulkModeActive:{backgroundColor:"#EEF5FB",borderColor:"#163A63"},bulkModeTitle:{color:"#172033",fontSize:12,fontWeight:"900",textAlign:"right"},bulkModeTextActive:{color:"#163A63"},bulkModeHint:{color:"#667085",fontSize:9,marginTop:3,textAlign:"right"},bulkSaveButton:{marginTop:18,minHeight:48,borderRadius:14,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center",flexDirection:"row",gap:8},bulkSaveText:{color:"#FFF",fontSize:11,fontWeight:"900"},
+  content:{padding:20,paddingBottom:50,gap:14},contentCompact:{padding:14,paddingBottom:38,gap:11},  quickScheduleCard:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,padding:14},quickScheduleHeader:{flexDirection:"row-reverse",alignItems:"center",gap:12},bulkButton:{backgroundColor:"#163A63",borderRadius:13,paddingHorizontal:14,paddingVertical:11,flexDirection:"row",alignItems:"center",gap:7},bulkButtonText:{color:"#FFF",fontSize:10,fontWeight:"900"},bulkCard:{backgroundColor:"#FFF",borderRadius:24,padding:18,width:"94%",maxWidth:620,alignSelf:"center"},bulkSectionTitle:{color:"#172033",fontSize:13,fontWeight:"900",textAlign:"right",marginTop:18,marginBottom:9},bulkShiftGrid:{flexDirection:"row-reverse",flexWrap:"wrap",gap:8},bulkShiftOption:{flex:1,minWidth:140,borderWidth:1,borderColor:"#E1E7EF",borderRadius:14,padding:12,backgroundColor:"#F7F9FC"},bulkShiftOptionActive:{backgroundColor:"#EEF5FB",borderColor:"#163A63"},bulkShiftName:{color:"#172033",fontSize:11,fontWeight:"900",textAlign:"right"},bulkShiftTime:{color:"#667085",fontSize:9,marginTop:3,textAlign:"right"},bulkShiftTextActive:{color:"#163A63"},bulkModeRow:{gap:8},bulkMode:{borderWidth:1,borderColor:"#E1E7EF",borderRadius:14,padding:12,backgroundColor:"#F7F9FC"},bulkModeActive:{backgroundColor:"#EEF5FB",borderColor:"#163A63"},bulkModeTitle:{color:"#172033",fontSize:12,fontWeight:"900",textAlign:"right"},bulkModeTextActive:{color:"#163A63"},bulkModeHint:{color:"#667085",fontSize:9,marginTop:3,textAlign:"right"},bulkSaveButton:{marginTop:18,minHeight:48,borderRadius:14,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center",flexDirection:"row",gap:8},bulkSaveText:{color:"#FFF",fontSize:11,fontWeight:"900"},
   weekNavigator:{flexDirection:"row",alignItems:"stretch",justifyContent:"space-between",gap:8},
   weekNavButton:{flex:1,minHeight:52,backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E1E7EF",borderRadius:15,paddingHorizontal:10,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:5},
   weekNavText:{color:"#163A63",fontSize:10,fontWeight:"800"},
   weekCurrentButton:{flex:1.35,minHeight:52,backgroundColor:"#EEF5FB",borderWidth:1,borderColor:"#C9DCEC",borderRadius:15,alignItems:"center",justifyContent:"center",paddingHorizontal:8},
   weekCurrentText:{color:"#163A63",fontSize:11,fontWeight:"900"},
   weekRangeText:{color:"#667085",fontSize:9,marginTop:2,fontWeight:"700"},
-  dayStrip:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,padding:8,flexDirection:"row-reverse",gap:6},dayMini:{flex:1,minWidth:42,minHeight:68,borderRadius:12,backgroundColor:"#F7F9FC",alignItems:"center",justifyContent:"center",paddingVertical:7},dayMiniToday:{backgroundColor:"#EEF6FF",borderWidth:1,borderColor:"#C7DFF5"},dayMiniSelected:{backgroundColor:"#DDEEFF",borderWidth:1,borderColor:"#76A9D8"},dayMiniLabel:{color:"#7B8798",fontSize:8,fontWeight:"800"},dayMiniDate:{color:"#172033",fontSize:15,fontWeight:"900",marginTop:2},dayMiniCount:{color:"#667085",fontSize:7,fontWeight:"700",marginTop:4},header:{flexDirection:"row-reverse",alignItems:"center",gap:12},
+  dayStripScroll:{borderWidth:1,borderColor:"#E5EAF0",borderRadius:18,backgroundColor:"#FFFFFF"},dayStrip:{padding:8,flexDirection:"row-reverse",gap:6,minWidth:"100%"},dayMini:{flex:1,minWidth:42,minHeight:68,borderRadius:12,backgroundColor:"#F7F9FC",alignItems:"center",justifyContent:"center",paddingVertical:7},dayMiniToday:{backgroundColor:"#EEF6FF",borderWidth:1,borderColor:"#C7DFF5"},dayMiniSelected:{backgroundColor:"#DDEEFF",borderWidth:1,borderColor:"#76A9D8"},dayMiniLabel:{color:"#7B8798",fontSize:8,fontWeight:"800"},dayMiniDate:{color:"#172033",fontSize:15,fontWeight:"900",marginTop:2},dayMiniCount:{color:"#667085",fontSize:7,fontWeight:"700",marginTop:4},header:{flexDirection:"row-reverse",alignItems:"center",gap:12},
   headerIcon:{width:52,height:52,borderRadius:17,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},
   headerCopy:{flex:1},eyebrow:{color:"#7B8798",fontSize:9,fontWeight:"900",textAlign:"right",letterSpacing:1},title:{color:"#172033",fontSize:29,fontWeight:"900",textAlign:"right",marginTop:3},subtitle:{color:"#667085",fontSize:11,lineHeight:18,textAlign:"right",marginTop:4},
   hero:{backgroundColor:"#102A47",borderRadius:22,padding:18,gap:18},heroTop:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"flex-start"},weekPill:{backgroundColor:"#1D4268",borderRadius:10,paddingHorizontal:10,paddingVertical:6},weekPillText:{color:"#B9D9F5",fontSize:9,fontWeight:"900"},heroKicker:{color:"#8EA7BE",fontSize:8,fontWeight:"900",textAlign:"right",letterSpacing:1},heroTitle:{color:"#FFF",fontSize:19,fontWeight:"900",textAlign:"right",marginTop:4},heroStats:{flexDirection:"row-reverse",alignItems:"center",justifyContent:"space-between"},heroStatValue:{color:"#72B5EF",fontSize:21,fontWeight:"900",textAlign:"center"},heroStatLabel:{color:"#B8C9D8",fontSize:8,textAlign:"center",marginTop:3},heroDivider:{width:1,height:28,backgroundColor:"#2A4B69"},
