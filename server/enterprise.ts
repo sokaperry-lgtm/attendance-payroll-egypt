@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, getStaffAccountById } from "./db";
 import * as dbQueries from "./db";
 import { calculateEgyptPayroll } from "./egypt-payroll";
-import { PAYROLL_RULES, capMonthlyDisciplinaryDeduction } from "../lib/payroll";
+import { PAYROLL_RULES, capMonthlyDisciplinaryDeduction, calculateLatePenaltyDays } from "../lib/payroll";
 import {
   companies, branches, companyMembers, leaveBalances,
   payrollRecords, notifications, subscriptions, auditLogs, staffAccounts,
@@ -867,52 +867,63 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       }
     }
 
-    // Attendance exceptions are pending until a manager/owner reviews them.
-    // Payroll may deduct only reviewed, approved exceptions; no automatic
-    // disciplinary multiplier is applied here.
-    let lateDeduction=0;
+    // Attendance exceptions remain pending until a manager/owner approves them.
+    // Only approved events create disciplinary deductions; the monthly legal cap
+    // is applied across attendance sanctions and manually entered penalty rows.
+    let rawLateDeduction=0;
     let absenceDeduction=0;
+    let absenceDisciplinaryPenalty=0;
+    let rawEarlyDeduction=0;
 
     for (const record of records) {
+      const note=String(record.note || "");
       const lateMinutes=Math.max(0, Number(record.lateMinutes || 0));
-      const lateApproved=String(record.note || "").includes("تم اعتماد التأخير");
+      const lateApproved=note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
       if (lateApproved && lateMinutes > 0) {
-        // The stored lateMinutes already excludes the 15-minute grace period.
-        // Deduct the actual time missed, not a quarter/half/full-day tier.
-        lateDeduction += (lateMinutes / 60) * hourlyValue;
+        rawLateDeduction += calculateLatePenaltyDays(lateMinutes) * dailyValue;
       }
 
       if (record.status === "غياب") {
-        const hasPermission = String(record.note || "").includes("بإذن");
-        const absenceApproved = String(record.note || "").includes("تم اعتماد الغياب");
-        // An automatically detected absence stays pending and has no payroll
-        // effect until a manager/owner approves it. Approved permission is
-        // treated according to its approved paid/unpaid status (legacy "بإذن"
-        // remains exempt here); no three-day automatic penalty is added.
-        if (!hasPermission && absenceApproved) absenceDeduction += dailyValue;
+        const hasPermission = note.includes("بإذن");
+        const absenceApproved = note.includes("تم اعتماد الغياب") && !note.includes("تم إلغاء الغياب");
+        if (absenceApproved && hasPermission) {
+          // Approved permission absence follows the configured one-day sanction.
+          absenceDisciplinaryPenalty += dailyValue;
+        } else if (absenceApproved && !hasPermission) {
+          // One unpaid day is separate from the three-day disciplinary sanction.
+          absenceDeduction += dailyValue;
+          absenceDisciplinaryPenalty += PAYROLL_RULES.absencePenaltyDays * dailyValue;
+        }
+      }
+
+      if (record.checkOut && note.includes("تم اعتماد الانصراف المبكر") && !note.includes("تم إلغاء الانصراف المبكر")) {
+        const schedule = schedules.find(item => item.staffAccountId === s.id && item.scheduleDate === record.date);
+        const shift = schedule ? shifts.find(item => item.id === schedule.shiftTemplateId) : undefined;
+        const shiftStart = shift?.startTime ?? s.shiftStart;
+        const shiftEnd = shift?.endTime ?? s.shiftEnd;
+        const crossesMidnight = (shift?.crossesMidnight ?? false) || minutesOf(shiftEnd) < minutesOf(shiftStart);
+        const scheduledEnd = minutesOf(shiftEnd) + (crossesMidnight ? 24 * 60 : 0);
+        let actualCheckout = minutesOf(record.checkOut);
+        if (crossesMidnight && actualCheckout < minutesOf(shiftStart)) actualCheckout += 24 * 60;
+        const earlyMinutes = Math.max(0, scheduledEnd - actualCheckout);
+        rawEarlyDeduction += calculateLatePenaltyDays(earlyMinutes) * dailyValue;
       }
     }
-
-    const earlyMinutes=records.reduce((total, record) => {
-      if (!record.checkOut || !String(record.note || "").includes("تم اعتماد الانصراف المبكر")) return total;
-      const schedule = schedules.find(item => item.staffAccountId === s.id && item.scheduleDate === record.date);
-      const shift = schedule ? shifts.find(item => item.id === schedule.shiftTemplateId) : undefined;
-      const shiftStart = shift?.startTime ?? s.shiftStart;
-      const shiftEnd = shift?.endTime ?? s.shiftEnd;
-      const crossesMidnight = (shift?.crossesMidnight ?? false) || minutesOf(shiftEnd) < minutesOf(shiftStart);
-      const scheduledEnd = minutesOf(shiftEnd) + (crossesMidnight ? 24 * 60 : 0);
-      let actualCheckout = minutesOf(record.checkOut);
-      if (crossesMidnight && actualCheckout < minutesOf(shiftStart)) actualCheckout += 24 * 60;
-      return total + Math.max(0, scheduledEnd - actualCheckout);
-    }, 0);
-    const earlyDeduction=Math.round(hourlyValue*earlyMinutes/60);
+    // Rest-day work earns an additional day of pay (the monthly base already
+    // includes the paid weekly rest day). Regeneration is idempotent because
+    // this is derived from the attendance record, not inserted as an adjustment.
+    const workedWeeklyRestDays = records.filter(record =>
+      String(record.note || "").includes("عمل في يوم الراحة الأسبوعية") &&
+      Boolean(record.checkIn) && Boolean(record.checkOut)
+    ).length;
 
     const approvedOvertimeHours=approvedOvertime
       .filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month))
       .reduce((sum,r)=>sum+Math.max(0, Number(r.hours ?? 0)),0);
     const overtimeHours=approvedOvertimeHours;
     const overtimeRate=hourlyValue;
-    const overtimeValue=Math.round(overtimeHours*overtimeRate*PAYROLL_RULES.overtimeMultiplier);
+    const restDayCompensation=workedWeeklyRestDays*dailyValue;
+    const overtimeValue=Math.round(overtimeHours*overtimeRate*PAYROLL_RULES.overtimeMultiplier+restDayCompensation);
     const adjustments=await db.select().from(salaryAdjustments).where(and(
       eq(salaryAdjustments.companyId,m.companyId),
       eq(salaryAdjustments.staffAccountId,s.id),
@@ -920,11 +931,16 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     ));
     const allowances=adjustments.filter(a=>a.type==="allowance").reduce((sum,a)=>sum+a.amount,0);
     const bonuses=adjustments.filter(a=>a.type==="bonus"||a.type==="incentive").reduce((sum,a)=>sum+a.amount,0);
-    const disciplinaryDeductions=adjustments.filter(a=>a.type==="penalty").reduce((sum,a)=>sum+a.amount,0);
+    const adjustmentPenalties=adjustments.filter(a=>a.type==="penalty").reduce((sum,a)=>sum+a.amount,0);
     const ordinaryDeductions=adjustments.filter(a=>a.type==="deduction").reduce((sum,a)=>sum+a.amount,0);
-    // Article 143 limits disciplinary wage deductions to five basic-wage days
-    // in a month. Ordinary approved deductions remain itemized separately.
-    const extraDeductions=capMonthlyDisciplinaryDeduction(disciplinaryDeductions,dailyValue)+ordinaryDeductions;
+    const rawDisciplinaryTotal=rawLateDeduction+rawEarlyDeduction+absenceDisciplinaryPenalty+adjustmentPenalties;
+    const cappedDisciplinaryTotal=capMonthlyDisciplinaryDeduction(rawDisciplinaryTotal,dailyValue);
+    const disciplinaryScale=rawDisciplinaryTotal>0 ? cappedDisciplinaryTotal/rawDisciplinaryTotal : 1;
+    const lateDeduction=Math.round(rawLateDeduction*disciplinaryScale);
+    const earlyDeduction=Math.round(rawEarlyDeduction*disciplinaryScale);
+    // The remaining capped disciplinary amount contains absence sanctions and
+    // manual penalty rows; ordinary approved deductions and advances stay separate.
+    const extraDeductions=Math.max(0,cappedDisciplinaryTotal-lateDeduction-earlyDeduction)+ordinaryDeductions;
     const activeAdvances=await db.select().from(salaryAdvances).where(and(
       eq(salaryAdvances.companyId,m.companyId),
       eq(salaryAdvances.staffAccountId,s.id),
