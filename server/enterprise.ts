@@ -36,7 +36,7 @@ export async function assertPermission(staffAccountId: number, permission: Permi
 export async function listPermissionMembers(actorId: number) { const actor = await getCompanyForStaff(actorId); if (!actor || actor.role !== "owner") throw new Error("إدارة الصلاحيات متاحة لمالك الشركة فقط."); const members = await listCompanyMembers(actorId); return Promise.all(members.map(async (member:any) => ({ ...member, permissions: await getEffectivePermissions(Number(member.id)) }))); }
 export async function updateMemberPermissions(actorId: number, staffAccountId: number, permissions: Partial<PermissionMap>) {
   const actor = await getCompanyForStaff(actorId); if (!actor || actor.role !== "owner") throw new Error("إدارة الصلاحيات متاحة لمالك الشركة فقط."); const access = await assertStaffInCompany(actorId, staffAccountId);
-  if (access.target.role === "owner") throw new Error("لا يمكن تعديل صلاحيات المالك."); await ensurePermissionStore(); const db = await getDb(); if (!db) throw new Error("Database not available");
+  if (access.String(target.role) === "owner") throw new Error("لا يمكن تعديل صلاحيات المالك."); await ensurePermissionStore(); const db = await getDb(); if (!db) throw new Error("Database not available");
   const current = await getEffectivePermissions(staffAccountId);
   const next = { ...current } as PermissionMap;
   for (const key of PERMISSION_KEYS) {
@@ -364,7 +364,7 @@ export async function updateBranch(staffAccountId: number, branchId: number, inp
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
     throw new Error("إحداثيات GPS غير صالحة.");
   }
-  await db.update(branches).set({ ...input, name: input.name.trim(), address: input.address.trim(), updatedAt: new Date() }).where(eq(branches.id, branchId));
+  await db.update(branches).set({ ...input, name: input.name.trim(), address: input.address.trim() }).where(eq(branches.id, branchId));
   await writeAudit(staffAccountId, m.companyId, "branch.updated", "branch", String(branchId), input);
   return (await db.select().from(branches).where(eq(branches.id, branchId)).limit(1))[0];
 }
@@ -1287,7 +1287,7 @@ export async function reviewLeaveRequest(actorId:number,id:number,status:"مقب
     consumed=true;
   }
   try {
-    const row=await db.approveRequest(id,actorId,status);
+    const row=await dbQueries.approveRequest(id,actorId,status);
     if(!row) throw new Error("تعذر تحديث طلب الإجازة.");
     if(status==="مقبول") {
       await syncMonthlyAttendance(actorId,existing.fromDate.slice(0,7));
