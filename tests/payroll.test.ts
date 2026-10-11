@@ -9,10 +9,16 @@ describe("قواعد المرتب الداخلية", () => {
     expect(result.hourlyValue).toBeCloseTo(12000 / 30 / 9);
   });
 
-  it("تطبق خصم الغياب ثلاثة أيام لكل يوم غياب", () => {
+  it("تخصم أجر يوم الغياب الفعلي فقط ولا تضاعف الجزاء تلقائيًا", () => {
     const result = calculatePayroll({ baseSalary: 12000, absences: 1 });
-    expect(result.absenceDeduction).toBeCloseTo((12000 / 30) * 3);
-    expect(result.net).toBeCloseTo(12000 - (12000 / 30) * 3);
+    expect(result.absenceDeduction).toBeCloseTo(12000 / 30);
+    expect(result.net).toBeCloseTo(12000 - 12000 / 30);
+  });
+
+  it("تعتمد سماح 15 دقيقة وتخصم التأخير الفعلي المسجل بعدها بسعر الساعة", () => {
+    expect(PAYROLL_RULES.graceMinutes).toBe(15);
+    const result = calculatePayroll({ baseSalary: 12000, lateMinutes: 10 });
+    expect(result.lateDeduction).toBeCloseTo((12000 / 30 / 9) * 10 / 60);
   });
 
   it("تجمع الإضافي وتخصم التأخير والخصومات والسلف", () => {
