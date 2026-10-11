@@ -83,7 +83,7 @@ export default function MoreScreen() {
 
 const UI = { navy: "#163A63", navySoft: "#EEF4FA", text: "#172033", muted: "#667085", border: "#E4E7EC", white: "#FFFFFF", surface: "#F7F9FC" };
 
-const styles = StyleSheet.create({
+const styles: any = StyleSheet.create({
   content: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 34, gap: 12 },
   header: { backgroundColor: UI.white, borderWidth: 1, borderColor: UI.border, borderRadius: 22, padding: 16, flexDirection: "row-reverse", alignItems: "center", gap: 12 },
   headerIcon: { width: 48, height: 48, borderRadius: 15, backgroundColor: UI.navySoft, alignItems: "center", justifyContent: "center" },
