@@ -658,8 +658,10 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
       if (shift?.kind === "weekly_off") continue;
 
       const day = new Date(`${date}T12:00:00`).getDay();
-      // If no explicit schedule exists, use the employee's normal Mon-Fri work week.
-      const isWorkday = scheduled ? true : day !== 5 && day !== 6;
+      // Weekly schedules are employee-specific. Do not infer a workday (or
+      // create an absence) when no shift was assigned for this date.
+      if (!scheduled) continue;
+      const isWorkday = true;
       if (!isWorkday) continue;
 
       const record = existing.find(x => x.staffAccountId === employee.id && x.date === date);
@@ -868,8 +870,9 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       }
     }
 
-    // Attendance penalties are automatic. The manager/owner can still correct
-    // the attendance record or waive a penalty before payroll is closed.
+    // Attendance exceptions are pending until a manager/owner reviews them.
+    // Payroll may deduct only reviewed, approved exceptions; no automatic
+    // disciplinary multiplier is applied here.
     let lateDeduction=0;
     let lateCount=0;
     let absenceDeduction=0;
@@ -878,28 +881,20 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     for (const record of records) {
       const lateMinutes=Math.max(0, Number(record.lateMinutes || 0));
       const lateApproved=String(record.note || "").includes("تم اعتماد التأخير");
-      if (lateApproved && lateMinutes >= PAYROLL_RULES.lateQuarterDayMinutes) {
-        lateCount++;
-        const baseDays =
-          lateMinutes >= PAYROLL_RULES.lateFullDayMinutes ? 1 :
-          lateMinutes >= PAYROLL_RULES.lateHalfDayMinutes ? 0.5 :
-          0.25;
-        const multiplier = lateCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
-        lateDeduction += baseDays * dailyValue * multiplier;
+      if (lateApproved && lateMinutes > 0) {
+        // The stored lateMinutes already excludes the 15-minute grace period.
+        // Deduct the actual time missed, not a quarter/half/full-day tier.
+        lateDeduction += (lateMinutes / 60) * hourlyValue;
       }
 
       if (record.status === "غياب") {
         const hasPermission = String(record.note || "").includes("بإذن");
-        if (!hasPermission) {
-          // Deduct the normal daily wage for every recorded absence. A reviewed
-          // disciplinary absence may additionally apply the configured penalty.
-          absenceDeduction += dailyValue;
-          if (String(record.note || "").includes("تم اعتماد الغياب")) {
-            absenceCount++;
-            const multiplier = absenceCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
-            absenceDeduction += PAYROLL_RULES.absencePenaltyDays * dailyValue * multiplier;
-          }
-        }
+        const absenceApproved = String(record.note || "").includes("تم اعتماد الغياب");
+        // An automatically detected absence stays pending and has no payroll
+        // effect until a manager/owner approves it. Approved permission is
+        // treated according to its approved paid/unpaid status (legacy "بإذن"
+        // remains exempt here); no three-day automatic penalty is added.
+        if (!hasPermission && absenceApproved) absenceDeduction += dailyValue;
       }
     }
 
