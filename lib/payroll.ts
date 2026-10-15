@@ -3,14 +3,19 @@ export const PAYROLL_RULES = {
   workDays: 26,
   paidLeaveDays: 4,
   calendarDays: 30,
-  graceMinutes: 0,
+  graceMinutes: 14,
   absencePenaltyDays: 3,
+  permittedAbsencePenaltyDays: 1,
   lateQuarterDayMinutes: 15,
   lateHalfDayMinutes: 30,
   lateFullDayMinutes: 60,
   repeatPenaltyAfter: 3,
-  overtimeMultiplier: 2,
+  overtimeMultiplier: 1,
 } as const;
+
+export function getAbsencePenaltyDays(hasPermission: boolean) {
+  return hasPermission ? PAYROLL_RULES.permittedAbsencePenaltyDays : PAYROLL_RULES.absencePenaltyDays;
+}
 
 /**
  * Salary earned so far from recorded work time. Monthly salary is based on
@@ -54,7 +59,7 @@ export function calculatePayroll(inputs: PayrollInputs) {
     lateMinutes >= PAYROLL_RULES.lateHalfDayMinutes ? 0.5 :
     lateMinutes >= PAYROLL_RULES.lateQuarterDayMinutes ? 0.25 : 0;
   const lateDeduction = latePenaltyDays * dailyValue;
-  const overtimeValue = overtimeHours * overtimeRate;
+  const overtimeValue = overtimeHours * overtimeRate * PAYROLL_RULES.overtimeMultiplier;
   const gross = inputs.baseSalary + allowances + bonuses + overtimeValue;
   const totalDeductions = absenceDeduction + lateDeduction + deductions + advances;
 
