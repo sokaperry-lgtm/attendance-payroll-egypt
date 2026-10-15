@@ -819,7 +819,7 @@ export async function recalculateHistoricalPenaltyDeductions(staffAccountId:numb
   const staffById=new Map(staff.map(row=>[Number(row.id),row]));
   const payroll=(await db.select().from(payrollRecords).where(eq(payrollRecords.companyId,m.companyId)))
     .filter(row=>staffIds.has(Number(row.staffAccountId)));
-  const approvedStatuses=new Set(["approved","مقبول","معتمد"]);
+  const approvedStatuses=new Set(["approved","مقبول","معتمد","paid","مدفوع","closed","مغلق","finalized","مقفل"]);
   const approvedCount=payroll.filter(row=>approvedStatuses.has(String(row.status))).length;
   const drafts=payroll.filter(row=>!approvedStatuses.has(String(row.status)));
   const attendance=(await db.select().from(attendanceRecords)).filter(row=>staffIds.has(Number(row.staffAccountId)));
