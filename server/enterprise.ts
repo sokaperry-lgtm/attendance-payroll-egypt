@@ -890,15 +890,15 @@ export async function generatePayroll(staffAccountId: number, month: string) {
 
       if (record.status === "غياب") {
         const hasPermission = String(record.note || "").includes("بإذن");
-        if (!hasPermission) {
-          // Deduct the normal daily wage for every recorded absence. A reviewed
-          // disciplinary absence may additionally apply the configured penalty.
+        if (hasPermission) {
           absenceDeduction += dailyValue;
-          if (String(record.note || "").includes("تم اعتماد الغياب")) {
-            absenceCount++;
-            const multiplier = absenceCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
-            absenceDeduction += PAYROLL_RULES.absencePenaltyDays * dailyValue * multiplier;
-          }
+        } else {
+          absenceCount++;
+          const multiplier = String(record.note || "").includes("تم اعتماد الغياب") &&
+            absenceCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
+          // The penalty is the total for the absence: three days without permission,
+          // one day when permission is recorded. Do not add a second daily deduction.
+          absenceDeduction += (hasPermission ? 1 : PAYROLL_RULES.absencePenaltyDays) * dailyValue * multiplier;
         }
       }
     }
@@ -922,7 +922,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       .reduce((sum,r)=>sum+Math.max(0, Number(r.hours ?? 0)),0);
     const overtimeHours=approvedOvertimeHours;
     const overtimeRate=hourlyValue;
-    const overtimeValue=Math.round(overtimeHours*overtimeRate*PAYROLL_RULES.overtimeMultiplier);
+    const overtimeValue=Math.round(overtimeHours*overtimeRate); // Standard hourly rate; no double multiplier.
     const adjustments=await db.select().from(salaryAdjustments).where(and(
       eq(salaryAdjustments.companyId,m.companyId),
       eq(salaryAdjustments.staffAccountId,s.id),
