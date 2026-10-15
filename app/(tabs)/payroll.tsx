@@ -76,6 +76,8 @@ export default function PayrollScreen() {
   const payrollStaffQuery = trpc.staff.list.useQuery(undefined, { enabled: isAdmin, retry: false });
   const updateStaff = trpc.staff.update.useMutation();
   const generate = trpc.payroll.generate.useMutation({ onSuccess: () => query.refetch() });
+  const [confirmHistoricalRecalc, setConfirmHistoricalRecalc] = useState(false);
+  const historicalRecalc = trpc.payroll.recalculateHistoricalPenalties.useMutation({ onSuccess: async () => { setConfirmHistoricalRecalc(false); await query.refetch(); } });
   const approve = trpc.payroll.approve.useMutation({ onSuccess: () => query.refetch() });
   const unapprove = trpc.payroll.unapprove.useMutation({ onSuccess: () => query.refetch() });
   const adjustments = trpc.hrTools.adjustments.useQuery({ month }, { enabled: isAdmin });
@@ -273,6 +275,34 @@ export default function PayrollScreen() {
             <Text style={styles.primaryText}>{generate.isPending || updateStaff.isPending ? "جارٍ الحساب..." : "حساب المسير"}</Text>
           </Pressable>
         </View>
+
+        {(role === "owner" || role === "manager") ? (
+          <View style={[styles.actionCard, compact && styles.actionCardCompact]}>
+            <View style={styles.actionCopy}>
+              <Text style={styles.actionTitle}>إعادة حساب الخصومات التاريخية</Text>
+              <Text style={styles.actionText}>يعيد حساب خصم التأخير والغياب لكل المسيرات غير المعتمدة الموجودة، حسب اللائحة الجديدة. المسيرات المعتمدة ستظل كما هي لحين مراجعتها بشكل منفصل.</Text>
+              {historicalRecalc.data ? (
+                <Text style={styles.actionText}>تم تحديث {historicalRecalc.data.updated} مسير، بدون تغيير {historicalRecalc.data.unchanged}، وتم تجاوز {historicalRecalc.data.approvedSkipped} مسير معتمد. فرق الخصومات: {formatMoney(historicalRecalc.data.newPenaltyTotal - historicalRecalc.data.oldPenaltyTotal)}.</Text>
+              ) : null}
+              {historicalRecalc.error ? <Text style={[styles.actionText,{color:"#B42318"}]}>{historicalRecalc.error.message}</Text> : null}
+              {confirmHistoricalRecalc ? <Text style={[styles.actionText,{color:"#9A6700"}]}>تأكيد: سيتم تعديل خصومات الغياب والتأخير وصافي المرتب في المسيرات غير المعتمدة فقط، مع تسجيل العملية في سجل المراجعة.</Text> : null}
+            </View>
+            {confirmHistoricalRecalc ? (
+              <View style={{gap:8}}>
+                <Pressable disabled={historicalRecalc.isPending} onPress={() => historicalRecalc.mutate()} style={styles.primaryButton}>
+                  <Text style={styles.primaryText}>{historicalRecalc.isPending ? "جارٍ إعادة الحساب..." : "تأكيد وإعادة الحساب"}</Text>
+                </Pressable>
+                <Pressable disabled={historicalRecalc.isPending} onPress={() => setConfirmHistoricalRecalc(false)} style={styles.monthButton}>
+                  <Text style={styles.monthButtonLabel}>إلغاء</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable disabled={historicalRecalc.isPending} onPress={() => setConfirmHistoricalRecalc(true)} style={styles.primaryButton}>
+                <Text style={styles.primaryText}>مراجعة وإعادة الحساب</Text>
+              </Pressable>
+            )}
+          </View>
+        ) : null}
 
         <View style={[styles.insightGrid, compact && styles.insightGridCompact]}>
           <Insight title="تعديلات الشهر" value={String(adjustments.data?.length ?? 0)} meta="حوافز / خصومات" />
