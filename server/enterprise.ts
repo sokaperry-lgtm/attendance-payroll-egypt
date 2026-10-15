@@ -898,7 +898,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
             absenceCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
           // The penalty is the total for the absence: three days without permission,
           // one day when permission is recorded. Do not add a second daily deduction.
-          absenceDeduction += (hasPermission ? 1 : PAYROLL_RULES.absencePenaltyDays) * dailyValue * multiplier;
+          absenceDeduction += PAYROLL_RULES.absencePenaltyDays * dailyValue * multiplier;
         }
       }
     }
