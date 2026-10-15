@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculatePayroll, calculateEarnedSalary, PAYROLL_RULES } from "../lib/payroll";
+import { calculatePayroll, calculateEarnedSalary, getAbsencePenaltyDays, PAYROLL_RULES } from "../lib/payroll";
 
 describe("قواعد المرتب الداخلية", () => {
   it("تحسب قيمة اليوم والساعة من 30 يوم و9 ساعات مع 26 يوم عمل و4 إجازة مدفوعة", () => {
@@ -13,6 +13,27 @@ describe("قواعد المرتب الداخلية", () => {
     const result = calculatePayroll({ baseSalary: 12000, absences: 1 });
     expect(result.absenceDeduction).toBeCloseTo((12000 / 30) * 3);
     expect(result.net).toBeCloseTo(12000 - (12000 / 30) * 3);
+  });
+
+  it("تطبق شرائح التأخير عند حدود الدقائق المطلوبة", () => {
+    const daily = 12000 / 30;
+    expect(calculatePayroll({ baseSalary: 12000, lateMinutes: 14 }).lateDeduction).toBe(0);
+    expect(calculatePayroll({ baseSalary: 12000, lateMinutes: 15 }).lateDeduction).toBeCloseTo(daily * 0.25);
+    expect(calculatePayroll({ baseSalary: 12000, lateMinutes: 29 }).lateDeduction).toBeCloseTo(daily * 0.25);
+    expect(calculatePayroll({ baseSalary: 12000, lateMinutes: 30 }).lateDeduction).toBeCloseTo(daily * 0.5);
+    expect(calculatePayroll({ baseSalary: 12000, lateMinutes: 59 }).lateDeduction).toBeCloseTo(daily * 0.5);
+    expect(calculatePayroll({ baseSalary: 12000, lateMinutes: 60 }).lateDeduction).toBeCloseTo(daily);
+  });
+
+  it("تحدد خصم الغياب حسب وجود الإذن", () => {
+    expect(getAbsencePenaltyDays(false)).toBe(3);
+    expect(getAbsencePenaltyDays(true)).toBe(1);
+  });
+
+  it("تحسب الأوفر تايم بسعر الساعة العادي دون مضاعفة", () => {
+    const result = calculatePayroll({ baseSalary: 12000, overtimeHours: 2, overtimeRate: 50 });
+    expect(PAYROLL_RULES.overtimeMultiplier).toBe(1);
+    expect(result.overtimeValue).toBe(100);
   });
 
   it("تجمع الإضافي وتخصم التأخير والخصومات والسلف", () => {

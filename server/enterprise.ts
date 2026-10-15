@@ -890,15 +890,15 @@ export async function generatePayroll(staffAccountId: number, month: string) {
 
       if (record.status === "غياب") {
         const hasPermission = String(record.note || "").includes("بإذن");
-        if (!hasPermission) {
-          // Deduct the normal daily wage for every recorded absence. A reviewed
-          // disciplinary absence may additionally apply the configured penalty.
+        if (hasPermission) {
           absenceDeduction += dailyValue;
-          if (String(record.note || "").includes("تم اعتماد الغياب")) {
-            absenceCount++;
-            const multiplier = absenceCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
-            absenceDeduction += PAYROLL_RULES.absencePenaltyDays * dailyValue * multiplier;
-          }
+        } else {
+          absenceCount++;
+          const multiplier = String(record.note || "").includes("تم اعتماد الغياب") &&
+            absenceCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
+          // The penalty is the total for the absence: three days without permission,
+          // one day when permission is recorded. Do not add a second daily deduction.
+          absenceDeduction += PAYROLL_RULES.absencePenaltyDays * dailyValue * multiplier;
         }
       }
     }
@@ -922,7 +922,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       .reduce((sum,r)=>sum+Math.max(0, Number(r.hours ?? 0)),0);
     const overtimeHours=approvedOvertimeHours;
     const overtimeRate=hourlyValue;
-    const overtimeValue=Math.round(overtimeHours*overtimeRate*PAYROLL_RULES.overtimeMultiplier);
+    const overtimeValue=Math.round(overtimeHours*overtimeRate); // Standard hourly rate; no double multiplier.
     const adjustments=await db.select().from(salaryAdjustments).where(and(
       eq(salaryAdjustments.companyId,m.companyId),
       eq(salaryAdjustments.staffAccountId,s.id),
@@ -1473,22 +1473,26 @@ export function toCsv(rows: Array<Record<string, unknown>>) {
 
 async function ensureDefaultPenaltyPolicies(staffAccountId:number, companyId:number) {
   const db=await getDb(); if(!db) return;
-  const rows=await db.execute(sql`SELECT COUNT(*) AS count FROM penalty_policies WHERE companyId = ${companyId}`);
-  const count=Number((rows as any)[0]?.[0]?.count ?? 0);
-  if(count>0) return;
   const defaults=[
-    ["تأخير 15 دقيقة فأكثر وحتى أقل من 30 دقيقة","حضور وانصراف","days",0.25,"خصم ربع يوم"],
-    ["تأخير 30 دقيقة فأكثر وحتى أقل من ساعة","حضور وانصراف","days",0.5,"خصم نصف يوم"],
-    ["تأخير ساعة فأكثر","حضور وانصراف","days",1,"خصم يوم كامل"],
-    ["غياب بدون إذن","حضور وانصراف","days",3,"خصم 3 أيام"],
-    ["غياب بإذن","حضور وانصراف","days",1,"خصم يوم"],
+    ["تأخير 15 دقيقة فأكثر وحتى أقل من 30 دقيقة","حضور وانصراف","days",0.25,"فترة السماح من 1 إلى 14 دقيقة بدون خصم؛ من 15 إلى 29 دقيقة خصم ربع يوم"],
+    ["تأخير 30 دقيقة فأكثر وحتى أقل من ساعة","حضور وانصراف","days",0.5,"من 30 إلى 59 دقيقة خصم نصف يوم"],
+    ["تأخير ساعة فأكثر","حضور وانصراف","days",1,"من 60 دقيقة فأكثر خصم يوم كامل"],
+    ["غياب بدون إذن","حضور وانصراف","days",3,"إجمالي خصم الغياب بدون إذن ثلاثة أيام"],
+    ["غياب بإذن","حضور وانصراف","days",1,"إجمالي خصم الغياب بإذن يوم واحد"],
     ["انصراف مبكر","حضور وانصراف","hours",1,"يحسب حسب مدة الانصراف المبكر"],
-    ["تكرار المخالفة بعد المرة الثالثة","حضور وانصراف","percentage",100,"يتضاعف الجزاء من المخالفة الرابعة"],
-    ["أوفر تايم معتمد","وقت إضافي","percentage",200,"ساعة الأوفر تايم تحسب بضعف الساعة العادية"],
-  ];
+    ["تكرار المخالفة بعد المرة الثالثة","حضور وانصراف","percentage",100,"يتضاعف الجزاء من المخالفة الرابعة وفق اللائحة"],
+    ["أوفر تايم معتمد","وقت إضافي","percentage",100,"ساعة الأوفر تايم تحسب بسعر الساعة العادية بدون مضاعفة"],
+  ] as const;
+  const rows=await db.execute(sql`SELECT title FROM penalty_policies WHERE companyId = ${companyId}`);
+  const existingTitles=new Set(((rows as any)[0] ?? []).map((row:any)=>String(row.title)));
   for(const item of defaults) {
-    await db.execute(sql`INSERT INTO penalty_policies (companyId,title,category,deductionType,deductionValue,note,active,createdBy)
-      VALUES (${companyId},${item[0]},${item[1]},${item[2]},${item[3]},${item[4]},TRUE,${staffAccountId})`);
+    if(existingTitles.has(item[0])) {
+      // Keep the company's existing policy row and ID, but synchronize the official rules.
+      await db.execute(sql`UPDATE penalty_policies SET category=${item[1]}, deductionType=${item[2]}, deductionValue=${item[3]}, note=${item[4]}, active=TRUE WHERE companyId=${companyId} AND title=${item[0]}`);
+    } else {
+      await db.execute(sql`INSERT INTO penalty_policies (companyId,title,category,deductionType,deductionValue,note,active,createdBy)
+        VALUES (${companyId},${item[0]},${item[1]},${item[2]},${item[3]},${item[4]},TRUE,${staffAccountId})`);
+    }
   }
 }
 export async function listPenaltyPolicies(staffAccountId: number) {
