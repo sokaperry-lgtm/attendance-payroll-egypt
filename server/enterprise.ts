@@ -808,6 +808,82 @@ export async function getAttendanceWorkSummary(staffAccountId: number, month: st
   };
 }
 
+export async function recalculateHistoricalPenaltyDeductions(staffAccountId:number) {
+  const db=await getDb(); if(!db) throw new Error("Database not available");
+  const m=await getCompanyForStaff(staffAccountId);
+  if(!m || !["owner","manager"].includes(m.role)) throw new Error("إعادة حساب الخصومات التاريخية متاحة للمالك أو المدير فقط.");
+
+  const members=await db.select().from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
+  const staffIds=new Set(members.map(row=>Number(row.staffAccountId)));
+  const staff=(await db.select().from(staffAccounts)).filter(row=>staffIds.has(Number(row.id)));
+  const staffById=new Map(staff.map(row=>[Number(row.id),row]));
+  const payroll=(await db.select().from(payrollRecords).where(eq(payrollRecords.companyId,m.companyId)))
+    .filter(row=>staffIds.has(Number(row.staffAccountId)));
+  const approvedStatuses=new Set(["approved","مقبول","معتمد"]);
+  const approvedCount=payroll.filter(row=>approvedStatuses.has(String(row.status))).length;
+  const drafts=payroll.filter(row=>!approvedStatuses.has(String(row.status)));
+  const attendance=(await db.select().from(attendanceRecords)).filter(row=>staffIds.has(Number(row.staffAccountId)));
+  const permissions=(await db.select().from(staffRequests)).filter(row=>
+    staffIds.has(Number(row.staffAccountId)) && row.type==="إذن" && row.status==="مقبول"
+  );
+  const permissionDates=new Set(permissions.map(row=>String(row.staffAccountId)+":"+String(row.fromDate)));
+  const nowParts=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit"}).formatToParts(new Date());
+  const nowValues=Object.fromEntries(nowParts.map(part=>[part.type,part.value]));
+  const currentMonth=String(nowValues.year)+"-"+String(nowValues.month);
+  let updated=0, unchanged=0, oldTotal=0, newTotal=0;
+  const changes:Array<{payrollId:number;staffAccountId:number;month:string;oldAbsence:number;newAbsence:number;oldLate:number;newLate:number;oldNet:number;newNet:number}>=[];
+  for(const row of drafts) {
+    const staffRow=staffById.get(Number(row.staffAccountId));
+    if(!staffRow) continue;
+    const monthRecords=attendance.filter(a=>Number(a.staffAccountId)===Number(row.staffAccountId) && String(a.date).startsWith(row.month))
+      .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const monthlySalary=row.month===currentMonth
+      ? Math.max(0,Number(staffRow.baseSalary||0))
+      : Math.max(0,Number(row.baseSalary||0));
+    const dailyValue=monthlySalary/PAYROLL_RULES.calendarDays;
+    let lateDeduction=0, lateCount=0, absenceDeduction=0, absenceCount=0;
+    for(const record of monthRecords) {
+      const lateMinutes=Math.max(0,Number(record.lateMinutes||0));
+      const note=String(record.note||"");
+      if(note.includes("تم اعتماد التأخير") && lateMinutes>=PAYROLL_RULES.lateQuarterDayMinutes) {
+        lateCount++;
+        const days=lateMinutes>=PAYROLL_RULES.lateFullDayMinutes?1:
+          lateMinutes>=PAYROLL_RULES.lateHalfDayMinutes?0.5:0.25;
+        lateDeduction+=days*dailyValue*(lateCount>PAYROLL_RULES.repeatPenaltyAfter?2:1);
+      }
+      if(record.status==="غياب") {
+        const permitted=note.includes("بإذن") || permissionDates.has(String(record.staffAccountId)+":"+String(record.date));
+        if(permitted) {
+          absenceDeduction+=dailyValue;
+        } else {
+          absenceCount++;
+          const multiplier=note.includes("تم اعتماد الغياب") && absenceCount>PAYROLL_RULES.repeatPenaltyAfter?2:1;
+          absenceDeduction+=PAYROLL_RULES.absencePenaltyDays*dailyValue*multiplier;
+        }
+      }
+    }
+    absenceDeduction=Math.round(absenceDeduction);
+    lateDeduction=Math.round(lateDeduction);
+    const oldAbsence=Number(row.absenceDeduction||0), oldLate=Number(row.lateDeduction||0), oldNet=Number(row.netSalary||0);
+    const newNet=Math.max(0,Number(row.grossSalary||0)-Number(row.employeeSocialInsurance||0)-Number(row.employeeIncomeTax||0)
+      -absenceDeduction-lateDeduction-Number(row.earlyDeduction||0)-Number(row.otherDeductions||0)-Number(row.advances||0));
+    oldTotal+=oldAbsence+oldLate;
+    newTotal+=absenceDeduction+lateDeduction;
+    if(oldAbsence===absenceDeduction && oldLate===lateDeduction && oldNet===newNet) { unchanged++; continue; }
+    await db.update(payrollRecords).set({
+      absenceDeduction,lateDeduction,netSalary:newNet,updatedAt:new Date()
+    }).where(and(eq(payrollRecords.id,row.id),eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.status,row.status)));
+    changes.push({payrollId:Number(row.id),staffAccountId:Number(row.staffAccountId),month:row.month,oldAbsence,newAbsence:absenceDeduction,oldLate,newLate:lateDeduction,oldNet,newNet});
+    updated++;
+  }
+  await writeAudit(staffAccountId,m.companyId,"payroll.historical_penalties_recalculated","payroll",undefined,{
+    updated,unchanged,approvedSkipped:approvedCount,oldPenaltyTotal:oldTotal,newPenaltyTotal:newTotal,
+    netDifference:changes.reduce((sum,row)=>sum+row.oldNet-row.newNet,0),changes
+  });
+  return {updated,unchanged,approvedSkipped:approvedCount,oldPenaltyTotal:oldTotal,newPenaltyTotal:newTotal,
+    netDifference:changes.reduce((sum,row)=>sum+row.oldNet-row.newNet,0)};
+}
+
 export async function generatePayroll(staffAccountId: number, month: string) {
   const db = await getDb(); if (!db) throw new Error("Database not available");
   if (!/^\d{4}-\d{2}$/.test(month)) throw new Error("صيغة الشهر غير صحيحة. استخدم YYYY-MM.");
