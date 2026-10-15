@@ -520,6 +520,7 @@ listPenaltyRequests: managerProcedure.query(async ({ctx})=>{ await enterprise.as
   payroll: router({
     list: payrollAdminProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "payroll.view"); return enterprise.getPayroll(ctx.staffUser.id, input.month); }),
     generate: payrollAdminProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).mutation(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "payroll.manage"); return enterprise.generatePayroll(ctx.staffUser.id, input.month); }),
+    recalculateHistoricalPenalties: payrollAdminProcedure.mutation(async ({ ctx }) => { await enterprise.assertPermission(ctx.staffUser.id, "payroll.manage"); return enterprise.recalculateHistoricalPenaltyDeductions(ctx.staffUser.id); }),
     approve: payrollAdminProcedure.input(z.object({ id: z.number().int() })).mutation(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "payroll.approve"); return enterprise.approvePayroll(ctx.staffUser.id, input.id); }),
     unapprove: payrollAdminProcedure.input(z.object({ id: z.number().int() })).mutation(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "payroll.approve"); return enterprise.unapprovePayroll(ctx.staffUser.id, input.id); }),
     payslip: staffProcedure.input(z.object({ id: z.number().int() })).query(({ ctx, input }) => enterprise.getPayrollPayslip(ctx.staffUser.id, input.id)),
