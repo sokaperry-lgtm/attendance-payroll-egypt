@@ -10,11 +10,12 @@ const roleLabels: Record<Role, string> = { owner: "مالك النظام", manag
 
 export default function EmployeesScreen() {
   const router = useRouter();
-  const { role, staffMembers, loading, createStaffAccount } = useAppData();
+  const { role, staffMembers, loading, createStaffAccount, deleteStaffAccount } = useAppData();
   const { width } = useWindowDimensions();
   const compact = width < 600;
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", password: "", title: "", department: "", baseSalary: "", role: "employee" as "manager" | "supervisor" | "employee" });
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | Role>("all");
@@ -38,6 +39,31 @@ export default function EmployeesScreen() {
   const reset = () => {
     setForm({ name: "", phone: "", password: "", title: "", department: "", baseSalary: "", role: "employee" });
     setOpen(false);
+  };
+
+  const confirmDelete = (id: string, name: string) => {
+    Alert.alert(
+      "حذف نهائي للموظف",
+      "هل أنت متأكد من حذف " + name + " نهائيًا؟\n\nسيتم حذف حساب الدخول وسجلات الحضور والطلبات والجداول والخصومات والسلف والمستندات ومسيرات المرتبات المرتبطة به. لا يمكن التراجع عن هذه العملية.",
+      [
+        { text: "إلغاء", style: "cancel" },
+        {
+          text: "حذف نهائي",
+          style: "destructive",
+          onPress: async () => {
+            setDeletingId(Number(id));
+            try {
+              await deleteStaffAccount(Number(id));
+              Alert.alert("تم الحذف", "تم حذف الموظف " + name + " نهائيًا.");
+            } catch (error) {
+              Alert.alert("تعذر الحذف", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
+            } finally {
+              setDeletingId(null);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const save = async () => {
@@ -120,24 +146,32 @@ export default function EmployeesScreen() {
         </View>
 
         {filteredStaff.map(p => (
-          <Pressable key={p.id} style={[styles.person, compact && styles.personCompact]} onPress={() => router.push(("/employee/" + p.id) as never)}>
-            <View style={styles.avatar}><Text style={styles.avatarText}>{p.initials}</Text></View>
-            <View style={styles.main}>
-              <Text style={styles.name}>{p.name}</Text>
-              <Text style={styles.role}>{p.title} · {p.department}</Text>
-              <View style={styles.metaRow}>
-                <View style={[styles.roleBadge, p.role === "manager" ? styles.managerBadge : p.role === "supervisor" ? styles.supervisorBadge : styles.employeeBadge]}>
-                  <Text style={styles.roleBadgeText}>{roleLabels[p.role ?? "employee"]}</Text>
+          <View key={p.id} style={[styles.person, compact && styles.personCompact]}>
+            <Pressable style={styles.personContent} onPress={() => router.push(("/employee/" + p.id) as never)}>
+              <View style={styles.avatar}><Text style={styles.avatarText}>{p.initials}</Text></View>
+              <View style={styles.main}>
+                <Text style={styles.name}>{p.name}</Text>
+                <Text style={styles.role}>{p.title} · {p.department}</Text>
+                <View style={styles.metaRow}>
+                  <View style={[styles.roleBadge, p.role === "manager" ? styles.managerBadge : p.role === "supervisor" ? styles.supervisorBadge : styles.employeeBadge]}>
+                    <Text style={styles.roleBadgeText}>{roleLabels[p.role ?? "employee"]}</Text>
+                  </View>
+                  <Text style={styles.phone}>{p.phone || "لا يوجد رقم هاتف"}</Text>
                 </View>
-                <Text style={styles.phone}>{p.phone || "لا يوجد رقم هاتف"}</Text>
               </View>
-            </View>
-            <View style={styles.right}>
-              <View style={[styles.dot, { backgroundColor: p.active === false ? "#667085" : "#163A63" }]} />
-              <Text style={styles.active}>{p.active === false ? "موقوف" : "نشط"}</Text>
-              <Text style={styles.salary}>{formatMoney(p.baseSalary)}</Text>
-            </View>
-          </Pressable>
+              <View style={styles.right}>
+                <View style={[styles.dot, { backgroundColor: p.active === false ? "#667085" : "#163A63" }]} />
+                <Text style={styles.active}>{p.active === false ? "موقوف" : "نشط"}</Text>
+                <Text style={styles.salary}>{formatMoney(p.baseSalary)}</Text>
+              </View>
+            </Pressable>
+            {role === "owner" && p.role !== "owner" && (
+              <Pressable disabled={deletingId === Number(p.id)} style={[styles.deleteButton, deletingId === Number(p.id) && styles.disabled]} onPress={() => confirmDelete(p.id, p.name)}>
+                {deletingId === Number(p.id) ? <ActivityIndicator size="small" color="#B42318" /> : <IconSymbol name="trash" size={16} color="#B42318" />}
+                <Text style={styles.deleteButtonText}>{deletingId === Number(p.id) ? "جاري الحذف" : "حذف نهائي"}</Text>
+              </Pressable>
+            )}
+          </View>
         ))}
         {!filteredStaff.length && <View style={styles.empty}><Text style={styles.emptyIcon}>⌕</Text><Text style={styles.emptyTitle}>لا توجد نتائج</Text><Text style={styles.emptyText}>جرّب تغيير كلمة البحث أو الفلتر.</Text></View>}      </ScrollView>
 
@@ -206,7 +240,7 @@ const styles = StyleSheet.create({
   workspace:{backgroundColor:"#163A63",borderRadius:22,padding:19,flexDirection:"row-reverse",gap:12,alignItems:"center"},workspaceIcon:{width:46,height:46,borderRadius:14,backgroundColor:"rgba(255,255,255,0.14)",alignItems:"center",justifyContent:"center"},workspaceTitle:{color:"#FFFFFF",fontSize:16,fontWeight:"900",textAlign:"right"},workspaceText:{color:"#D9E6F2",fontSize:10,lineHeight:17,textAlign:"right",marginTop:4},
   toolbar:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E8EDF3",borderRadius:18,padding:12,gap:10},searchBox:{borderWidth:1,borderColor:"#E4E7EC",borderRadius:13,minHeight:46,flexDirection:"row-reverse",alignItems:"center",paddingHorizontal:12},searchIcon:{color:"#667085",fontSize:24,width:28,textAlign:"center"},searchInput:{flex:1,color:"#172033",fontSize:12,paddingVertical:10},filters:{flexDirection:"row-reverse",flexWrap:"wrap",gap:7},filter:{borderRadius:10,paddingHorizontal:12,paddingVertical:8,backgroundColor:"#F7F9FC"},filterActive:{backgroundColor:"#163A63"},filterText:{color:"#667085",fontSize:10,fontWeight:"800"},filterTextActive:{color:"#FFFFFF"},sectionHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",paddingTop:4},sectionTitle:{color:"#172033",fontSize:17,fontWeight:"900",textAlign:"right"},sectionHint:{color:"#98A6B8",fontSize:10,fontWeight:"700"},
 
-  empty:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E8EDF3",borderRadius:18,padding:32,alignItems:"center",gap:6},emptyIcon:{fontSize:32,color:"#98A6B8"},emptyTitle:{color:"#172033",fontSize:16,fontWeight:"900"},emptyText:{color:"#667085",fontSize:11},  person:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#F2F5F8",borderRadius:18,padding:15,flexDirection:"row-reverse",alignItems:"center",gap:11},avatar:{width:48,height:48,borderRadius:15,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},avatarText:{color:"#FFFFFF",fontWeight:"900"},
+  empty:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#E8EDF3",borderRadius:18,padding:32,alignItems:"center",gap:6},emptyIcon:{fontSize:32,color:"#98A6B8"},emptyTitle:{color:"#172033",fontSize:16,fontWeight:"900"},emptyText:{color:"#667085",fontSize:11},  person:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#F2F5F8",borderRadius:18,padding:12,gap:10},personContent:{flexDirection:"row-reverse",alignItems:"center",gap:11},deleteButton:{alignSelf:"flex-end",borderWidth:1,borderColor:"#FEE4E2",backgroundColor:"#FFFBFA",borderRadius:10,paddingHorizontal:11,paddingVertical:8,flexDirection:"row-reverse",alignItems:"center",gap:6},deleteButtonText:{color:"#B42318",fontSize:10,fontWeight:"900"},avatar:{width:48,height:48,borderRadius:15,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},avatarText:{color:"#FFFFFF",fontWeight:"900"},
   personCompact:{alignItems:"flex-start",padding:12,gap:9},main:{flex:1,minWidth:0},name:{color:"#172033",fontSize:14,fontWeight:"800",textAlign:"right"},role:{color:"#667085",fontSize:11,textAlign:"right",marginTop:3},phone:{color:"#667085",fontSize:10,textAlign:"right"},right:{alignItems:"flex-end",gap:3},dot:{width:9,height:9,borderRadius:5},active:{color:"#667085",fontSize:9},salary:{color:"#163A63",fontSize:10,fontWeight:"800"},
   metaRow:{flexDirection:"row-reverse",alignItems:"center",gap:7,marginTop:5},roleBadge:{borderRadius:7,paddingHorizontal:7,paddingVertical:3},managerBadge:{backgroundColor:"#EEF4FB"},supervisorBadge:{backgroundColor:"#EEF4FB"},employeeBadge:{backgroundColor:"#F7F9FC"},roleBadgeText:{fontSize:9,fontWeight:"800",color:"#98A6B8"},
   modalBackdrop:{flex:1,backgroundColor:"rgba(2,6,23,0.58)",justifyContent:"flex-end"},modalCard:{backgroundColor:"#FFFFFF",borderTopLeftRadius:28,borderTopRightRadius:28,maxHeight:"92%",padding:20},modalHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",marginBottom:10},modalEyebrow:{color:"#98A6B8",fontSize:9,fontWeight:"900",textAlign:"right"},modalTitle:{color:"#172033",fontSize:23,fontWeight:"900",textAlign:"right",marginTop:2},close:{width:36,height:36,borderRadius:18,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},closeText:{color:"#98A6B8",fontSize:25,lineHeight:28},form:{paddingBottom:30,gap:8},label:{color:"#667085",fontSize:11,fontWeight:"800",textAlign:"right",marginTop:7},input:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#667085",borderRadius:12,paddingHorizontal:13,paddingVertical:12,fontSize:13,color:"#172033"},roleOptions:{gap:8},roleOption:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#667085",borderRadius:14,padding:12,flexDirection:"row-reverse",alignItems:"center",gap:9},roleOptionActive:{backgroundColor:"#163A63",borderColor:"#163A63"},roleOptionTitle:{color:"#172033",fontSize:13,fontWeight:"900",minWidth:78,textAlign:"right"},roleOptionTitleActive:{color:"#FFFFFF"},roleOptionSub:{color:"#667085",fontSize:9,flex:1,textAlign:"right"},roleOptionSubActive:{color:"#D9E6F2"},saveButton:{backgroundColor:"#163A63",borderRadius:14,padding:14,marginTop:12,flexDirection:"row-reverse",alignItems:"center",justifyContent:"center",gap:8},saveText:{color:"#FFFFFF",fontWeight:"900",fontSize:13},disabled:{opacity:0.6},
