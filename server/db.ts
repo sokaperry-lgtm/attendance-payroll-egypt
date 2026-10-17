@@ -224,15 +224,17 @@ export async function deleteStaffAccountPermanently(id: number) {
     "salary_advances", "employee_documents",
   ];
   try {
-    for (const table of linkedTables) {
-      await db.execute(sql.raw("DELETE FROM `" + table + "` WHERE staffAccountId = " + id));
-    }
-    // Permission storage is created lazily on older installations.
-    try {
-      await db.execute(sql.raw("DELETE FROM member_permissions WHERE staffAccountId = " + id));
-    } catch {}
-    await db.delete(companyMembers).where(eq(companyMembers.staffAccountId, id));
-    await db.delete(staffAccounts).where(eq(staffAccounts.id, id));
+    await db.transaction(async (tx) => {
+      for (const table of linkedTables) {
+        await tx.execute(sql.raw("DELETE FROM `" + table + "` WHERE staffAccountId = " + id));
+      }
+      // Permission storage is created lazily on older installations.
+      try {
+        await tx.execute(sql.raw("DELETE FROM member_permissions WHERE staffAccountId = " + id));
+      } catch {}
+      await tx.delete(companyMembers).where(eq(companyMembers.staffAccountId, id));
+      await tx.delete(staffAccounts).where(eq(staffAccounts.id, id));
+    });
     return { id, name: staff.name, phone: staff.phone };
   } catch (error: any) {
     const message = error?.message ? String(error.message) : String(error);
