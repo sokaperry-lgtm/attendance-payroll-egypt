@@ -28,6 +28,7 @@ const MAPPING = {
   settings: "settings",
   logout: "logout",
   edit: "edit",
+  trash: "delete",
   plus: "add",
   "chart.bar.fill": "bar-chart",
   info: "info-outline",

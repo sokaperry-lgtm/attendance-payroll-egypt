@@ -210,6 +210,38 @@ export async function updateStaffAccount(id: number, input: { phone?: string; na
   return getStaffAccountById(id);
 }
 
+export async function deleteStaffAccountPermanently(id: number) {
+  if (!Number.isInteger(id) || id <= 0) throw new Error("معرّف الموظف غير صحيح.");
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const staff = await getStaffAccountById(id);
+  if (!staff) throw new Error("الموظف غير موجود.");
+
+  // Intentional hard delete: remove the account and all employee-owned records.
+  const linkedTables = [
+    "staff_sessions", "attendance_records", "staff_requests", "weekly_schedules",
+    "leave_balances", "payroll_records", "notifications", "salary_adjustments",
+    "salary_advances", "employee_documents",
+  ];
+  try {
+    await db.transaction(async (tx) => {
+      for (const table of linkedTables) {
+        await tx.execute(sql.raw("DELETE FROM `" + table + "` WHERE staffAccountId = " + id));
+      }
+      // Permission storage is created lazily on older installations.
+      try {
+        await tx.execute(sql.raw("DELETE FROM member_permissions WHERE staffAccountId = " + id));
+      } catch {}
+      await tx.delete(companyMembers).where(eq(companyMembers.staffAccountId, id));
+      await tx.delete(staffAccounts).where(eq(staffAccounts.id, id));
+    });
+    return { id, name: staff.name, phone: staff.phone };
+  } catch (error: any) {
+    const message = error?.message ? String(error.message) : String(error);
+    throw new Error("تعذر حذف الموظف نهائيًا: " + message);
+  }
+}
+
 export async function getCompanySettings() {
   const db = await getDb();
   if (!db) return undefined;

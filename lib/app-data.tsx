@@ -43,6 +43,7 @@ export type AppDataContext = {
   approveRequest: (id: string, status: RequestStatus) => Promise<void>;
   createStaffAccount: (input: { phone: string; password: string; name: string; title?: string; department?: string; baseSalary: number; role: "manager" | "supervisor" | "employee" }) => Promise<void>;
   updateStaffAccount: (input: { id: number; phone?: string; password?: string; name?: string; title?: string; department?: string; baseSalary?: number; role?: "manager" | "supervisor" | "employee"; shiftStart?: string; shiftEnd?: string; active?: boolean }) => Promise<void>;
+  deleteStaffAccount: (id: number) => Promise<void>;
   updateBranch: (input: { name: string; address: string; latitude: string; longitude: string; radiusMeters: number }) => Promise<void>;
   shiftTemplates: ShiftTemplate[];
   schedules: ScheduleEntry[];
@@ -68,6 +69,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const reviewMutation = trpc.requests.review.useMutation();
   const createStaffMutation = trpc.staff.create.useMutation();
   const updateStaffMutation = trpc.staff.update.useMutation();
+  const deleteStaffMutation = trpc.staff.delete.useMutation();
   const companyQuery = trpc.company.settings.useQuery(undefined, { enabled: Boolean(meQuery.data), retry: false });
   const updateCompanyMutation = trpc.company.updateSettings.useMutation();
   const shiftTemplatesQuery = trpc.schedule.templates.useQuery(undefined, { enabled: Boolean(meQuery.data), retry: false });
@@ -125,9 +127,10 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     approveRequest: async (id, status) => { await reviewMutation.mutateAsync({ id: Number(id), status: status as "مقبول" | "مرفوض" }); await invalidateAll(); },
     createStaffAccount: async (input) => { await createStaffMutation.mutateAsync({ ...input, shiftStart: "08:00", shiftEnd: "17:00" }); await invalidateAll(); },
     updateStaffAccount: async (input) => { await updateStaffMutation.mutateAsync(input); await invalidateAll(); },
+    deleteStaffAccount: async (id) => { await deleteStaffMutation.mutateAsync({ id }); await invalidateAll(); },
     updateBranch: async (input) => { await updateCompanyMutation.mutateAsync(input); await invalidateAll(); },
     saveSchedule: async (input) => { await saveScheduleMutation.mutateAsync(input); await invalidateAll(); },
-  }), [role, employee, branch, meQuery.data?.shiftStart, meQuery.data?.shiftEnd, records, requests, staffMembers, payrollInputs, payroll, todayRecord, activeAttendanceRecord, previousRecord, previousSchedule, meQuery.isLoading, attendanceQuery.isLoading, teamAttendanceQuery.isLoading, shiftTemplates, schedules, teamSchedules, teamAttendance, activeShift, checkInMutation, checkOutMutation, requestMutation, reviewMutation, createStaffMutation, updateStaffMutation, updateCompanyMutation, saveScheduleMutation]);
+  }), [role, employee, branch, meQuery.data?.shiftStart, meQuery.data?.shiftEnd, records, requests, staffMembers, payrollInputs, payroll, todayRecord, activeAttendanceRecord, previousRecord, previousSchedule, meQuery.isLoading, attendanceQuery.isLoading, teamAttendanceQuery.isLoading, shiftTemplates, schedules, teamSchedules, teamAttendance, activeShift, checkInMutation, checkOutMutation, requestMutation, reviewMutation, createStaffMutation, updateStaffMutation, deleteStaffMutation, updateCompanyMutation, saveScheduleMutation]);
   return <AppData.Provider value={value}>{children}</AppData.Provider>;
 }
 

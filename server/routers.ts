@@ -177,6 +177,26 @@ export const appRouter = router({
       await enterprise.writeAudit(ctx.staffUser.id, (await enterprise.getCompanyForStaff(ctx.staffUser.id))!.companyId, "staff.updated", "staff", String(id), changes);
       return await staffView(updated);
     }),
+    delete: hrProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const actorMembership = await enterprise.getMembership(ctx.staffUser.id);
+      if (!actorMembership?.active || actorMembership.role !== "owner") {
+        throw new Error("الحذف النهائي للموظفين متاح لمالك النظام فقط.");
+      }
+      const targetMembership = await enterprise.getMembership(input.id);
+      if (!targetMembership || targetMembership.companyId !== actorMembership.companyId) {
+        throw new Error("الموظف غير موجود في شركتك.");
+      }
+      if (input.id === ctx.staffUser.id || targetMembership.role === "owner") {
+        throw new Error("لا يمكن حذف حساب المالك.");
+      }
+      const target = await db.getStaffAccountById(input.id);
+      if (!target) throw new Error("الموظف غير موجود.");
+      const deleted = await db.deleteStaffAccountPermanently(input.id);
+      await enterprise.writeAudit(ctx.staffUser.id, actorMembership.companyId, "staff.permanently_deleted", "staff", String(input.id), {
+        deletedStaffId: input.id, name: target.name, phone: target.phone, title: target.title, department: target.department,
+      });
+      return { success: true, employee: deleted };
+    }),
   }),
   company: router({
     settings: staffProcedure.query(async ({ctx}) => { const b = await enterprise.getBranchForStaff(ctx.staffUser.id); if (!b) throw new Error("لم يتم إعداد فرع للحساب. تواصل مع مدير الشركة لإعداد موقع GPS."); return b; }),
