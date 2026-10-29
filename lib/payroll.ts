@@ -9,7 +9,10 @@ export const PAYROLL_RULES = {
   lateQuarterDayMinutes: 15,
   lateHalfDayMinutes: 30,
   lateFullDayMinutes: 60,
-  repeatPenaltyAfter: 3,
+  // The current approved policy has fixed penalties and no repeat-doubling rule.
+  // Keep this threshold effectively unreachable because older payroll service code
+  // still checks it when recalculating historical/draft payroll rows.
+  repeatPenaltyAfter: Number.MAX_SAFE_INTEGER,
   overtimeMultiplier: 1,
 } as const;
 
