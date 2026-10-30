@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, getStaffAccountById } from "./db";
 import * as dbQueries from "./db";
 import { calculateEgyptPayroll } from "./egypt-payroll";
-import { PAYROLL_RULES } from "../lib/payroll";
+import { PAYROLL_RULES, calculateAttendanceAccrual, calculateAttendancePenalties, todayKey } from "../lib/payroll";
 import {
   companies, branches, companyMembers, leaveBalances,
   payrollRecords, notifications, subscriptions, auditLogs, staffAccounts,
@@ -897,7 +897,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
   const staff = await db.select().from(staffAccounts).where(eq(staffAccounts.active,true));
   const attendance = await db.select().from(attendanceRecords);
   const schedules = await db.select().from(weeklySchedules);
-  const shifts = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
+  const shifts = await db.select().from(shiftTemplates);
   const approvedOvertime = await db.select().from(staffRequests).where(and(eq(staffRequests.type,"أوفر تايم"),eq(staffRequests.status,"مقبول")));
   const result=[];
   let skippedApproved=0;
@@ -909,25 +909,16 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     )).limit(1))[0];
     if(existing && ["approved","مقبول","معتمد"].includes(String(existing.status))) { result.push(existing); skippedApproved++; continue; }
     const records=attendance
-      .filter(x=>x.staffAccountId===s.id && x.date.startsWith(month))
+      .filter(x=>x.staffAccountId===s.id && x.date.startsWith(month) && x.date <= todayKey())
       .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
 
-    // Monthly salary accrues by calendar day, including the four paid weekly
-    // rest days. Actual absences are deducted separately below; rest days are
-    // never treated as missing attendance. The company payroll month is 30 days.
     const monthlyBaseSalary = Math.max(0, Math.round(Number(s.baseSalary) || 0));
-    const cairoDateParts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit",
-    }).formatToParts(new Date());
-    const cairoDateValues = Object.fromEntries(cairoDateParts.map(part => [part.type, part.value]));
-    const todayCairo = `${cairoDateValues.year}-${cairoDateValues.month}-${cairoDateValues.day}`;
-    const currentMonth = todayCairo.slice(0, 7);
-    const elapsedDays = month < currentMonth
-      ? PAYROLL_RULES.calendarDays
-      : month > currentMonth
-        ? 0
-        : Math.min(PAYROLL_RULES.calendarDays, Number(todayCairo.slice(8, 10)));
-    const earnedBaseSalary = Math.round(monthlyBaseSalary * elapsedDays / PAYROLL_RULES.calendarDays);
+    const todayCairo = todayKey();
+    const restDates = schedules.filter(row => row.staffAccountId === s.id &&
+      shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
+      .map(row => row.scheduleDate);
+    const accrual = calculateAttendanceAccrual(monthlyBaseSalary, month, records, restDates, todayCairo);
+    const earnedBaseSalary = accrual.earnedBaseSalary;
     const dailyValue=monthlyBaseSalary/PAYROLL_RULES.calendarDays;
     const hourlyValue=dailyValue/PAYROLL_RULES.dailyHours;
 
@@ -944,45 +935,15 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       }
     }
 
-    // Attendance penalties are automatic. The manager/owner can still correct
-    // the attendance record or waive a penalty before payroll is closed.
-    let lateDeduction=0;
-    let lateCount=0;
-    let absenceDeduction=0;
-    let absenceCount=0;
-
-    for (const record of records) {
-      const lateMinutes=Math.max(0, Number(record.lateMinutes || 0));
-      const lateApproved=String(record.note || "").includes("تم اعتماد التأخير");
-      if (lateApproved && lateMinutes >= PAYROLL_RULES.lateQuarterDayMinutes) {
-        lateCount++;
-        const baseDays =
-          lateMinutes >= PAYROLL_RULES.lateFullDayMinutes ? 1 :
-          lateMinutes >= PAYROLL_RULES.lateHalfDayMinutes ? 0.5 :
-          0.25;
-        const multiplier = lateCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
-        lateDeduction += baseDays * dailyValue * multiplier;
-      }
-
-      if (record.status === "غياب") {
-        const hasPermission = String(record.note || "").includes("بإذن");
-        if (hasPermission) {
-          absenceDeduction += dailyValue;
-        } else {
-          absenceCount++;
-          const multiplier = String(record.note || "").includes("تم اعتماد الغياب") &&
-            absenceCount > PAYROLL_RULES.repeatPenaltyAfter ? 2 : 1;
-          // The penalty is the total for the absence: three days without permission,
-          // one day when permission is recorded. Do not add a second daily deduction.
-          absenceDeduction += PAYROLL_RULES.absencePenaltyDays * dailyValue * multiplier;
-        }
-      }
-    }
+    const { absenceDeduction, lateDeduction } = calculateAttendancePenalties(
+      monthlyBaseSalary, records, accrual.unpaidAbsenceDays, restDates,
+    );
 
     const earlyMinutes=records.reduce((total, record) => {
       if (!record.checkOut || !String(record.note || "").includes("تم اعتماد الانصراف المبكر")) return total;
       const schedule = schedules.find(item => item.staffAccountId === s.id && item.scheduleDate === record.date);
       const shift = schedule ? shifts.find(item => item.id === schedule.shiftTemplateId) : undefined;
+      if (shift?.kind === "weekly_off") return total;
       const shiftStart = shift?.startTime ?? s.shiftStart;
       const shiftEnd = shift?.endTime ?? s.shiftEnd;
       const crossesMidnight = (shift?.crossesMidnight ?? false) || minutesOf(shiftEnd) < minutesOf(shiftStart);
@@ -994,7 +955,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const earlyDeduction=Math.round(hourlyValue*earlyMinutes/60);
 
     const approvedOvertimeHours=approvedOvertime
-      .filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month))
+      .filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month) && r.fromDate <= todayCairo)
       .reduce((sum,r)=>sum+Math.max(0, Number(r.hours ?? 0)),0);
     const overtimeHours=approvedOvertimeHours;
     const overtimeRate=hourlyValue;
@@ -1072,7 +1033,7 @@ export async function approvePayroll(staffAccountId:number, id:number) {
 export async function getPayrollPayslip(staffAccountId:number, payrollId:number) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(staffAccountId); if(!m) throw new Error("Company not found");
-  const payroll=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,payrollId),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
+  let payroll=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,payrollId),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
   if(!payroll) throw new Error("قسيمة الراتب غير موجودة");
   const payrollAdminRoles: CompanyRole[] = ["owner","manager","hr","accountant"];
   if (payrollAdminRoles.includes(m.role as CompanyRole)) {
@@ -1084,6 +1045,10 @@ export async function getPayrollPayslip(staffAccountId:number, payrollId:number)
   if(!staff) throw new Error("الموظف غير موجود");
   const company=(await db.select().from(companies).where(eq(companies.id,m.companyId)).limit(1))[0];
   const branch=m.branchId ? (await db.select().from(branches).where(eq(branches.id,m.branchId)).limit(1))[0] : undefined;
+  if (!["approved","مقبول","معتمد","paid","مدفوع","closed","مغلق","finalized","مقفل"].includes(payroll.status)) {
+    const live = await getEmployeeSelfService(payroll.staffAccountId,payroll.month);
+    if (live) payroll = {...payroll,...live.livePayroll};
+  }
   return { payroll, staff, company, branch, employeeId: staff.id, issuedAt: payroll.approvedAt ?? payroll.updatedAt ?? payroll.createdAt };
 }
 
@@ -1187,7 +1152,13 @@ export async function getPayroll(staffAccountId:number, month:string) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId);
   if(!m || !["owner","manager","hr","accountant"].includes(m.role)) throw new Error("غير مصرح");
-  return db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.month,month))).orderBy(desc(payrollRecords.netSalary));
+  const rows = await db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.month,month)));
+  const result = await Promise.all(rows.map(async row => {
+    if (["approved","مقبول","معتمد","paid","مدفوع","closed","مغلق","finalized","مقفل"].includes(row.status)) return row;
+    const live = await getEmployeeSelfService(row.staffAccountId,month);
+    return live ? {...row,...live.livePayroll} : row;
+  }));
+  return result.sort((a,b)=>b.netSalary-a.netSalary);
 }
 
 export async function assertPayrollEditable(staffAccountId:number, month:string, targetStaffAccountId?:number) {
@@ -1514,29 +1485,60 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   const requests=await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,staffAccountId)).orderBy(desc(staffRequests.createdAt)).limit(50);
   const payroll=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.staffAccountId,staffAccountId),eq(payrollRecords.month,month))).limit(1))[0] ?? null;
 
-  // For the active month, employee self-service shows salary earned only up to today.
-  const cairoToday = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit"
-  }).format(new Date());
+  const cairoToday = todayKey();
   const isCurrentMonth = month === cairoToday.slice(0, 7);
-  const workedDaysToDate = new Set(
-    attendance
-      .filter(record => record.date.startsWith(month) && (!isCurrentMonth || record.date <= cairoToday) && Boolean(record.checkIn) && ["حاضر", "متأخر"].includes(String(record.status || "")))
-      .map(record => record.date)
-  ).size;
-  // Monthly salary accrues through the current calendar date, including paid weekly rest days.
-  // Attendance days remain a separate metric; absences are handled in payroll deductions.
-  const elapsedPayrollDays = month < cairoToday.slice(0, 7)
-    ? PAYROLL_RULES.calendarDays
-    : month > cairoToday.slice(0, 7)
-      ? 0
-      : Math.min(PAYROLL_RULES.calendarDays, Number(cairoToday.slice(8, 10)));
-  const earnedBaseSalaryToDate = Math.round(
-    (Number(staff.baseSalary || 0) / PAYROLL_RULES.calendarDays) * elapsedPayrollDays
-  );
+  const schedules = await db.select().from(weeklySchedules).where(eq(weeklySchedules.staffAccountId,staffAccountId));
+  // Historical schedules retain their meaning even if a template is now inactive.
+  const shifts = await db.select().from(shiftTemplates);
+  const restDates = schedules.filter(row => shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
+    .map(row => row.scheduleDate);
+  const accrual = calculateAttendanceAccrual(Number(staff.baseSalary), month, attendance, restDates, cairoToday);
+  const earnedBaseSalaryToDate = accrual.earnedBaseSalary;
+  const workedDaysToDate = accrual.workedDays;
+  const paidRestDaysToDate = accrual.paidRestDays;
+
+  const currentRecords = attendance.filter(row => row.date.startsWith(`${month}-`) && row.date <= cairoToday);
+  const permissionDates = new Set((await db.select().from(staffRequests).where(and(
+    eq(staffRequests.staffAccountId,staffAccountId), eq(staffRequests.type,"إذن"), eq(staffRequests.status,"مقبول")
+  ))).map(row => row.fromDate));
+  const penalties = calculateAttendancePenalties(Number(staff.baseSalary), currentRecords.map(row => ({...row,
+    note: permissionDates.has(row.date) ? `${row.note || ""} بإذن` : row.note,
+  })), accrual.unpaidAbsenceDays, restDates);
+  const overtime = (await db.select().from(staffRequests).where(and(
+    eq(staffRequests.staffAccountId,staffAccountId), eq(staffRequests.type,"أوفر تايم"), eq(staffRequests.status,"مقبول")
+  ))).filter(row => row.fromDate.startsWith(`${month}-`) && row.fromDate <= cairoToday)
+    .reduce((sum,row) => sum + Math.max(0,Number(row.hours) || 0),0) * Number(staff.baseSalary) / 30 / 9;
+  const earlyMinutes = currentRecords.reduce((total,record) => {
+    if (!record.checkOut || !String(record.note || "").includes("تم اعتماد الانصراف المبكر")) return total;
+    const schedule = schedules.find(row => row.scheduleDate === record.date);
+    const shift = shifts.find(row => row.id === schedule?.shiftTemplateId);
+    if (shift?.kind === "weekly_off") return total;
+    const start = shift?.startTime ?? staff.shiftStart;
+    const end = shift?.endTime ?? staff.shiftEnd;
+    const overnight = Boolean(shift?.crossesMidnight) || minutesOf(end) < minutesOf(start);
+    let checkout = minutesOf(record.checkOut);
+    if (overnight && checkout < minutesOf(start)) checkout += 1440;
+    return total + Math.max(0,minutesOf(end)+(overnight ? 1440 : 0)-checkout);
+  },0);
+  const earlyDeduction = Math.round(Number(staff.baseSalary)/30/9*earlyMinutes/60);
+  const adjustments = await db.select().from(salaryAdjustments).where(and(
+    eq(salaryAdjustments.companyId,m.companyId),eq(salaryAdjustments.staffAccountId,staffAccountId),eq(salaryAdjustments.month,month)
+  ));
+  const allowances = adjustments.filter(row => row.type === "allowance").reduce((sum,row)=>sum+row.amount,0);
+  const bonuses = adjustments.filter(row => ["bonus","incentive"].includes(row.type)).reduce((sum,row)=>sum+row.amount,0);
+  const otherDeductions = adjustments.filter(row => ["penalty","deduction"].includes(row.type)).reduce((sum,row)=>sum+row.amount,0);
+  const advances = (await db.select().from(salaryAdvances).where(and(
+    eq(salaryAdvances.companyId,m.companyId),eq(salaryAdvances.staffAccountId,staffAccountId),eq(salaryAdvances.status,"active")
+  ))).filter(row => row.startMonth <= month && row.remainingAmount > 0)
+    .reduce((sum,row)=>sum+Math.min(row.installmentAmount,row.remainingAmount),0);
+  const grossSalary = earnedBaseSalaryToDate + allowances + bonuses + Math.round(overtime);
+  const egypt = calculateEgyptPayroll({monthlyGross:grossSalary,insuranceWage:earnedBaseSalaryToDate,monthlyOtherDeductions:0});
+  const livePayroll = {...payroll, ...penalties, baseSalary:earnedBaseSalaryToDate, allowances, bonuses, otherDeductions, advances, earlyDeduction,
+    overtime:Math.round(overtime), grossSalary, employeeSocialInsurance:egypt.employeeSocialInsurance, employeeIncomeTax:egypt.employeeIncomeTax,
+    netSalary:Math.max(0,egypt.net-penalties.absenceDeduction-penalties.lateDeduction-earlyDeduction-otherDeductions-advances)};
 
   const balance=await ensureLeaveBalance(staffAccountId,Number(month.slice(0,4)));
-  return { staff, attendance: attendance.slice(0,90), requests, payroll, leaveBalance: balance, earnedBaseSalaryToDate, workedDaysToDate, isCurrentMonth };
+  return { staff, attendance: attendance.slice(0,90), requests, payroll, leaveBalance: balance, livePayroll, earnedBaseSalaryToDate, workedDaysToDate, paidRestDaysToDate, isCurrentMonth };
 }
 
 export function toCsv(rows: Array<Record<string, unknown>>) {

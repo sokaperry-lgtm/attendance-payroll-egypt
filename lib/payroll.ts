@@ -32,6 +32,51 @@ export function calculateEarnedSalary(baseSalary: number, workedMinutes: number)
   return Math.min(Math.round(monthlySalary), Math.round(hourlyValue * minutes / 60));
 }
 
+/** One paid day per recorded attendance/rest date, using Cairo's date cutoff. */
+export function calculateAttendanceAccrual(
+  baseSalary: number,
+  month: string,
+  attendance: Array<{ date: string; checkIn?: string | null; status: string }>,
+  restDates: string[],
+  today = todayKey(),
+) {
+  const eligible = (date: string) => date.startsWith(`${month}-`) && date <= today;
+  const worked = new Set(attendance.filter(r => eligible(r.date) && Boolean(r.checkIn) &&
+    ["حاضر", "متأخر"].includes(r.status)).map(r => r.date));
+  const rest = new Set(restDates.filter(eligible));
+  const paid = new Set([...worked, ...rest]);
+  // An absent day's wage is already excluded from accrual. Only the additional
+  // two days of the three-day penalty may be deducted from this basis.
+  const unpaidAbsence = new Set(attendance.filter(r => eligible(r.date) && r.status === "غياب" &&
+    !paid.has(r.date)).map(r => r.date));
+  return {
+    earnedBaseSalary: Math.round(Math.max(0, Number(baseSalary) || 0) * Math.min(PAYROLL_RULES.calendarDays, paid.size) / PAYROLL_RULES.calendarDays),
+    workedDays: worked.size,
+    paidRestDays: [...rest].filter(date => !worked.has(date)).length,
+    unpaidAbsenceDays: unpaidAbsence.size,
+  };
+}
+
+export function calculateAttendancePenalties(
+  baseSalary: number,
+  records: Array<{date: string; status: string; lateMinutes?: number | null; note?: string | null}>,
+  unpaidAbsenceDays: number,
+  paidRestDates: string[] = [],
+) {
+  const daily = Math.max(0, baseSalary) / PAYROLL_RULES.calendarDays;
+  let absence = 0, late = 0;
+  for (const record of records) {
+    if (paidRestDates.includes(record.date)) continue;
+    const note = record.note || "";
+    if (record.status === "غياب") absence += getAbsencePenaltyDays(note.includes("بإذن")) * daily;
+    if (note.includes("تم اعتماد التأخير")) {
+      const minutes = Math.max(0, Number(record.lateMinutes) || 0);
+      late += (minutes >= PAYROLL_RULES.lateFullDayMinutes ? 1 : minutes >= PAYROLL_RULES.lateHalfDayMinutes ? 0.5 : minutes >= PAYROLL_RULES.lateQuarterDayMinutes ? 0.25 : 0) * daily;
+    }
+  }
+  return { absenceDeduction: Math.round(Math.max(0, absence - unpaidAbsenceDays * daily)), lateDeduction: Math.round(late) };
+}
+
 export type PayrollInputs = {
   baseSalary: number;
   allowances?: number;

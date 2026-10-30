@@ -64,19 +64,8 @@ export default function HomeScreen(){
   const payrollTotal = (payrollQuery.data ?? []).reduce((sum:number,r:any) => sum + Number(r.netSalary || 0), 0);
   // Employee dashboard uses the same accrued-to-date payroll figures as the "My Salary" screen.
   const selfPayroll = selfServicePayroll.data?.payroll;
-  const selfLiveBase = Number(selfServicePayroll.data?.earnedBaseSalaryToDate ?? 0);
-  const selfIsLiveCurrentMonth = selfServicePayroll.data?.isCurrentMonth === true && selfPayroll?.status !== "approved";
-  const employeeGross = selfPayroll?.status === "approved"
-    ? Number(selfPayroll.grossSalary ?? 0)
-    : selfIsLiveCurrentMonth
-      ? selfLiveBase + Number(payroll.overtimeValue ?? 0)
-      : Number(selfPayroll?.grossSalary ?? (selfLiveBase + Number(payroll.overtimeValue ?? 0)));
-  const employeeDeductions = selfPayroll?.status === "approved"
-    ? Number(selfPayroll.employeeSocialInsurance ?? 0) + Number(selfPayroll.employeeIncomeTax ?? 0) + Number(selfPayroll.absenceDeduction ?? 0) + Number(selfPayroll.lateDeduction ?? 0) + Number(selfPayroll.earlyDeduction ?? 0) + Number(selfPayroll.otherDeductions ?? 0) + Number(selfPayroll.advances ?? 0)
-    : Number(payroll.absenceDeduction ?? 0) + Number(payroll.lateDeduction ?? 0) + Number(payroll.earlyDeduction ?? 0);
-  const employeeNet = selfPayroll?.status === "approved"
-    ? Number(selfPayroll.netSalary ?? 0)
-    : Math.max(0, employeeGross - employeeDeductions);
+  const shownPayroll = selfPayroll?.status === "approved" ? selfPayroll : selfServicePayroll.data?.livePayroll;
+  const employeeNet = Number(shownPayroll?.netSalary ?? 0);
   const attendanceActionLabel = working ? "جارٍ التحقق..." : isCheckedOut ? "تم إنهاء الوردية ✓" : effectiveCheckedIn ? "تسجيل الانصراف" : "تسجيل الحضور";
   const dateLabel=useMemo(()=>new Intl.DateTimeFormat("ar-EG",{weekday:"long",day:"numeric",month:"long"}).format(new Date()),[]);
 

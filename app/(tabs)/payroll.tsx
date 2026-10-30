@@ -165,10 +165,11 @@ export default function PayrollScreen() {
     const p = selfService.data?.payroll;
     const liveBase = Number(selfService.data?.earnedBaseSalaryToDate ?? 0);
     const isLiveCurrentMonth = selfService.data?.isCurrentMonth === true && p?.status !== "approved";
-    const gross = p?.status === "approved" ? p.grossSalary : (isLiveCurrentMonth ? liveBase + payroll.overtimeValue : (p?.grossSalary ?? liveBase + payroll.overtimeValue));
-    const deductions = p?.status === "approved" ? p.employeeSocialInsurance + p.employeeIncomeTax + p.absenceDeduction + p.lateDeduction + (p.earlyDeduction ?? 0) + p.otherDeductions + p.advances : payroll.absenceDeduction + payroll.lateDeduction + payroll.earlyDeduction;
-    const net = p?.status === "approved" ? p.netSalary : Math.max(0, gross - deductions);
-    const salaryMeta = isLiveCurrentMonth ? "حتى " + (selfService.data?.workedDaysToDate ?? 0) + " يوم عمل مسجل" : undefined;
+    const shown = p?.status === "approved" ? p : (selfService.data?.livePayroll ?? p);
+    const gross = Number(shown?.grossSalary ?? 0);
+    const deductions = Number(shown?.employeeSocialInsurance ?? 0) + Number(shown?.employeeIncomeTax ?? 0) + Number(shown?.absenceDeduction ?? 0) + Number(shown?.lateDeduction ?? 0) + Number(shown?.earlyDeduction ?? 0) + Number(shown?.otherDeductions ?? 0) + Number(shown?.advances ?? 0);
+    const net = Number(shown?.netSalary ?? 0);
+    const salaryMeta = isLiveCurrentMonth ? `${selfService.data?.workedDaysToDate ?? 0} يوم حضور + ${selfService.data?.paidRestDaysToDate ?? 0} يوم راحة مدفوعة` : undefined;
     return (
       <ScreenContainer>
         <ScrollView contentContainerStyle={[styles.content, compact && styles.contentCompact]} showsVerticalScrollIndicator={false}>
@@ -182,21 +183,21 @@ export default function PayrollScreen() {
             <View style={styles.monthCenter}><Text style={styles.monthKicker}>PAYSLIP PERIOD</Text><Text style={styles.monthTitle}>{monthLabel(month)}</Text></View>
             <Pressable onPress={() => setMonth(shiftMonth(month, 1))} style={styles.monthButton}><Text style={styles.monthButtonLabel}>التالي</Text><IconSymbol name="arrow.right" size={16} color="#163A63" /></Pressable>
           </View>
-          <View style={[styles.kpiGrid, compact && styles.kpiGridCompact]}><Kpi label="إجمالي المستحقات" value={formatMoney(gross)} /><Kpi label="إجمالي الخصومات" value={formatMoney(deductions)} /><Kpi label="الأوفر تايم" value={formatMoney(p?.overtime ?? payroll.overtimeValue)} /></View>
+          <View style={[styles.kpiGrid, compact && styles.kpiGridCompact]}><Kpi label="إجمالي المستحقات" value={formatMoney(gross)} /><Kpi label="إجمالي الخصومات" value={formatMoney(deductions)} /><Kpi label="الأوفر تايم" value={formatMoney(shown?.overtime ?? 0)} /></View>
           <Section title="قسيمة الراتب" subtitle="تفصيل كامل للمستحقات والخصومات والتأمين والضريبة" />
           <View style={styles.detailCard}>
-            <Row label={isLiveCurrentMonth ? "الراتب المستحق حتى الآن" : "الراتب الأساسي"} value={formatMoney(p?.status === "approved" ? p.baseSalary : liveBase)} />
-            <Row label="البدلات" value={formatMoney(p?.allowances ?? 0)} />
-            <Row label="الحوافز والمكافآت" value={formatMoney(p?.bonuses ?? 0)} />
-            <Row label="الأوفر تايم" value={formatMoney(p?.overtime ?? payroll.overtimeValue)} />
+            <Row label={isLiveCurrentMonth ? "الراتب المستحق حتى الآن" : "الراتب الأساسي"} value={formatMoney(shown?.baseSalary ?? liveBase)} />
+            <Row label="البدلات" value={formatMoney(shown?.allowances ?? 0)} />
+            <Row label="الحوافز والمكافآت" value={formatMoney(shown?.bonuses ?? 0)} />
+            <Row label="الأوفر تايم" value={formatMoney(shown?.overtime ?? 0)} />
             <Row label="إجمالي المستحقات" value={formatMoney(gross)} />
-            <Row label="التأمينات الاجتماعية" value={formatMoney(p?.employeeSocialInsurance ?? 0)} />
-            <Row label="ضريبة الدخل" value={formatMoney(p?.employeeIncomeTax ?? 0)} />
-            <Row label="خصم الغياب" value={formatMoney(p?.absenceDeduction ?? payroll.absenceDeduction)} />
-            <Row label="خصم التأخير" value={formatMoney(p?.lateDeduction ?? payroll.lateDeduction)} />
-            <Row label="خصم الانصراف المبكر" value={formatMoney(p?.earlyDeduction ?? 0)} />
-            <Row label="خصومات أخرى" value={formatMoney(p?.otherDeductions ?? 0)} />
-            <Row label="السلف والأقساط" value={formatMoney(p?.advances ?? 0)} />
+            <Row label="التأمينات الاجتماعية" value={formatMoney(shown?.employeeSocialInsurance ?? 0)} />
+            <Row label="ضريبة الدخل" value={formatMoney(shown?.employeeIncomeTax ?? 0)} />
+            <Row label="خصم الغياب" value={formatMoney(shown?.absenceDeduction ?? 0)} />
+            <Row label="خصم التأخير" value={formatMoney(shown?.lateDeduction ?? 0)} />
+            <Row label="خصم الانصراف المبكر" value={formatMoney(shown?.earlyDeduction ?? 0)} />
+            <Row label="خصومات أخرى" value={formatMoney(shown?.otherDeductions ?? 0)} />
+            <Row label="السلف والأقساط" value={formatMoney(shown?.advances ?? 0)} />
             <Row label="صافي الراتب" value={formatMoney(net)} strong />
           </View>
           <View style={styles.statusCard}>
