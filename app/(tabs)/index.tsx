@@ -6,7 +6,6 @@ import * as Haptics from "expo-haptics";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAppData } from "@/lib/app-data";
-import { PAYROLL_RULES } from "@/lib/payroll";
 import { calculateLateMinutes } from "@/lib/shift-utils";
 import { trpc } from "@/lib/trpc";
 import { useRouter } from "expo-router";
@@ -30,7 +29,7 @@ async function getCurrentCoordinates():Promise<Coordinates>{
 const weeklyAttendance=[86,94,78,91,88,96,70];
 
 export default function HomeScreen(){
-  const {role,employee,branch,shift,payroll,payrollInputs,records,checkedIn,todayRecord,checkIn,checkOut}=useAppData();
+  const {role,employee,branch,shift,payrollInputs,records,checkedIn,todayRecord,checkIn,checkOut}=useAppData();
   const router=useRouter();
   const { width } = useWindowDimensions();
   const isMobile = width < 700;
@@ -73,7 +72,7 @@ export default function HomeScreen(){
     if(isWeeklyOff)return;setWorking(true);
     try{const c=await getCurrentCoordinates(),d=distanceBetween(branch.latitude,branch.longitude,c.latitude,c.longitude);
       if(d>branch.radiusMeters)throw new Error(`أنت خارج نطاق الفرع بـ ${d} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`);
-      const lateMinutes=calculateLateMinutes(new Date(),shift.start,PAYROLL_RULES.graceMinutes);
+      const lateMinutes=calculateLateMinutes(new Date(),shift.start);
       await checkIn({time:currentTime(now),latitude:c.latitude,longitude:c.longitude,status:lateMinutes>0?"متأخر":"حاضر",lateMinutes});
       setAttendanceConfirmed(true);
       setGpsMessage(`تم تسجيل الحضور بنجاح ✓ — ${d} متر من الفرع`);

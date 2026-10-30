@@ -60,7 +60,7 @@ function shiftMonth(value: string, delta: number) {
 export default function PayrollScreen() {
   const { width } = useWindowDimensions();
   const compact = width < 700;
-  const { role, employee, payroll, staffMembers } = useAppData();
+  const { role, employee, staffMembers } = useAppData();
   const payrollAccess = trpc.companyAdmin.payrollAccess.useQuery();
   // Fallback to the authenticated app role so a stale/missing company-membership row
   // cannot push a manager or supervisor into the employee self-service payroll screen.

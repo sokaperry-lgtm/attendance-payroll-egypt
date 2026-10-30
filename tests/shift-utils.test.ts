@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import { calculateLateMinutes, formatShiftRange } from "../lib/shift-utils";
 
 describe("shift utilities", () => {
-  it("uses the configured shift start and grace period", () => {
-    expect(calculateLateMinutes(new Date("2026-09-16T08:20:00"), "08:00", 15)).toBe(5);
-    expect(calculateLateMinutes(new Date("2026-09-16T08:10:00"), "08:00", 15)).toBe(0);
+  it("records raw lateness; penalty bands handle the first fourteen minutes", () => {
+    for (const minutes of [1,14,15,29,30,59,60]) {
+      const now = new Date(2026,8,16,8,minutes);
+      expect(calculateLateMinutes(now,"08:00")).toBe(minutes);
+    }
+    expect(calculateLateMinutes(new Date(2026,8,16,7,55),"08:00")).toBe(0);
   });
 
   it("supports the evening shift ending after midnight", () => {

@@ -5,7 +5,6 @@ import { INTERNAL_SESSION_COOKIE } from "../shared/const";
 import { companyAdminProcedure, payrollAdminProcedure, managerProcedure, supervisorProcedure, publicProcedure, router, staffProcedure, sessionStaffProcedure, hrProcedure, payrollProcedure, reportsProcedure } from "./_core/trpc";
 import * as enterprise from "./enterprise";
 import * as db from "./db";
-import { PAYROLL_RULES } from "../lib/payroll";
 
 function previousCalendarDate(date: string) {
   const d = new Date(date + "T12:00:00");
@@ -351,12 +350,15 @@ export const appRouter = router({
       const records = await db.listAttendance(ctx.staffUser.id);
       const existing = records.find(r => r.date === input.date);
       if (existing?.checkIn) throw new Error("تم تسجيل الحضور بالفعل لهذا اليوم.");
+      if (records.some(record => record.checkIn && !record.checkOut)) {
+        throw new Error("لديك شيفت سابق مفتوح. سجل الانصراف أولًا أو تواصل مع المدير لتصحيح السجل.");
+      }
 
       const scheduled = (await db.listSchedules(ctx.staffUser.id)).find(r => r.scheduleDate === input.date);
       if (scheduled?.shift?.kind === "weekly_off") throw new Error("هذا اليوم إجازة أسبوعية حسب الجدول.");
       const shiftStart = scheduled?.shift?.startTime ?? ctx.staffUser.shiftStart;
       const rawLate = Math.max(0, timeMinutes(input.time) - timeMinutes(shiftStart));
-      const late = Math.max(0, rawLate - PAYROLL_RULES.graceMinutes);
+      const late = rawLate;
       const status = late > 0 ? "متأخر" : "حاضر";
       return db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status, lateMinutes: late, distanceMeters, note: scheduled?.shift ? `حسب جدول: ${scheduled.shift.name}` : null });
     }),

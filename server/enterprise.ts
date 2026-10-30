@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, getStaffAccountById } from "./db";
 import * as dbQueries from "./db";
+import { redactAuditMetadata, redactStoredAuditMetadata } from "../lib/audit-utils";
 import { calculateEgyptPayroll } from "./egypt-payroll";
 import { PAYROLL_RULES, calculateAttendanceAccrual, calculateAttendancePenalties, todayKey } from "../lib/payroll";
 import {
@@ -1049,7 +1050,8 @@ export async function getPayrollPayslip(staffAccountId:number, payrollId:number)
     const live = await getEmployeeSelfService(payroll.staffAccountId,payroll.month);
     if (live) payroll = {...payroll,...live.livePayroll};
   }
-  return { payroll, staff, company, branch, employeeId: staff.id, issuedAt: payroll.approvedAt ?? payroll.updatedAt ?? payroll.createdAt };
+  const { passwordHash: _passwordHash, ...safeStaff } = staff;
+  return { payroll, staff:safeStaff, company, branch, employeeId: staff.id, issuedAt: payroll.approvedAt ?? payroll.updatedAt ?? payroll.createdAt };
 }
 
 
@@ -1168,7 +1170,7 @@ export async function assertPayrollEditable(staffAccountId:number, month:string,
     eq(payrollRecords.companyId,m.companyId),
     eq(payrollRecords.month,month),
     inArray(payrollRecords.status, ["approved", "مقبول", "معتمد"]),
-    ...(targetStaffAccountId ? [eq(payrollRecords.staffAccountId,targetStaffAccountId)] : [])
+    eq(payrollRecords.staffAccountId,targetStaffAccountId ?? staffAccountId)
   )).limit(1))[0];
   if(approved) throw new Error("مسير هذا الشهر تم اعتماده ولا يمكن تعديل الحضور بعد الإغلاق.");
   return true;
@@ -1201,7 +1203,7 @@ export async function syncCompanyMemberRole(actorId:number,targetId:number,role:
 
 export async function writeAudit(staffAccountId:number, companyId:number, action:string, entity?:string, entityId?:string, metadata?:unknown) {
   const db=await getDb(); if(!db) return;
-  await db.insert(auditLogs).values({staffAccountId,companyId,action,entity:entity??null,entityId:entityId??null,metadata:metadata?JSON.stringify(metadata):null});
+  await db.insert(auditLogs).values({staffAccountId,companyId,action,entity:entity??null,entityId:entityId??null,metadata:metadata?JSON.stringify(redactAuditMetadata(metadata)):null});
 }
 
 export async function getMonthlyStaffReports(staffAccountId: number, month: string) {
@@ -1457,7 +1459,7 @@ export async function listAuditLogs(staffAccountId:number, limit=100) {
   if (!["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   // Return the actor name with each event so the audit center is useful to
   // managers without exposing unrelated company records.
-  return db.select({
+  const rows = await db.select({
     id: auditLogs.id,
     companyId: auditLogs.companyId,
     staffAccountId: auditLogs.staffAccountId,
@@ -1473,6 +1475,7 @@ export async function listAuditLogs(staffAccountId:number, limit=100) {
     .where(eq(auditLogs.companyId,m.companyId))
     .orderBy(desc(auditLogs.createdAt))
     .limit(Math.min(Math.max(limit,1),250));
+  return rows.map(row => ({...row,metadata:redactStoredAuditMetadata(row.metadata)}));
 }
 
 export async function getEmployeeSelfService(staffAccountId:number, month:string) {
@@ -1538,7 +1541,8 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
     netSalary:Math.max(0,egypt.net-penalties.absenceDeduction-penalties.lateDeduction-earlyDeduction-otherDeductions-advances)};
 
   const balance=await ensureLeaveBalance(staffAccountId,Number(month.slice(0,4)));
-  return { staff, attendance: attendance.slice(0,90), requests, payroll, leaveBalance: balance, livePayroll, earnedBaseSalaryToDate, workedDaysToDate, paidRestDaysToDate, isCurrentMonth };
+  const { passwordHash: _passwordHash, ...safeStaff } = staff;
+  return { staff:safeStaff, attendance: attendance.slice(0,90), requests, payroll, leaveBalance: balance, livePayroll, earnedBaseSalaryToDate, workedDaysToDate, paidRestDaysToDate, isCurrentMonth };
 }
 
 export function toCsv(rows: Array<Record<string, unknown>>) {
@@ -1759,5 +1763,6 @@ export async function listEmployee360(actorId:number,targetId:number) {
     return metadata.includes(`"staffAccountId":${targetId}`) || metadata.includes(`"staffAccountId": ${targetId}`);
   });
 
-  return {staff,attendance,requests,adjustments:companyAdjustments,advances:companyAdvances,documents:companyDocuments,payroll,schedules:employeeSchedules,audit:employeeAudit};
+  const { passwordHash: _passwordHash, ...safeStaff } = staff;
+  return {staff:safeStaff,attendance,requests,adjustments:companyAdjustments,advances:companyAdvances,documents:companyDocuments,payroll,schedules:employeeSchedules,audit:employeeAudit.map(log => ({...log,metadata:redactStoredAuditMetadata(log.metadata)}))};
 }
