@@ -161,3 +161,12 @@ export function approvedLeaveDates(requests: Array<{type:string;status:string;fr
   }
   return [...dates];
 }
+
+/** Former employees stay payable in their leaving month and in historical months. */
+export function employeePayrollCutoff(employee:{employmentEndedOn?:string|null}, today=todayKey()) {
+  return employee.employmentEndedOn && employee.employmentEndedOn < today ? employee.employmentEndedOn : today;
+}
+export function includeEmployeeInPayroll(employee:{active:boolean;employmentEndedOn?:string|null}, month:string, hasMonthActivity=false) {
+  if (employee.employmentEndedOn) return month <= employee.employmentEndedOn.slice(0,7);
+  return employee.active || hasMonthActivity;
+}

@@ -14,13 +14,13 @@ export type ShiftTemplate = { id: number; name: string; kind: "shift" | "weekly_
 export type ScheduleEntry = { id: number; staffAccountId: number; scheduleDate: string; shiftTemplateId: number; note?: string | null; shift: ShiftTemplate | null };
 export type AttendanceRecord = { id: string; date: string; checkIn?: string | null; checkOut?: string | null; status: AttendanceState; lateMinutes: number; distanceMeters?: number | null; note?: string | null };
 export type LeaveRequest = { id: string; type: RequestType | string; from: string; to: string; reason: string; status: RequestStatus | string; staffAccountId?: number; staffName?: string; source?: "request" | "attendance" | "penalty"; exceptionKind?: "late" | "early" | "absence"; fromDate?: string; adjustmentId?: number; actionable?: boolean; hours?: number | null };
-export type Employee = { id: string; name: string; title: string; department: string; baseSalary: number; initials: string; phone?: string; role?: Role; active?: boolean };
+export type Employee = { id: string; name: string; title: string; department: string; baseSalary: number; initials: string; phone?: string; role?: Role; employmentEndedOn?: string | null; active?: boolean };
 
 export const defaultBranch: Branch = { name: "الفرع الرئيسي", address: "مدينة نصر، القاهرة", latitude: 30.0444, longitude: 31.2357, radiusMeters: 200 };
 
 function initials(name: string) { return name.split(" ").slice(0, 2).map((part) => part[0] ?? "").join(""); }
-function mapEmployee(staff: { id: number; name: string; title: string | null; department: string | null; baseSalary?: number; phone?: string; role?: Role; active?: boolean }): Employee {
-  return { id: String(staff.id), name: staff.name, title: staff.title ?? "موظف", department: staff.department ?? "عام", baseSalary: Number(staff.baseSalary ?? 0), initials: initials(staff.name), phone: staff.phone, role: staff.role, active: staff.active };
+function mapEmployee(staff: { id: number; name: string; title: string | null; department: string | null; baseSalary?: number; phone?: string; role?: Role; employmentEndedOn?: string | null; active?: boolean }): Employee {
+  return { id: String(staff.id), name: staff.name, title: staff.title ?? "موظف", department: staff.department ?? "عام", baseSalary: Number(staff.baseSalary ?? 0), initials: initials(staff.name), phone: staff.phone, role: staff.role, employmentEndedOn: staff.employmentEndedOn, active: staff.active };
 }
 
 export type AppDataContext = {
@@ -43,7 +43,7 @@ export type AppDataContext = {
   approveRequest: (id: string, status: RequestStatus) => Promise<void>;
   createStaffAccount: (input: { phone: string; password: string; name: string; title?: string; department?: string; baseSalary: number; role: "manager" | "supervisor" | "employee" }) => Promise<void>;
   updateStaffAccount: (input: { id: number; phone?: string; password?: string; name?: string; title?: string; department?: string; baseSalary?: number; role?: "manager" | "supervisor" | "employee"; shiftStart?: string; shiftEnd?: string; active?: boolean }) => Promise<void>;
-  deleteStaffAccount: (id: number) => Promise<void>;
+  deleteStaffAccount: (id: number, employmentEndedOn?: string) => Promise<void>;
   updateBranch: (input: { name: string; address: string; latitude: string; longitude: string; radiusMeters: number }) => Promise<void>;
   shiftTemplates: ShiftTemplate[];
   schedules: ScheduleEntry[];
@@ -69,7 +69,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const reviewMutation = trpc.requests.review.useMutation();
   const createStaffMutation = trpc.staff.create.useMutation();
   const updateStaffMutation = trpc.staff.update.useMutation();
-  const deleteStaffMutation = trpc.staff.delete.useMutation();
+  const deleteStaffMutation = trpc.staff.archive.useMutation();
   const companyQuery = trpc.company.settings.useQuery(undefined, { enabled: Boolean(meQuery.data), retry: false });
   const updateCompanyMutation = trpc.company.updateSettings.useMutation();
   const shiftTemplatesQuery = trpc.schedule.templates.useQuery(undefined, { enabled: Boolean(meQuery.data), retry: false });
@@ -127,7 +127,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     approveRequest: async (id, status) => { await reviewMutation.mutateAsync({ id: Number(id), status: status as "مقبول" | "مرفوض" }); await invalidateAll(); },
     createStaffAccount: async (input) => { await createStaffMutation.mutateAsync({ ...input, shiftStart: "08:00", shiftEnd: "17:00" }); await invalidateAll(); },
     updateStaffAccount: async (input) => { await updateStaffMutation.mutateAsync(input); await invalidateAll(); },
-    deleteStaffAccount: async (id) => { await deleteStaffMutation.mutateAsync({ id }); await invalidateAll(); },
+    deleteStaffAccount: async (id, employmentEndedOn) => { await deleteStaffMutation.mutateAsync({ id, employmentEndedOn }); await invalidateAll(); },
     updateBranch: async (input) => { await updateCompanyMutation.mutateAsync(input); await invalidateAll(); },
     saveSchedule: async (input) => { await saveScheduleMutation.mutateAsync(input); await invalidateAll(); },
   }), [role, employee, branch, meQuery.data?.shiftStart, meQuery.data?.shiftEnd, records, requests, staffMembers, payrollInputs, payroll, todayRecord, activeAttendanceRecord, previousRecord, previousSchedule, meQuery.isLoading, attendanceQuery.isLoading, teamAttendanceQuery.isLoading, shiftTemplates, schedules, teamSchedules, teamAttendance, activeShift, checkInMutation, checkOutMutation, requestMutation, reviewMutation, createStaffMutation, updateStaffMutation, deleteStaffMutation, updateCompanyMutation, saveScheduleMutation]);

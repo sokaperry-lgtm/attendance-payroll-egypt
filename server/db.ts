@@ -1,5 +1,5 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { and, desc, eq, gt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   attendanceRecords,
@@ -14,6 +14,7 @@ import {
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { employeePayrollCutoff, includeEmployeeInPayroll } from "../lib/payroll";
 import { summarizeAttendance, summarizeRequests } from "../lib/report-utils";
 import { companyMembers, salaryAdjustments, salaryAdvances, employeeDocuments, payrollRecords, leaveBalances, notifications, subscriptions, auditLogs } from "../drizzle/schema";
 
@@ -182,6 +183,7 @@ export async function listStaffAccounts() {
     baseSalary: staffAccounts.baseSalary,
     shiftStart: staffAccounts.shiftStart,
     shiftEnd: staffAccounts.shiftEnd,
+    employmentEndedOn: staffAccounts.employmentEndedOn,
     active: staffAccounts.active,
     createdAt: staffAccounts.createdAt,
   }).from(staffAccounts).orderBy(desc(staffAccounts.createdAt));
@@ -190,6 +192,7 @@ export async function listStaffAccounts() {
 export async function updateStaffAccount(id: number, input: { phone?: string; name?: string; title?: string; department?: string; baseSalary?: number; shiftStart?: string; shiftEnd?: string; active?: boolean; password?: string; role?: "manager" | "supervisor" | "employee" }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  if (input.active === true && (await getStaffAccountById(id))?.employmentEndedOn) throw new Error("الموظف مؤرشف بعد انتهاء عمله. لا يمكن إعادة تنشيطه من هذا الزر.");
   const values: Record<string, unknown> = {};
   if (input.phone !== undefined) values.phone = input.phone.trim();
   if (input.name !== undefined) values.name = input.name.trim();
@@ -208,38 +211,6 @@ export async function updateStaffAccount(id: number, input: { phone?: string; na
     }
   }
   return getStaffAccountById(id);
-}
-
-export async function deleteStaffAccountPermanently(id: number) {
-  if (!Number.isInteger(id) || id <= 0) throw new Error("معرّف الموظف غير صحيح.");
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const staff = await getStaffAccountById(id);
-  if (!staff) throw new Error("الموظف غير موجود.");
-
-  // Intentional hard delete: remove the account and all employee-owned records.
-  const linkedTables = [
-    "staff_sessions", "attendance_records", "staff_requests", "weekly_schedules",
-    "leave_balances", "payroll_records", "notifications", "salary_adjustments",
-    "salary_advances", "employee_documents",
-  ];
-  try {
-    await db.transaction(async (tx) => {
-      for (const table of linkedTables) {
-        await tx.execute(sql.raw("DELETE FROM `" + table + "` WHERE staffAccountId = " + id));
-      }
-      // Permission storage is created lazily on older installations.
-      try {
-        await tx.execute(sql.raw("DELETE FROM member_permissions WHERE staffAccountId = " + id));
-      } catch {}
-      await tx.delete(companyMembers).where(eq(companyMembers.staffAccountId, id));
-      await tx.delete(staffAccounts).where(eq(staffAccounts.id, id));
-    });
-    return { id, name: staff.name, phone: staff.phone };
-  } catch (error: any) {
-    const message = error?.message ? String(error.message) : String(error);
-    throw new Error("تعذر حذف الموظف نهائيًا: " + message);
-  }
 }
 
 export async function getCompanySettings() {
@@ -300,7 +271,7 @@ export async function saveSchedule(input: { staffAccountId: number; scheduleDate
 export async function authenticateStaff(phone: string, password: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.select().from(staffAccounts).where(and(eq(staffAccounts.phone, phone.trim()), eq(staffAccounts.active, true))).limit(1);
+  const result = await db.select().from(staffAccounts).where(and(eq(staffAccounts.phone, phone.trim()), eq(staffAccounts.active, true), isNull(staffAccounts.employmentEndedOn))).limit(1);
   const staff = result[0];
   if (!staff || !verifyPassword(password, staff.passwordHash)) return null;
   return staff;
@@ -311,7 +282,7 @@ export async function changeStaffPassword(staffAccountId: number, currentPasswor
   if (!db) throw new Error("Database not available");
   const result = await db.select().from(staffAccounts).where(eq(staffAccounts.id, staffAccountId)).limit(1);
   const staff = result[0];
-  if (!staff || !staff.active || !verifyPassword(currentPassword, staff.passwordHash)) {
+  if (!staff || !staff.active || staff.employmentEndedOn || !verifyPassword(currentPassword, staff.passwordHash)) {
     throw new Error("كلمة المرور الحالية غير صحيحة.");
   }
   if (newPassword.length < 6) throw new Error("كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل.");
@@ -341,7 +312,7 @@ export async function getStaffBySessionToken(token: string | null | undefined) {
   if (!session) return undefined;
   const staff = await getStaffAccountById(session.staffAccountId);
   // A session must never revive an account that is no longer active.
-  if (!staff?.active) return undefined;
+  if (!staff?.active || staff.employmentEndedOn) return undefined;
   return staff;
 }
 
@@ -441,8 +412,8 @@ export async function getMonthlyStaffReports(month: string, companyId?: number) 
     const members = await db.select({ staffAccountId: companyMembers.staffAccountId }).from(companyMembers).where(eq(companyMembers.companyId, companyId));
     companyStaffIds = new Set(members.map(member => member.staffAccountId));
   }
-  const employees = staff.filter((member) => member.active && (companyStaffIds === null || companyStaffIds.has(member.id))).map((member) => {
-    const records = attendance.filter((record) => record.staffAccountId === member.id && record.date.startsWith(month));
+  const employees = staff.filter((member) => (companyStaffIds === null || companyStaffIds.has(member.id)) && includeEmployeeInPayroll(member,month,attendance.some(row=>row.staffAccountId===member.id && row.date.startsWith(month)))).map((member) => {
+    const records = attendance.filter((record) => record.staffAccountId === member.id && record.date.startsWith(month) && record.date <= employeePayrollCutoff(member));
     const memberRequests = requests.filter((request) => request.staffAccountId === member.id && (request.fromDate.startsWith(month) || request.toDate.startsWith(month)));
     const attendanceSummary = summarizeAttendance(records);
     const requestSummary = summarizeRequests(memberRequests);

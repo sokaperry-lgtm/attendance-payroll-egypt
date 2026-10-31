@@ -1,22 +1,28 @@
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAppData, type Role } from "@/lib/app-data";
+import { showAlert } from "@/lib/alert";
+import { todayKey } from "@/lib/payroll";
 import { formatMoney } from "@/lib/payroll";
 
 const roleLabels: Record<Role, string> = { owner: "مالك النظام", manager: "مدير", hr: "موارد بشرية", supervisor: "سوبرفايزر", accountant: "محاسب", employee: "موظف عادي" };
 
 export default function EmployeesScreen() {
   const router = useRouter();
-  const { role, staffMembers, loading, createStaffAccount, deleteStaffAccount } = useAppData();
+  const { role, employee, staffMembers, loading, createStaffAccount, deleteStaffAccount } = useAppData();
   const { width } = useWindowDimensions();
   const compact = width < 600;
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", password: "", title: "", department: "", baseSalary: "", role: "employee" as "manager" | "supervisor" | "employee" });
+  const [archiveTarget,setArchiveTarget]=useState<{id:string;name:string}|null>(null);
+  const [lastWorkingDate,setLastWorkingDate]=useState(todayKey());
+  const [archiveError,setArchiveError]=useState("");
+  const [staffStatus,setStaffStatus]=useState<"active"|"archived"|"all">("active");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | Role>("all");
 
@@ -25,9 +31,10 @@ export default function EmployeesScreen() {
     return staffMembers.filter((p) => {
       const matchesSearch = !q || [p.name, p.phone, p.title, p.department].some((v) => String(v || "").toLowerCase().includes(q));
       const matchesRole = filter === "all" || (p.role ?? "employee") === filter;
-      return matchesSearch && matchesRole;
+      const matchesStatus=staffStatus==="all" || (staffStatus==="archived" ? Boolean(p.employmentEndedOn) : !p.employmentEndedOn);
+      return matchesSearch && matchesRole && matchesStatus;
     });
-  }, [staffMembers, search, filter]);
+  }, [staffMembers, search, filter, staffStatus]);
 
   const activeCount = staffMembers.filter((p) => p.active !== false).length;
   const managerCount = staffMembers.filter((p) => p.role === "manager").length;
@@ -41,34 +48,23 @@ export default function EmployeesScreen() {
     setOpen(false);
   };
 
-  const confirmDelete = (id: string, name: string) => {
-    Alert.alert(
-      "حذف نهائي للموظف",
-      "هل أنت متأكد من حذف " + name + " نهائيًا؟\n\nسيتم حذف حساب الدخول وسجلات الحضور والطلبات والجداول والخصومات والسلف والمستندات ومسيرات المرتبات المرتبطة به. لا يمكن التراجع عن هذه العملية.",
-      [
-        { text: "إلغاء", style: "cancel" },
-        {
-          text: "حذف نهائي",
-          style: "destructive",
-          onPress: async () => {
-            setDeletingId(Number(id));
-            try {
-              await deleteStaffAccount(Number(id));
-              Alert.alert("تم الحذف", "تم حذف الموظف " + name + " نهائيًا.");
-            } catch (error) {
-              Alert.alert("تعذر الحذف", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
-            } finally {
-              setDeletingId(null);
-            }
-          },
-        },
-      ],
-    );
+  const confirmDelete = (id:string,name:string) => {
+    setArchiveTarget({id,name});setLastWorkingDate(todayKey());setArchiveError("");
+  };
+  const archive = async () => {
+    if(!archiveTarget || deletingId!==null) return;
+    setDeletingId(Number(archiveTarget.id));setArchiveError("");
+    try {
+      await deleteStaffAccount(Number(archiveTarget.id),lastWorkingDate);
+      setArchiveTarget(null);
+      showAlert("تم نقل الموظف للأرشيف", "تم إيقاف دخوله مع الاحتفاظ بحضوره ومرتباته ومستحقاته حتى آخر يوم عمل.");
+    } catch(error) {setArchiveError(error instanceof Error ? error.message : "تعذرت الأرشفة. حاول مرة أخرى.");}
+    finally {setDeletingId(null);}
   };
 
   const save = async () => {
     if (!form.name.trim() || !form.phone.trim() || form.password.length < 6) {
-      Alert.alert("بيانات ناقصة", "اكتب الاسم ورقم الهاتف وكلمة مرور لا تقل عن 6 أحرف.");
+      showAlert("بيانات ناقصة", "اكتب الاسم ورقم الهاتف وكلمة مرور لا تقل عن 6 أحرف.");
       return;
     }
     setSaving(true);
@@ -82,10 +78,10 @@ export default function EmployeesScreen() {
         baseSalary: Number(form.baseSalary) || 0,
         role: form.role,
       });
-      Alert.alert("تم إنشاء الحساب", "تم إضافة " + form.name + " كـ " + roleLabels[form.role] + " ويمكنه تسجيل الدخول من صفحة الدخول.");
+      showAlert("تم إنشاء الحساب", "تم إضافة " + form.name + " كـ " + roleLabels[form.role] + " ويمكنه تسجيل الدخول من صفحة الدخول.");
       reset();
     } catch (error) {
-      Alert.alert("تعذر إنشاء الحساب", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
+      showAlert("تعذر إنشاء الحساب", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
     } finally {
       setSaving(false);
     }
@@ -145,6 +141,11 @@ export default function EmployeesScreen() {
           </View>
         </View>
 
+        <View style={styles.filters}>
+          {([["active","الفريق الحالي"],["archived","الأرشيف"],["all","الكل"]] as const).map(([key,label])=>(
+            <Pressable key={key} onPress={()=>setStaffStatus(key)} style={[styles.filter,staffStatus===key&&styles.filterActive]}><Text style={[styles.filterText,staffStatus===key&&styles.filterTextActive]}>{label}</Text></Pressable>
+          ))}
+        </View>
         {filteredStaff.map(p => (
           <View key={p.id} style={[styles.person, compact && styles.personCompact]}>
             <Pressable style={styles.personContent} onPress={() => router.push(("/employee/" + p.id) as never)}>
@@ -161,20 +162,32 @@ export default function EmployeesScreen() {
               </View>
               <View style={styles.right}>
                 <View style={[styles.dot, { backgroundColor: p.active === false ? "#667085" : "#163A63" }]} />
-                <Text style={styles.active}>{p.active === false ? "موقوف" : "نشط"}</Text>
+                <Text style={styles.active}>{p.employmentEndedOn ? `انتهى العمل: ${p.employmentEndedOn}` : p.active === false ? "موقوف" : "نشط"}</Text>
                 <Text style={styles.salary}>{formatMoney(p.baseSalary)}</Text>
               </View>
             </Pressable>
-            {role === "owner" && p.role !== "owner" && (
+            {role === "owner" && p.id !== employee.id && p.role !== "owner" && !p.employmentEndedOn && (
               <Pressable disabled={deletingId === Number(p.id)} style={[styles.deleteButton, deletingId === Number(p.id) && styles.disabled]} onPress={() => confirmDelete(p.id, p.name)}>
                 {deletingId === Number(p.id) ? <ActivityIndicator size="small" color="#B42318" /> : <IconSymbol name="trash" size={16} color="#B42318" />}
-                <Text style={styles.deleteButtonText}>{deletingId === Number(p.id) ? "جاري الحذف" : "حذف نهائي"}</Text>
+                <Text style={styles.deleteButtonText}>{deletingId === Number(p.id) ? "جاري الأرشفة" : "نقل للأرشيف"}</Text>
               </Pressable>
             )}
           </View>
         ))}
         {!filteredStaff.length && <View style={styles.empty}><Text style={styles.emptyIcon}>⌕</Text><Text style={styles.emptyTitle}>لا توجد نتائج</Text><Text style={styles.emptyText}>جرّب تغيير كلمة البحث أو الفلتر.</Text></View>}      </ScrollView>
 
+      <Modal visible={archiveTarget!==null} animationType="fade" transparent onRequestClose={()=>deletingId===null&&setArchiveTarget(null)}>
+        <View style={styles.modalBackdrop}><View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>إنهاء العمل ونقل للأرشيف</Text>
+          <Text style={styles.sub}>{archiveTarget?.name}</Text>
+          <Text style={styles.sub}>هيتقفل حساب الدخول، وتفضل بيانات الحضور والمرتبات والسلف والخصومات محفوظة للمحاسبة. الموظف يفضل ظاهر في مسير شهر خروجه.</Text>
+          <Text style={styles.label}>آخر يوم عمل (شامل اليوم ده)</Text>
+          <TextInput accessibilityLabel="آخر يوم عمل" style={styles.input} value={lastWorkingDate} onChangeText={setLastWorkingDate} placeholder="YYYY-MM-DD" editable={deletingId===null} />
+          {archiveError ? <Text accessibilityRole="alert" style={[styles.sub,{color:"#B42318"}]}>{archiveError}</Text> : null}
+          <Pressable disabled={deletingId!==null} style={[styles.saveButton,deletingId!==null&&styles.disabled]} onPress={archive}><Text style={styles.saveText}>{deletingId!==null?"جاري الأرشفة...":"تأكيد النقل للأرشيف"}</Text></Pressable>
+          <Pressable disabled={deletingId!==null} style={styles.closeArchive} onPress={()=>setArchiveTarget(null)}><Text style={styles.filterText}>إلغاء</Text></Pressable>
+        </View></View>
+      </Modal>
       <Modal visible={open} animationType="slide" transparent onRequestClose={() => !saving && setOpen(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
@@ -244,5 +257,6 @@ const styles = StyleSheet.create({
   personCompact:{alignItems:"flex-start",padding:12,gap:9},main:{flex:1,minWidth:0},name:{color:"#172033",fontSize:14,fontWeight:"800",textAlign:"right"},role:{color:"#667085",fontSize:11,textAlign:"right",marginTop:3},phone:{color:"#667085",fontSize:10,textAlign:"right"},right:{alignItems:"flex-end",gap:3},dot:{width:9,height:9,borderRadius:5},active:{color:"#667085",fontSize:9},salary:{color:"#163A63",fontSize:10,fontWeight:"800"},
   metaRow:{flexDirection:"row-reverse",alignItems:"center",gap:7,marginTop:5},roleBadge:{borderRadius:7,paddingHorizontal:7,paddingVertical:3},managerBadge:{backgroundColor:"#EEF4FB"},supervisorBadge:{backgroundColor:"#EEF4FB"},employeeBadge:{backgroundColor:"#F7F9FC"},roleBadgeText:{fontSize:9,fontWeight:"800",color:"#98A6B8"},
   modalBackdrop:{flex:1,backgroundColor:"rgba(2,6,23,0.58)",justifyContent:"flex-end"},modalCard:{backgroundColor:"#FFFFFF",borderTopLeftRadius:28,borderTopRightRadius:28,maxHeight:"92%",padding:20},modalHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",marginBottom:10},modalEyebrow:{color:"#98A6B8",fontSize:9,fontWeight:"900",textAlign:"right"},modalTitle:{color:"#172033",fontSize:23,fontWeight:"900",textAlign:"right",marginTop:2},close:{width:36,height:36,borderRadius:18,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},closeText:{color:"#98A6B8",fontSize:25,lineHeight:28},form:{paddingBottom:30,gap:8},label:{color:"#667085",fontSize:11,fontWeight:"800",textAlign:"right",marginTop:7},input:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#667085",borderRadius:12,paddingHorizontal:13,paddingVertical:12,fontSize:13,color:"#172033"},roleOptions:{gap:8},roleOption:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#667085",borderRadius:14,padding:12,flexDirection:"row-reverse",alignItems:"center",gap:9},roleOptionActive:{backgroundColor:"#163A63",borderColor:"#163A63"},roleOptionTitle:{color:"#172033",fontSize:13,fontWeight:"900",minWidth:78,textAlign:"right"},roleOptionTitleActive:{color:"#FFFFFF"},roleOptionSub:{color:"#667085",fontSize:9,flex:1,textAlign:"right"},roleOptionSubActive:{color:"#D9E6F2"},saveButton:{backgroundColor:"#163A63",borderRadius:14,padding:14,marginTop:12,flexDirection:"row-reverse",alignItems:"center",justifyContent:"center",gap:8},saveText:{color:"#FFFFFF",fontWeight:"900",fontSize:13},disabled:{opacity:0.6},
+  closeArchive:{padding:14,alignItems:"center"},
   state:{flex:1,alignItems:"center",justifyContent:"center",gap:10},stateText:{color:"#172033",fontSize:18,fontWeight:"800"}
 });

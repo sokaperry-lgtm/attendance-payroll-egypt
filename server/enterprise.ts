@@ -4,7 +4,7 @@ import { getDb, getStaffAccountById } from "./db";
 import * as dbQueries from "./db";
 import { redactAuditMetadata, redactStoredAuditMetadata } from "../lib/audit-utils";
 import { calculateEgyptPayroll } from "./egypt-payroll";
-import { PAYROLL_RULES, calculateAttendanceAccrual, calculateAttendancePenalties, approvedLeaveDates, todayKey } from "../lib/payroll";
+import { PAYROLL_RULES, calculateAttendanceAccrual, calculateAttendancePenalties, approvedLeaveDates, employeePayrollCutoff, includeEmployeeInPayroll, todayKey } from "../lib/payroll";
 import {
   companies, branches, companyMembers, leaveBalances,
   payrollRecords, notifications, subscriptions, auditLogs, staffAccounts,
@@ -185,6 +185,7 @@ export async function listCompanyStaff(staffAccountId: number) {
         baseSalary: staffAccounts.baseSalary,
         shiftStart: staffAccounts.shiftStart,
         shiftEnd: staffAccounts.shiftEnd,
+        employmentEndedOn: staffAccounts.employmentEndedOn,
         active: staffAccounts.active,
         createdAt: staffAccounts.createdAt,
       }).from(staffAccounts).where(inArray(staffAccounts.id, Array.from(ids))).orderBy(desc(staffAccounts.createdAt))
@@ -222,6 +223,7 @@ export async function getManagementDashboard(staffAccountId: number, month: stri
         title: staffAccounts.title,
         department: staffAccounts.department,
         role: staffAccounts.role,
+        employmentEndedOn: staffAccounts.employmentEndedOn,
         active: staffAccounts.active,
       }).from(staffAccounts).where(inArray(staffAccounts.id, staffIds))
     : [];
@@ -233,7 +235,8 @@ export async function getManagementDashboard(staffAccountId: number, month: stri
     timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit"
   }).format(new Date());
 
-  const todayRows = attendance.filter(row => row.date === today);
+  const activeStaffIds = new Set(staff.filter(s=>s.active).map(s=>s.id));
+  const todayRows = attendance.filter(row => row.date === today && activeStaffIds.has(row.staffAccountId));
   const present = todayRows.filter(row => ["حاضر","متأخر"].includes(row.status)).length;
   const absent = todayRows.filter(row => row.status === "غياب").length;
   const lateMinutes = todayRows.reduce((sum, row) => sum + Number(row.lateMinutes || 0), 0);
@@ -893,14 +896,15 @@ export async function generatePayroll(staffAccountId: number, month: string) {
   await syncMonthlyAttendance(staffAccountId, month);
   const members = await db.select().from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
   const ids = new Set(members.map(x=>x.staffAccountId));
-  const staff = await db.select().from(staffAccounts).where(eq(staffAccounts.active,true));
+  const staff = await db.select().from(staffAccounts);
   const attendance = await db.select().from(attendanceRecords);
   const schedules = await db.select().from(weeklySchedules);
   const shifts = await db.select().from(shiftTemplates);
   const approvedOvertime = await db.select().from(staffRequests).where(and(eq(staffRequests.type,"أوفر تايم"),eq(staffRequests.status,"مقبول")));
   const result=[];
   let skippedApproved=0;
-  for(const s of staff.filter(x=>ids.has(x.id))) {
+  for(const s of staff.filter(x=>ids.has(x.id) && includeEmployeeInPayroll(x,month,attendance.some(row=>row.staffAccountId===x.id && row.date.startsWith(month))))) {
+    const cutoff=employeePayrollCutoff(s);
     const existing=(await db.select().from(payrollRecords).where(and(
       eq(payrollRecords.companyId,m.companyId),
       eq(payrollRecords.staffAccountId,s.id),
@@ -908,11 +912,11 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     )).limit(1))[0];
     if(existing && ["approved","مقبول","معتمد"].includes(String(existing.status))) { result.push(existing); skippedApproved++; continue; }
     const records=attendance
-      .filter(x=>x.staffAccountId===s.id && x.date.startsWith(month) && x.date <= todayKey())
+      .filter(x=>x.staffAccountId===s.id && x.date.startsWith(month) && x.date <= cutoff)
       .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
 
     const monthlyBaseSalary = Math.max(0, Math.round(Number(s.baseSalary) || 0));
-    const todayCairo = todayKey();
+    const todayCairo = cutoff;
     const restDates = schedules.filter(row => row.staffAccountId === s.id &&
       shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
       .map(row => row.scheduleDate);
@@ -1461,8 +1465,8 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   const requests=await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,staffAccountId)).orderBy(desc(staffRequests.createdAt));
   const payroll=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.staffAccountId,staffAccountId),eq(payrollRecords.month,month))).limit(1))[0] ?? null;
 
-  const cairoToday = todayKey();
-  const isCurrentMonth = month === cairoToday.slice(0, 7);
+  const cairoToday = employeePayrollCutoff(staff);
+  const isCurrentMonth = month === todayKey().slice(0, 7);
   const schedules = await db.select().from(weeklySchedules).where(eq(weeklySchedules.staffAccountId,staffAccountId));
   // Historical schedules retain their meaning even if a template is now inactive.
   const shifts = await db.select().from(shiftTemplates);

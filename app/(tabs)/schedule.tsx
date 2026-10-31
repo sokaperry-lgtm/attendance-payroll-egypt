@@ -263,7 +263,7 @@ export default function ScheduleScreen() {
               <Text style={styles.count}>{staffMembers.length}</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teamScroll}>
-              {staffMembers.map(item => (
+              {staffMembers.filter(item=>item.active!==false).map(item => (
                 <Pressable key={item.id} onPress={() => setSelectedEmployee(item.id)} style={[styles.employeeChip, item.id === selectedEmployee && styles.employeeChipActive]}>
                   <View style={[styles.avatar, item.id === selectedEmployee && styles.avatarActive]}><Text style={[styles.avatarText, item.id === selectedEmployee && styles.avatarTextActive]}>{item.name.slice(0, 1)}</Text></View>
                   <Text style={[styles.employeeName, item.id === selectedEmployee && styles.employeeNameActive]} numberOfLines={1}>{item.name}</Text>

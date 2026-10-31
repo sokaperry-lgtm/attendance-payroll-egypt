@@ -5,6 +5,7 @@ import { INTERNAL_SESSION_COOKIE } from "../shared/const";
 import { companyAdminProcedure, payrollAdminProcedure, managerProcedure, supervisorProcedure, publicProcedure, router, staffProcedure, sessionStaffProcedure, hrProcedure, payrollProcedure, reportsProcedure } from "./_core/trpc";
 import * as enterprise from "./enterprise";
 import * as db from "./db";
+import * as staffArchive from "./staff-archive";
 
 function previousCalendarDate(date: string) {
   const d = new Date(date + "T12:00:00");
@@ -49,6 +50,12 @@ const staffView = async (staff: Awaited<ReturnType<typeof db.getStaffAccountById
     membershipRole: effectiveMembershipRole,
   };
 };
+
+const archiveStaffProcedure = hrProcedure.input(z.object({id:z.number().int().positive(),employmentEndedOn:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()})).mutation(async ({ctx,input})=>{
+  const actor=await enterprise.getMembership(ctx.staffUser.id);
+  if(!actor?.active || actor.role!=="owner") throw new Error("أرشفة الموظفين متاحة لمالك النظام فقط.");
+  return {success:true,employee:await staffArchive.archiveStaffAccount(input.id,ctx.staffUser.id,actor.companyId,input.employmentEndedOn)};
+});
 
 export const appRouter = router({
   system: router({
@@ -181,26 +188,9 @@ export const appRouter = router({
       await enterprise.writeAudit(ctx.staffUser.id, (await enterprise.getCompanyForStaff(ctx.staffUser.id))!.companyId, "staff.updated", "staff", String(id), changes);
       return await staffView(updated);
     }),
-    delete: hrProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
-      const actorMembership = await enterprise.getMembership(ctx.staffUser.id);
-      if (!actorMembership?.active || actorMembership.role !== "owner") {
-        throw new Error("الحذف النهائي للموظفين متاح لمالك النظام فقط.");
-      }
-      const targetMembership = await enterprise.getMembership(input.id);
-      if (!targetMembership || targetMembership.companyId !== actorMembership.companyId) {
-        throw new Error("الموظف غير موجود في شركتك.");
-      }
-      if (input.id === ctx.staffUser.id || targetMembership.role === "owner") {
-        throw new Error("لا يمكن حذف حساب المالك.");
-      }
-      const target = await db.getStaffAccountById(input.id);
-      if (!target) throw new Error("الموظف غير موجود.");
-      const deleted = await db.deleteStaffAccountPermanently(input.id);
-      await enterprise.writeAudit(ctx.staffUser.id, actorMembership.companyId, "staff.permanently_deleted", "staff", String(input.id), {
-        deletedStaffId: input.id, name: target.name, phone: target.phone, title: target.title, department: target.department,
-      });
-      return { success: true, employee: deleted };
-    }),
+    // Retain the old route for cached clients, but never erase historical data.
+    delete: archiveStaffProcedure,
+    archive: archiveStaffProcedure,
   }),
   company: router({
     settings: staffProcedure.query(async ({ctx}) => { const b = await enterprise.getBranchForStaff(ctx.staffUser.id); if (!b) throw new Error("لم يتم إعداد فرع للحساب. تواصل مع مدير الشركة لإعداد موقع GPS."); return b; }),
@@ -223,6 +213,8 @@ export const appRouter = router({
       const access = await enterprise.assertOperationalTarget(ctx.staffUser.id, input.staffAccountId);
       if (access.target.role === "owner" && access.actor.role !== "owner") throw new Error("لا يمكن تعديل حضور المالك من هذا الحساب.");
       if (input.date > cairoToday()) throw new Error("لا يمكن تسجيل حضور بتاريخ مستقبلي.");
+      const targetStaff = await db.getStaffAccountById(input.staffAccountId);
+      if (targetStaff?.employmentEndedOn && input.date > targetStaff.employmentEndedOn) throw new Error("لا يمكن إضافة حضور بعد آخر يوم عمل للموظف المؤرشف.");
       if (input.checkIn) timeMinutes(input.checkIn);
       if (input.checkOut) timeMinutes(input.checkOut);
       if (input.checkIn && input.checkOut && timeMinutes(input.checkOut) < timeMinutes(input.checkIn)) {

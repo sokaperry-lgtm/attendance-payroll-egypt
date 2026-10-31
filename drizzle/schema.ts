@@ -23,6 +23,7 @@ export const staffAccounts = mysqlTable("staff_accounts", {
   baseSalary: int("baseSalary").default(0).notNull(),
   shiftStart: varchar("shiftStart", { length: 8 }).default("09:00").notNull(),
   shiftEnd: varchar("shiftEnd", { length: 8 }).default("18:00").notNull(),
+  employmentEndedOn: varchar("employmentEndedOn", { length: 10 }),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

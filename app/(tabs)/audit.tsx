@@ -10,6 +10,7 @@ function actionLabel(action: string) {
   const labels: Record<string, string> = {
     "auth.login": "تسجيل دخول",
     "auth.logout": "تسجيل خروج",
+    "staff.archived": "إنهاء عمل موظف ونقله للأرشيف",
     "staff.updated": "تعديل موظف",
     "role.updated": "تعديل صلاحية",
     "attendance.updated": "تعديل حضور",

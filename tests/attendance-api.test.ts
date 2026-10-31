@@ -2,11 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouter } from "../server/routers";
 import * as db from "../server/db";
 import * as enterprise from "../server/enterprise";
+import * as staffArchive from "../server/staff-archive";
 import type { TrpcContext } from "../server/_core/context";
 import { todayKey } from "../lib/payroll";
 
 function context(): TrpcContext {
-  return { user:null, staffUser:{id:10,name:"Employee",phone:"01000000000",passwordHash:"test",title:null,department:null,role:"employee",baseSalary:9000,shiftStart:"08:00",shiftEnd:"17:00",active:true,createdAt:new Date(),updatedAt:new Date()},
+  return { user:null, staffUser:{id:10,name:"Employee",phone:"01000000000",passwordHash:"test",title:null,department:null,role:"employee",baseSalary:9000,shiftStart:"08:00",shiftEnd:"17:00",employmentEndedOn:null,active:true,createdAt:new Date(),updatedAt:new Date()},
     req:{headers:{}} as TrpcContext["req"],res:{} as TrpcContext["res"] };
 }
 function membership(role="employee") {
@@ -89,8 +90,18 @@ describe("attendance API regression checks", () => {
     expect(enterprise.assertPayrollEditable).toHaveBeenCalledWith(10,"2026-09");
     expect(db.upsertAttendance).toHaveBeenCalledWith(expect.objectContaining({date:"2026-09-30",checkOut:"01:00"}));
   });
+  it("keeps the cached delete route safe by archiving instead of deleting history", async () => {
+    vi.mocked(enterprise.getMembership).mockResolvedValue(membership("owner"));
+    const archive=vi.spyOn(staffArchive,"archiveStaffAccount").mockResolvedValue({id:20,name:"Former Employee",employmentEndedOn:"2026-10-30"});
+    const caller=appRouter.createCaller(context());
+    await caller.staff.delete({id:20});
+    expect(archive).toHaveBeenCalledWith(20,10,1,undefined);
+    await caller.staff.archive({id:20,employmentEndedOn:"2026-10-20"});
+    expect(archive).toHaveBeenLastCalledWith(20,10,1,"2026-10-20");
+  });
   it("does not let an employee delete staff or generate payroll", async () => {
     const caller=appRouter.createCaller(context());
+    await expect(caller.staff.archive({id:20})).rejects.toMatchObject({code:"FORBIDDEN"});
     await expect(caller.staff.delete({id:20})).rejects.toMatchObject({code:"FORBIDDEN"});
     await expect(caller.payroll.generate({month:"2026-10"})).rejects.toMatchObject({code:"FORBIDDEN"});
   });

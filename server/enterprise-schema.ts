@@ -21,6 +21,7 @@ const statements = [
 ];
 
 const alterStatements = [
+`ALTER TABLE staff_accounts ADD COLUMN employmentEndedOn VARCHAR(10) NULL`,
 `ALTER TABLE staff_accounts MODIFY COLUMN role ENUM('manager','supervisor','employee') NOT NULL DEFAULT 'employee'`,
 `ALTER TABLE payroll_records ADD COLUMN employeeSocialInsurance INT NOT NULL DEFAULT 0`,
 `ALTER TABLE payroll_records ADD COLUMN employeeIncomeTax INT NOT NULL DEFAULT 0`,
