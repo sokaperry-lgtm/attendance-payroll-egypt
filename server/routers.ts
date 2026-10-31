@@ -21,6 +21,11 @@ function timeMinutes(value: string) {
 function cairoToday() {
   return new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 }
+function cairoClock() {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone:"Africa/Cairo", year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", hourCycle:"h23" }).formatToParts(new Date());
+  const p = Object.fromEntries(parts.map(part => [part.type,part.value]));
+  return {date:`${p.year}-${p.month}-${p.day}`,time:`${p.hour}:${p.minute}`};
+}
 function gpsDistanceMeters(lat1:number, lon1:number, lat2:number, lon2:number) {
   const earthRadius = 6371000;
   const toRad = (value:number) => value * Math.PI / 180;
@@ -242,8 +247,9 @@ export const appRouter = router({
       if (input.checkIn) {
         const target = await db.getStaffAccountById(input.staffAccountId);
         const scheduled = (await db.listSchedules(input.staffAccountId)).find(r => r.scheduleDate === input.date);
-        const shiftStart = scheduled?.shift?.startTime ?? target?.shiftStart ?? "08:00";
-        const rawLate = Math.max(0, timeMinutes(input.checkIn) - timeMinutes(shiftStart));
+        const workingRest = scheduled?.shift?.kind === "weekly_off";
+        const shiftStart = workingRest ? target?.shiftStart ?? "08:00" : scheduled?.shift?.startTime ?? target?.shiftStart ?? "08:00";
+        const rawLate = workingRest ? 0 : Math.max(0, timeMinutes(input.checkIn) - timeMinutes(shiftStart));
         effectiveLateMinutes = rawLate;
         effectiveStatus = rawLate > 0 ? "متأخر" : "حاضر";
       }
@@ -266,8 +272,9 @@ export const appRouter = router({
       if (finalCheckOut) {
         const target = await db.getStaffAccountById(input.staffAccountId);
         const scheduled = (await db.listSchedules(input.staffAccountId)).find(r => r.scheduleDate === input.date);
-        const shiftStart = scheduled?.shift?.startTime ?? target?.shiftStart ?? "09:00";
-        const shiftEnd = scheduled?.shift?.endTime ?? target?.shiftEnd ?? "17:00";
+        const workingRest = scheduled?.shift?.kind === "weekly_off";
+        const shiftStart = workingRest ? target?.shiftStart ?? "08:00" : scheduled?.shift?.startTime ?? target?.shiftStart ?? "08:00";
+        const shiftEnd = workingRest ? target?.shiftEnd ?? "17:00" : scheduled?.shift?.endTime ?? target?.shiftEnd ?? "17:00";
         const crossesMidnight = Boolean(
           scheduled?.shift?.crossesMidnight ||
           timeMinutes(shiftEnd) < timeMinutes(shiftStart)
@@ -337,8 +344,8 @@ export const appRouter = router({
       return row;
     }),
     checkIn: staffProcedure.input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), latitude: gpsCoordinate.min(-90).max(90), longitude: gpsCoordinate.min(-180).max(180) })).mutation(async ({ ctx, input }) => {
-      timeMinutes(input.time);
-      if (input.date > cairoToday()) throw new Error("لا يمكن تسجيل حضور بتاريخ مستقبلي.");
+      // Device dates/times are compatibility fields only; live punches use the server clock.
+      input = {...input,...cairoClock()};
       await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7));
       const branch = await enterprise.getBranchForStaff(ctx.staffUser.id);
       if (!branch) throw new Error("لم يتم إعداد موقع GPS لهذا الفرع.");
@@ -355,17 +362,15 @@ export const appRouter = router({
       }
 
       const scheduled = (await db.listSchedules(ctx.staffUser.id)).find(r => r.scheduleDate === input.date);
-      if (scheduled?.shift?.kind === "weekly_off") throw new Error("هذا اليوم إجازة أسبوعية حسب الجدول.");
-      const shiftStart = scheduled?.shift?.startTime ?? ctx.staffUser.shiftStart;
+      const workingRest = scheduled?.shift?.kind === "weekly_off";
+      const shiftStart = workingRest ? ctx.staffUser.shiftStart : scheduled?.shift?.startTime ?? ctx.staffUser.shiftStart;
       const rawLate = Math.max(0, timeMinutes(input.time) - timeMinutes(shiftStart));
-      const late = rawLate;
+      const late = workingRest ? 0 : rawLate;
       const status = late > 0 ? "متأخر" : "حاضر";
-      return db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status, lateMinutes: late, distanceMeters, note: scheduled?.shift ? `حسب جدول: ${scheduled.shift.name}` : null });
+      return db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: input.date, checkIn: input.time, checkOut: null, status, lateMinutes: late, distanceMeters, note: workingRest ? "عمل في يوم الراحة الأسبوعية" : scheduled?.shift ? `حسب جدول: ${scheduled.shift.name}` : null });
     }),
     checkOut: staffProcedure.input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), time: z.string().max(8), latitude: gpsCoordinate.min(-90).max(90), longitude: gpsCoordinate.min(-180).max(180) })).mutation(async ({ ctx, input }) => {
-      timeMinutes(input.time);
-      if (input.date > cairoToday()) throw new Error("لا يمكن تسجيل انصراف بتاريخ مستقبلي.");
-      await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7));
+      input = {...input,...cairoClock()};
       const branch = await enterprise.getBranchForStaff(ctx.staffUser.id);
       if (!branch) throw new Error("لم يتم إعداد موقع GPS لهذا الفرع.");
       const branchLatitude = Number(branch.latitude);
@@ -390,8 +395,8 @@ export const appRouter = router({
       if (!current && previousDayOpen) {
         const previousSchedule = (await db.listSchedules(ctx.staffUser.id))
           .find(r => r.scheduleDate === previousDayOpen.date);
-        const previousShiftStart = previousSchedule?.shift?.startTime ?? ctx.staffUser.shiftStart;
-        const previousShiftEnd = previousSchedule?.shift?.endTime ?? ctx.staffUser.shiftEnd;
+        const previousShiftStart = previousSchedule?.shift?.kind === "weekly_off" ? ctx.staffUser.shiftStart : previousSchedule?.shift?.startTime ?? ctx.staffUser.shiftStart;
+        const previousShiftEnd = previousSchedule?.shift?.kind === "weekly_off" ? ctx.staffUser.shiftEnd : previousSchedule?.shift?.endTime ?? ctx.staffUser.shiftEnd;
         const previousCrossesMidnight = Boolean(
           previousSchedule?.shift?.crossesMidnight ||
           timeMinutes(previousShiftEnd) < timeMinutes(previousShiftStart)
@@ -418,8 +423,9 @@ export const appRouter = router({
       await enterprise.assertPayrollEditable(ctx.staffUser.id, attendanceDate.slice(0,7));
 
       const scheduled = (await db.listSchedules(ctx.staffUser.id)).find(r => r.scheduleDate === attendanceDate);
-      const shiftEnd = scheduled?.shift?.endTime ?? ctx.staffUser.shiftEnd;
-      const shiftStart = scheduled?.shift?.startTime ?? ctx.staffUser.shiftStart;
+      const workingRest = scheduled?.shift?.kind === "weekly_off";
+      const shiftEnd = workingRest ? ctx.staffUser.shiftEnd : scheduled?.shift?.endTime ?? ctx.staffUser.shiftEnd;
+      const shiftStart = workingRest ? ctx.staffUser.shiftStart : scheduled?.shift?.startTime ?? ctx.staffUser.shiftStart;
       const crossesMidnight = Boolean(
         scheduled?.shift?.crossesMidnight ||
         timeMinutes(shiftEnd) < timeMinutes(shiftStart)
@@ -427,7 +433,7 @@ export const appRouter = router({
       const scheduledEnd = timeMinutes(shiftEnd) + (crossesMidnight ? 24 * 60 : 0);
       let actualCheckout = timeMinutes(input.time);
       if (crossesMidnight && actualCheckout < timeMinutes(shiftStart)) actualCheckout += 24 * 60;
-      const earlyMinutes = Math.max(0, scheduledEnd - actualCheckout);
+      const earlyMinutes = workingRest ? 0 : Math.max(0, scheduledEnd - actualCheckout);
       const earlyNote = earlyMinutes > 0 ? `انصراف مبكر: ${earlyMinutes} دقيقة` : null;
       const note = [current.note, earlyNote].filter(Boolean).join(" · ") || null;
       const attendance = await db.upsertAttendance({ staffAccountId: ctx.staffUser.id, date: attendanceDate, checkIn: current.checkIn, checkOut: input.time, status: current.status, lateMinutes: current.lateMinutes, distanceMeters: current.distanceMeters, note });
@@ -437,8 +443,8 @@ export const appRouter = router({
       const overtimeMinutes = enterprise.overtimeAfterShiftEndMinutes(
         current.checkIn!,
         input.time,
-        scheduled?.shift?.startTime ?? ctx.staffUser.shiftStart,
-        scheduled?.shift?.endTime ?? ctx.staffUser.shiftEnd,
+        shiftStart,
+        shiftEnd,
         crossesMidnight
       );
       if (overtimeMinutes >= 30) {

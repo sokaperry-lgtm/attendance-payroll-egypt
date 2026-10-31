@@ -55,3 +55,14 @@ export function summarizePayroll(rows: DashboardPayrollRow[]) {
     totalPayrollRows: rows.length,
   };
 }
+
+/** Calendar days, with no invented percentages for dates without attendance data. */
+export function buildLastSevenDaysAttendance(records: DashboardRecord[], today: string) {
+  const stats = new Map(buildWeeklyStats(records.filter(record => record.date <= today)).map(day => [day.date,day.value]));
+  return Array.from({length:7}, (_,i) => {
+    const d = new Date(`${today}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - 6 + i);
+    const date = d.toISOString().slice(0,10);
+    return {date, label:new Intl.DateTimeFormat("ar-EG",{weekday:"short",timeZone:"Africa/Cairo"}).format(d), value:stats.get(date) ?? null};
+  });
+}

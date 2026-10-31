@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculatePayroll, calculateAttendanceAccrual, calculateAttendancePenalties, calculateEarnedSalary, getAbsencePenaltyDays, PAYROLL_RULES } from "../lib/payroll";
+import { approvedLeaveDates, calculatePayroll, calculateAttendanceAccrual, calculateAttendancePenalties, calculateEarnedSalary, getAbsencePenaltyDays, PAYROLL_RULES } from "../lib/payroll";
 
 describe("قواعد المرتب الداخلية", () => {
   it("تحسب قيمة اليوم والساعة من 30 يوم و9 ساعات مع 26 يوم عمل و4 إجازة مدفوعة", () => {
@@ -95,7 +95,7 @@ describe("attendance based accrual", () => {
       {date:"2026-09-30",checkIn:"09:00",status:"حاضر"},
     ];
     const result = calculateAttendanceAccrual(9000,"2026-10",records,["2026-10-01","2026-10-03","2026-10-06"],"2026-10-04");
-    expect(result).toEqual({earnedBaseSalary:600,workedDays:1,paidRestDays:1,unpaidAbsenceDays:1});
+    expect(result).toEqual({earnedBaseSalary:900,workedDays:1,paidRestDays:1,unpaidAbsenceDays:1});
   });
   it("does not pay unrecorded calendar days, past or future months", () => {
     expect(calculateAttendanceAccrual(9000,"2026-09",[],[],"2026-10-04").earnedBaseSalary).toBe(0);
@@ -122,5 +122,28 @@ describe("attendance based accrual", () => {
   });
   it("applies late bands per approved record rather than accumulated minutes", () => {
     expect(calculateAttendancePenalties(9000,[15,29,30,59,60,14].map((lateMinutes,i)=>({date:`2026-10-0${i+1}`,status:"متأخر",lateMinutes,note:"تم اعتماد التأخير"})),0).lateDeduction).toBe(750);
+  });
+});
+
+
+describe("paid leave and worked rest accrual", () => {
+  it("pays approved leave across months only through today, without duplicating rest", () => {
+    const leave = approvedLeaveDates([
+      {type:"إجازة",status:"مقبول",fromDate:"2026-09-30",toDate:"2026-10-03"},
+      {type:"إجازة",status:"مرفوض",fromDate:"2026-10-04",toDate:"2026-10-04"},
+    ]);
+    const records=[{date:"2026-10-02",status:"غياب",note:"غياب تلقائي"}];
+    const accrual=calculateAttendanceAccrual(9000,"2026-10",records,["2026-10-01"],"2026-10-02",leave);
+    expect(accrual.earnedBaseSalary).toBe(600);
+    expect(calculateAttendancePenalties(9000,records,accrual.unpaidAbsenceDays,leave).absenceDeduction).toBe(0);
+  });
+  it("does not grant paid leave for an unapproved attendance label", () => {
+    expect(calculateAttendanceAccrual(9000,"2026-10",[{date:"2026-10-01",status:"إجازة"}],[],"2026-10-31").earnedBaseSalary).toBe(0);
+  });
+  it("pays two days for worked rest and keeps the premium above the monthly cap", () => {
+    const dates=Array.from({length:30},(_,i)=>`2026-10-${String(i+1).padStart(2,"0")}`);
+    const records=dates.map(date=>({date,checkIn:"08:00",status:"حاضر"}));
+    expect(calculateAttendanceAccrual(9000,"2026-10",records,[dates[0]],"2026-10-31").earnedBaseSalary).toBe(9300);
+    expect(calculateAttendanceAccrual(9000,"2026-10",[records[0]],[dates[0]],"2026-10-31").earnedBaseSalary).toBe(600);
   });
 });

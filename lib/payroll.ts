@@ -32,25 +32,29 @@ export function calculateEarnedSalary(baseSalary: number, workedMinutes: number)
   return Math.min(Math.round(monthlySalary), Math.round(hourlyValue * minutes / 60));
 }
 
-/** One paid day per recorded attendance/rest date, using Cairo's date cutoff. */
+/** Accrue paid work/leave/rest through Cairo today; work on rest earns an extra day. */
 export function calculateAttendanceAccrual(
   baseSalary: number,
   month: string,
-  attendance: Array<{ date: string; checkIn?: string | null; status: string }>,
+  attendance: Array<{ date: string; checkIn?: string | null; status: string; note?: string | null }>,
   restDates: string[],
   today = todayKey(),
+  paidLeaveDates: string[] = [],
 ) {
   const eligible = (date: string) => date.startsWith(`${month}-`) && date <= today;
   const worked = new Set(attendance.filter(r => eligible(r.date) && Boolean(r.checkIn) &&
     ["حاضر", "متأخر"].includes(r.status)).map(r => r.date));
   const rest = new Set(restDates.filter(eligible));
-  const paid = new Set([...worked, ...rest]);
+  const leave = new Set(paidLeaveDates.filter(eligible));
+  const missions = attendance.filter(r => eligible(r.date) && r.status === "مأمورية").map(r => r.date);
+  const paid = new Set([...worked, ...rest, ...leave, ...missions]);
+  const workedRestDays = [...worked].filter(date => rest.has(date)).length;
   // An absent day's wage is already excluded from accrual. Only the additional
   // two days of the three-day penalty may be deducted from this basis.
   const unpaidAbsence = new Set(attendance.filter(r => eligible(r.date) && r.status === "غياب" &&
     !paid.has(r.date)).map(r => r.date));
   return {
-    earnedBaseSalary: Math.round(Math.max(0, Number(baseSalary) || 0) * Math.min(PAYROLL_RULES.calendarDays, paid.size) / PAYROLL_RULES.calendarDays),
+    earnedBaseSalary: Math.round(Math.max(0, Number(baseSalary) || 0) * (Math.min(PAYROLL_RULES.calendarDays, paid.size) + workedRestDays) / PAYROLL_RULES.calendarDays),
     workedDays: worked.size,
     paidRestDays: [...rest].filter(date => !worked.has(date)).length,
     unpaidAbsenceDays: unpaidAbsence.size,
@@ -140,4 +144,20 @@ export function todayKey() {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${values.year}-${values.month}-${values.day}`;
+}
+
+/** Only approved leave requests grant paid leave; a bare attendance label does not. */
+export function approvedLeaveDates(requests: Array<{type:string;status:string;fromDate:string;toDate:string}>) {
+  const dates = new Set<string>();
+  for (const request of requests) {
+    if (request.status !== "مقبول" || !["إجازة", "إجازة مرضية", "إجازة طارئة"].includes(request.type)) continue;
+    const cursor = new Date(`${request.fromDate}T12:00:00Z`);
+    for (let i = 0; i < 366 && Number.isFinite(cursor.getTime()); i++) {
+      const date = cursor.toISOString().slice(0,10);
+      if (date > request.toDate) break;
+      dates.add(date);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+  }
+  return [...dates];
 }

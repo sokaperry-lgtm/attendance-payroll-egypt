@@ -6,6 +6,7 @@ import * as Haptics from "expo-haptics";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAppData } from "@/lib/app-data";
+import { buildLastSevenDaysAttendance } from "@/lib/dashboard-utils";
 import { calculateLateMinutes } from "@/lib/shift-utils";
 import { trpc } from "@/lib/trpc";
 import { useRouter } from "expo-router";
@@ -15,7 +16,7 @@ function distanceBetween(lat1:number,lon1:number,lat2:number,lon2:number){
   const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
   return Math.round(r*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
 }
-function currentTime(date = new Date()){return new Intl.DateTimeFormat("en-GB",{hour:"2-digit",minute:"2-digit",hour12:false}).format(date);}
+function currentTime(date = new Date()){return new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Cairo",hour:"2-digit",minute:"2-digit",hour12:false}).format(date);}
 type Coordinates={latitude:number;longitude:number};
 function getBrowserLocation():Promise<Coordinates>{return new Promise((resolve,reject)=>{if(!navigator.geolocation){reject(new Error("المتصفح لا يدعم تحديد الموقع."));return;}navigator.geolocation.getCurrentPosition(p=>resolve({latitude:p.coords.latitude,longitude:p.coords.longitude}),e=>reject(new Error(e.code===e.PERMISSION_DENIED?"يجب السماح بالوصول إلى الموقع لتسجيل الحضور.":e.code===e.POSITION_UNAVAILABLE?"تعذر تحديد موقعك الحالي.":"انتهت مهلة تحديد الموقع.")),{enableHighAccuracy:true,timeout:15000,maximumAge:0});});}
 async function getCurrentCoordinates():Promise<Coordinates>{
@@ -26,7 +27,7 @@ async function getCurrentCoordinates():Promise<Coordinates>{
   const p=await Location.getCurrentPositionAsync({accuracy:Location.Accuracy.High});
   return {latitude:p.coords.latitude,longitude:p.coords.longitude};
 }
-const weeklyAttendance=[86,94,78,91,88,96,70];
+
 
 export default function HomeScreen(){
   const {role,employee,branch,shift,payrollInputs,records,checkedIn,todayRecord,checkIn,checkOut}=useAppData();
@@ -54,7 +55,10 @@ export default function HomeScreen(){
   const effectiveCheckedIn=checkedIn || attendanceConfirmed;
   const isWeeklyOff=Boolean(shift?.kind==="weekly_off");
   const presentDays=records.filter(r=>r.status==="حاضر"||r.status==="متأخر").length;
+  const trackedDays=records.filter(r=>["حاضر","متأخر","غياب"].includes(r.status)).length;
+  const recordedAttendanceRate=trackedDays ? Math.round(presentDays/trackedDays*100) : 0;
   const unread=(notificationsQuery.data??[]).filter(n=>!n.readAt).length;
+  const weeklyAttendance = buildLastSevenDaysAttendance(isManagement || role === "supervisor" ? teamQuery.data ?? [] : records, todayCairo);
   const teamToday = (teamQuery.data ?? []).filter((r:any) => r.date === todayCairo);
   const teamPresent = teamToday.filter((r:any) => r.status === "حاضر" || r.status === "متأخر").length;
   const teamLate = teamToday.reduce((sum:number,r:any) => sum + Number(r.lateMinutes || 0), 0);
@@ -69,7 +73,7 @@ export default function HomeScreen(){
   const dateLabel=useMemo(()=>new Intl.DateTimeFormat("ar-EG",{weekday:"long",day:"numeric",month:"long"}).format(new Date()),[]);
 
   async function handleCheckIn(){
-    if(isWeeklyOff)return;setWorking(true);
+    setWorking(true);
     try{const c=await getCurrentCoordinates(),d=distanceBetween(branch.latitude,branch.longitude,c.latitude,c.longitude);
       if(d>branch.radiusMeters)throw new Error(`أنت خارج نطاق الفرع بـ ${d} متر. يجب أن تكون داخل ${branch.radiusMeters} متر.`);
       const lateMinutes=calculateLateMinutes(new Date(),shift.start);
@@ -102,7 +106,7 @@ export default function HomeScreen(){
   const workspaceItems = isManagement
     ? [["حالة الفريق","مستقر","person.2.fill"],["الطلبات",unread+" جديدة","doc.text.fill"],["الرواتب","هذا الشهر","banknote"]]
     : role==="supervisor"
-      ? [["حضور الفريق",presentDays+" سجل","person.2.fill"],["الطلبات",unread+" تحتاج مراجعة","doc.text.fill"],["تغطية الوردية","92%","calendar"]]
+      ? [["حضور الفريق",presentDays+" سجل","person.2.fill"],["الطلبات",unread+" تحتاج مراجعة","doc.text.fill"],["الحضور المسجل",recordedAttendanceRate+"%","calendar"]]
       : [["وردية اليوم",isWeeklyOff?"إجازة":shift.start+" — "+shift.end,"calendar"],["الحضور",checkedIn?"مسجل الآن":"لم يُسجل بعد","checkmark"],["الراتب",employeeNet.toLocaleString("ar-EG")+" EGP","banknote"]];
 
   return <ScreenContainer edges={["top","left","right"]}>
@@ -117,13 +121,13 @@ export default function HomeScreen(){
           <View style={styles.live}><View style={styles.liveDot}/><Text style={styles.liveText}>النظام يعمل · اليوم</Text></View>
           <Text style={styles.heroTitle}>{isManagement?"نظرة واحدة على يوم فريقك.":"كل ما تحتاجه ليوم عمل مرتب."}</Text>
           <Text style={styles.heroSub}>{isManagement?"الحضور، الرواتب، الطلبات وأداء الفريق في مكان واحد.":role==="supervisor"?"تابع حضور الفريق وطلبات الموظفين وجدول العمل من مكان واحد.":"سجل حضورك وتابع ورديتك وراتبك وطلباتك من لوحة واحدة بسيطة."}</Text>
-          <View style={[styles.heroStats, isMobile && styles.heroStatsMobile]}><View><Text style={styles.heroLabel}>الفرع</Text><Text style={styles.heroValue}>الفرع الرئيسي</Text></View><View><Text style={styles.heroLabel}>الوردية</Text><Text style={styles.heroValue}>{isWeeklyOff?"إجازة":shift.start+" — "+shift.end}</Text></View><View><Text style={styles.heroLabel}>الالتزام</Text><Text style={styles.heroValue}>92%</Text></View></View>
+          <View style={[styles.heroStats, isMobile && styles.heroStatsMobile]}><View><Text style={styles.heroLabel}>الفرع</Text><Text style={styles.heroValue}>الفرع الرئيسي</Text></View><View><Text style={styles.heroLabel}>الوردية</Text><Text style={styles.heroValue}>{isWeeklyOff?"إجازة":shift.start+" — "+shift.end}</Text></View><View><Text style={styles.heroLabel}>الالتزام</Text><Text style={styles.heroValue}>{recordedAttendanceRate}%</Text></View></View>
         </View>
         <View style={styles.attendanceCard}>
           <Text style={styles.attendanceLabel}>{isCheckedOut?"تم إنهاء الوردية":effectiveCheckedIn?"الوردية جارية":"ابدأ يومك"}</Text>
           <Text style={styles.clock}>{currentTime(now)}</Text>
           <View style={styles.locationRow}><View style={styles.locationIcon}><IconSymbol name="location.fill" size={14} color="#163A63"/></View><Text style={styles.locationText}>{gpsMessage}</Text></View>
-          <Pressable disabled={working||isWeeklyOff||isCheckedOut} onPress={effectiveCheckedIn?handleCheckOut:handleCheckIn} style={({pressed})=>[styles.attendanceButton,(working||isWeeklyOff||isCheckedOut)&&styles.disabled,pressed&&styles.pressed]}>
+          <Pressable disabled={working||isCheckedOut} onPress={effectiveCheckedIn?handleCheckOut:handleCheckIn} style={({pressed})=>[styles.attendanceButton,(working||isCheckedOut)&&styles.disabled,pressed&&styles.pressed]}>
             <IconSymbol name={effectiveCheckedIn?"arrow.right":"checkmark"} size={17} color="#FFFFFF"/><Text style={styles.attendanceButtonText}>{attendanceActionLabel}</Text>
           </Pressable>
         </View>
@@ -154,9 +158,9 @@ export default function HomeScreen(){
         <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>ملخص الرواتب</Text><Text style={styles.cardMeta}>هذا الشهر</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>EGP</Text><Text style={styles.payrollValue}>{payrollTotal.toLocaleString("ar-EG")}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>صافي المستحق</Text><Text style={styles.payrollStatus}>{payrollQuery.data?.length ? "محدث" : "لا توجد بيانات"}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{teamLate} دقيقة</Text></View></View>
       </View> : role==="supervisor" ? <View style={styles.executiveGrid}>
         <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>Team Operations</Text><Text style={styles.cardMeta}>اليوم</Text></View><View style={styles.pulseRow}><View style={styles.pulseRing}><Text style={styles.pulseValue}>{Math.min(100,Math.round((presentDays/Math.max(records.length,1))*100))}%</Text></View><View style={styles.pulseCopy}><Text style={styles.pulseTitle}>متابعة تشغيل الفريق</Text><Text style={styles.pulseSub}>راجع الحضور والتأخير والطلبات قبل نهاية الوردية.</Text></View></View><View style={styles.miniMetric}><Text style={styles.miniValue}>{unread}</Text><Text style={styles.miniLabel}>طلبات تحتاج مراجعة</Text></View></View>
-        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>تغطية الوردية</Text><Text style={styles.cardMeta}>مؤشر تشغيلي</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>%</Text><Text style={styles.payrollValue}>92</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>الحضور المسجل</Text><Text style={styles.payrollStatus}>{presentDays} سجل</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{payrollInputs.lateMinutes??0} دقيقة</Text></View></View>
+        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>نسبة الحضور المسجل</Text><Text style={styles.cardMeta}>مؤشر تشغيلي</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>%</Text><Text style={styles.payrollValue}>{recordedAttendanceRate}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>الحضور المسجل</Text><Text style={styles.payrollStatus}>{presentDays} سجل</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{payrollInputs.lateMinutes??0} دقيقة</Text></View></View>
       </View> : <View style={styles.executiveGrid}>
-        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>Personal Workday</Text><Text style={styles.cardMeta}>اليوم</Text></View><View style={styles.pulseRow}><View style={styles.pulseRing}><Text style={styles.pulseValue}>{checkedIn?"ON":"OFF"}</Text></View><View style={styles.pulseCopy}><Text style={styles.pulseTitle}>{checkedIn?"وردية جارية الآن":"لم يبدأ يوم العمل"}</Text><Text style={styles.pulseSub}>{isWeeklyOff?"اليوم إجازتك الأسبوعية":"سجل حضورك وتابع وقت الوردية من هنا."}</Text></View></View><View style={styles.miniMetric}><Text style={styles.miniValue}>{shift.start+" — "+shift.end}</Text><Text style={styles.miniLabel}>ساعات الوردية</Text></View></View>
+        <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>Personal Workday</Text><Text style={styles.cardMeta}>اليوم</Text></View><View style={styles.pulseRow}><View style={styles.pulseRing}><Text style={styles.pulseValue}>{checkedIn?"ON":"OFF"}</Text></View><View style={styles.pulseCopy}><Text style={styles.pulseTitle}>{checkedIn?"وردية جارية الآن":"لم يبدأ يوم العمل"}</Text><Text style={styles.pulseSub}>{isWeeklyOff?"اليوم راحتك الأسبوعية؛ إذا عملت يُحسب بيومين":"سجل حضورك وتابع وقت الوردية من هنا."}</Text></View></View><View style={styles.miniMetric}><Text style={styles.miniValue}>{shift.start+" — "+shift.end}</Text><Text style={styles.miniLabel}>ساعات الوردية</Text></View></View>
         <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>ملخصك المالي</Text><Text style={styles.cardMeta}>هذا الشهر</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>EGP</Text><Text style={styles.payrollValue}>{employeeNet.toLocaleString("ar-EG")}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>صافي الراتب</Text><Text style={styles.payrollStatus}>محدث</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{payrollInputs.lateMinutes??0} دقيقة</Text></View></View>
       </View>}
 
@@ -244,7 +248,7 @@ export default function HomeScreen(){
       <View style={[styles.grid, isMobile && styles.gridMobile]}>
         <View style={[styles.card,styles.attendancePanel,isMobile&&styles.panelMobile]}>
           <View style={styles.cardHeader}><Text style={styles.cardTitle}>أداء الحضور</Text><Text style={styles.cardMeta}>آخر 7 أيام</Text></View>
-          <View style={styles.chart}>{weeklyAttendance.map((v,i)=><View key={i} style={styles.barItem}><Text style={styles.barValue}>{v}%</Text><View style={styles.barTrack}><View style={[styles.barFill,{height:(v+"%") as `${number}%`,opacity:i===6?.55:1}]}/></View><Text style={styles.barDay}>{["س","ح","ن","ث","ر","خ","ج"][i]}</Text></View>)}</View>
+          <View style={styles.chart}>{weeklyAttendance.map((day,i)=><View key={day.date} style={styles.barItem}><Text style={styles.barValue}>{day.value === null ? "—" : `${day.value}%`}</Text><View style={styles.barTrack}><View style={[styles.barFill,{height:((day.value ?? 0)+"%") as `${number}%`,opacity:i===6?.55:1}]}/></View><Text style={styles.barDay}>{day.label}</Text></View>)}</View>
         </View>
         <View style={[styles.card,styles.todayPanel,isMobile&&styles.panelMobile]}>
           <View style={styles.cardHeader}><Text style={styles.cardTitle}>حالة اليوم</Text><Text style={styles.cardMeta}>{dateLabel}</Text></View>

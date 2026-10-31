@@ -1,9 +1,10 @@
+import { commitPayrollApproval } from "./payroll-approval";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, getStaffAccountById } from "./db";
 import * as dbQueries from "./db";
 import { redactAuditMetadata, redactStoredAuditMetadata } from "../lib/audit-utils";
 import { calculateEgyptPayroll } from "./egypt-payroll";
-import { PAYROLL_RULES, calculateAttendanceAccrual, calculateAttendancePenalties, todayKey } from "../lib/payroll";
+import { PAYROLL_RULES, calculateAttendanceAccrual, calculateAttendancePenalties, approvedLeaveDates, todayKey } from "../lib/payroll";
 import {
   companies, branches, companyMembers, leaveBalances,
   payrollRecords, notifications, subscriptions, auditLogs, staffAccounts,
@@ -658,10 +659,7 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
       // An explicit weekly-off schedule always wins.
       if (shift?.kind === "weekly_off") continue;
 
-      const day = new Date(`${date}T12:00:00`).getDay();
-      // If no explicit schedule exists, use the employee's normal Mon-Fri work week.
-      const isWorkday = scheduled ? true : day !== 5 && day !== 6;
-      if (!isWorkday) continue;
+      // Rest is defined only by the employee schedule, never by a fixed weekday.
 
       const record = existing.find(x => x.staffAccountId === employee.id && x.date === date);
       const onLeave = isApprovedLeave(requests, employee.id, date);
@@ -918,7 +916,8 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const restDates = schedules.filter(row => row.staffAccountId === s.id &&
       shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
       .map(row => row.scheduleDate);
-    const accrual = calculateAttendanceAccrual(monthlyBaseSalary, month, records, restDates, todayCairo);
+    const leaveRequests = await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,s.id));
+    const accrual = calculateAttendanceAccrual(monthlyBaseSalary, month, records, restDates, todayCairo, approvedLeaveDates(leaveRequests));
     const earnedBaseSalary = accrual.earnedBaseSalary;
     const dailyValue=monthlyBaseSalary/PAYROLL_RULES.calendarDays;
     const hourlyValue=dailyValue/PAYROLL_RULES.dailyHours;
@@ -937,7 +936,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     }
 
     const { absenceDeduction, lateDeduction } = calculateAttendancePenalties(
-      monthlyBaseSalary, records, accrual.unpaidAbsenceDays, restDates,
+      monthlyBaseSalary, records, accrual.unpaidAbsenceDays, [...restDates,...approvedLeaveDates(leaveRequests)],
     );
 
     const earlyMinutes=records.reduce((total, record) => {
@@ -983,8 +982,8 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     });
     const net=Math.max(0, egypt.net-absenceDeduction-lateDeduction-earlyDeduction-extraDeductions-advanceInstallment);
     const values={companyId:m.companyId,staffAccountId:s.id,month,baseSalary:earnedBaseSalary,allowances,bonuses,overtime:overtimeValue,absenceDeduction,lateDeduction,earlyDeduction,otherDeductions:extraDeductions,advances:advanceInstallment,employeeSocialInsurance:egypt.employeeSocialInsurance,employeeIncomeTax:egypt.employeeIncomeTax,grossSalary:gross,netSalary:net,status:"draft"};
-    if(existing) await db.update(payrollRecords).set({...values,updatedAt:new Date()}).where(eq(payrollRecords.id,existing.id));
-    else await db.insert(payrollRecords).values(values);
+    if(existing) await db.update(payrollRecords).set({...values,updatedAt:new Date()}).where(and(eq(payrollRecords.id,existing.id),eq(payrollRecords.status,"draft")));
+    else await db.insert(payrollRecords).values(values).onDuplicateKeyUpdate({set:{id:sql`id`}});
     result.push(values);
   }
   await writeAudit(staffAccountId,m.companyId,"payroll.generated","payroll",month,{count:result.length,skippedApproved});
@@ -993,42 +992,13 @@ export async function generatePayroll(staffAccountId: number, month: string) {
 
 export async function approvePayroll(staffAccountId:number, id:number) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
-  // Payroll approval is a payroll-admin action. Final unapproval remains
-  // restricted to owner/manager so reopening a closed payroll is more sensitive.
-  const m=await getCompanyForStaff(staffAccountId); if(!m || !["owner","manager","hr","accountant"].includes(m.role)) throw new Error("غير مصرح");
+  const m=await getCompanyForStaff(staffAccountId);
+  if(!m || !["owner","manager","hr","accountant"].includes(m.role)) throw new Error("غير مصرح");
   const current=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
   if(!current) throw new Error("مسير الرواتب غير موجود.");
-  if(current.status==="approved") return current;
-
-  // Always regenerate the draft before approval so the final payroll reflects
-  // the latest reviewed attendance, approved adjustments, and active advances.
-  await generatePayroll(staffAccountId, current.month);
-  const refreshed=(await db.select().from(payrollRecords).where(and(
-    eq(payrollRecords.id,id),
-    eq(payrollRecords.companyId,m.companyId)
-  )).limit(1))[0];
-  if(!refreshed) throw new Error("تعذر تحديث مسير الرواتب.");
-
-  await db.update(payrollRecords).set({status:"approved",approvedAt:new Date(),updatedAt:new Date()}).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId)));
-  await createNotification(current.staffAccountId,"payroll","تم اعتماد مسير راتبك","تم اعتماد راتب شهر "+current.month+" ويمكنك مراجعة التفاصيل من النظام.");
-  const advances=await db.select().from(salaryAdvances)
-    .where(and(eq(salaryAdvances.staffAccountId,current.staffAccountId),eq(salaryAdvances.companyId,m.companyId),eq(salaryAdvances.status,"active")))
-    .orderBy(salaryAdvances.id);
-  const paidAdvanceAllocations:{id:number;amount:number}[]=[];
-  for(const advance of advances){
-    if(advance.startMonth<=current.month && advance.remainingAmount>0){
-      const paid=Math.min(advance.installmentAmount,advance.remainingAmount);
-      const remaining=advance.remainingAmount-paid;
-      paidAdvanceAllocations.push({id:advance.id,amount:paid});
-      await db.update(salaryAdvances).set({remainingAmount:remaining,status:remaining===0?"completed":"active",updatedAt:new Date()}).where(eq(salaryAdvances.id,advance.id));
-    }
-  }
-  const row=(await db.select().from(payrollRecords).where(eq(payrollRecords.id,id)).limit(1))[0];
-  if(row){
-    await createNotification(row.staffAccountId,"payroll","تم اعتماد راتبك",`تم اعتماد راتب شهر ${row.month} بقيمة ${row.netSalary.toLocaleString()} جنيه.`);
-    await writeAudit(staffAccountId,m.companyId,"payroll.approved","payroll",String(id),{month:row.month,netSalary:row.netSalary,advanceAllocations:paidAdvanceAllocations});
-  }
-  return row;
+  if(current.status === "approved") return current;
+  await generatePayroll(staffAccountId,current.month);
+  return commitPayrollApproval(db,staffAccountId,m.companyId,id);
 }
 
 export async function getPayrollPayslip(staffAccountId:number, payrollId:number) {
@@ -1059,60 +1029,63 @@ export async function unapprovePayroll(staffAccountId:number, id:number) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(staffAccountId);
   if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
-  const current=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
-  if(!current) throw new Error("مسير الرواتب غير موجود.");
-  if(current.status!=="approved") return current;
-  if(Number(current.advances||0)>0){
-    const approvalAudit=(await db.select({metadata:auditLogs.metadata})
-      .from(auditLogs)
-      .where(and(
-        eq(auditLogs.companyId,m.companyId),
-        eq(auditLogs.action,"payroll.approved"),
-        eq(auditLogs.entity,"payroll"),
-        eq(auditLogs.entityId,String(id))
-      ))
-      .orderBy(desc(auditLogs.createdAt))
-      .limit(1))[0];
-    let allocations:{id:number;amount:number}[]=[];
-    try {
-      const parsed=approvalAudit?.metadata ? JSON.parse(approvalAudit.metadata) : null;
-      allocations=Array.isArray(parsed?.advanceAllocations) ? parsed.advanceAllocations.filter((x:any)=>Number.isInteger(x?.id)&&Number(x?.amount)>0).map((x:any)=>({id:Number(x.id),amount:Number(x.amount)})) : [];
-    } catch {}
-    if(allocations.length){
-      for(const allocation of allocations){
-        const advance=(await db.select().from(salaryAdvances).where(and(
-          eq(salaryAdvances.id,allocation.id),
+  return db.transaction(async tx => {
+    const current=(await tx.select().from(payrollRecords).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId))).limit(1).for("update"))[0];
+    if(!current) throw new Error("مسير الرواتب غير موجود.");
+    if(current.status!=="approved") return current;
+    if(Number(current.advances||0)>0){
+      const approvalAudit=(await tx.select({metadata:auditLogs.metadata})
+        .from(auditLogs)
+        .where(and(
+          eq(auditLogs.companyId,m.companyId),
+          eq(auditLogs.action,"payroll.approved"),
+          eq(auditLogs.entity,"payroll"),
+          eq(auditLogs.entityId,String(id))
+        ))
+        .orderBy(desc(auditLogs.createdAt))
+        .limit(1))[0];
+      let allocations:{id:number;amount:number}[]=[];
+      try {
+        const parsed=approvalAudit?.metadata ? JSON.parse(approvalAudit.metadata) : null;
+        allocations=Array.isArray(parsed?.advanceAllocations) ? parsed.advanceAllocations.filter((x:any)=>Number.isInteger(x?.id)&&Number(x?.amount)>0).map((x:any)=>({id:Number(x.id),amount:Number(x.amount)})) : [];
+      } catch {}
+      if(allocations.length && allocations.reduce((sum,a)=>sum+a.amount,0)!==Number(current.advances)) throw new Error("سجل أقساط السلف لا يطابق المسير. يلزم مراجعته قبل إلغاء الاعتماد.");
+      if(allocations.length){
+        for(const allocation of allocations){
+          const advance=(await tx.select().from(salaryAdvances).where(and(
+            eq(salaryAdvances.id,allocation.id),
+            eq(salaryAdvances.staffAccountId,current.staffAccountId),
+            eq(salaryAdvances.companyId,m.companyId)
+          )).limit(1).for("update"))[0];
+          if(!advance) throw new Error("تعذر استعادة قسط السلفة: السجل غير موجود.");
+          const remaining=Number(advance.remainingAmount)+allocation.amount;
+          await tx.update(salaryAdvances).set({remainingAmount:remaining,status:"active",updatedAt:new Date()}).where(eq(salaryAdvances.id,advance.id));
+        }
+      } else {
+        // Legacy approvals created before allocation tracking: keep the old
+        // aggregate fallback so unapprove remains backward compatible.
+        const advances=await tx.select().from(salaryAdvances).where(and(
           eq(salaryAdvances.staffAccountId,current.staffAccountId),
           eq(salaryAdvances.companyId,m.companyId)
-        )).limit(1))[0];
-        if(!advance) continue;
-        const remaining=Number(advance.remainingAmount)+allocation.amount;
-        await db.update(salaryAdvances).set({remainingAmount:remaining,status:"active",updatedAt:new Date()}).where(eq(salaryAdvances.id,advance.id));
-      }
-    } else {
-      // Legacy approvals created before allocation tracking: keep the old
-      // aggregate fallback so unapprove remains backward compatible.
-      const advances=await db.select().from(salaryAdvances).where(and(
-        eq(salaryAdvances.staffAccountId,current.staffAccountId),
-        eq(salaryAdvances.companyId,m.companyId)
-      )).orderBy(salaryAdvances.id);
-      let restore=Number(current.advances||0);
-      for(const advance of advances){
-        if(restore<=0) break;
-        const amount=Math.min(Number(advance.installmentAmount),restore);
-        await db.update(salaryAdvances).set({
-          remainingAmount:Number(advance.remainingAmount)+amount,
-          status:"active",
-          updatedAt:new Date()
-        }).where(eq(salaryAdvances.id,advance.id));
-        restore-=amount;
+        )).orderBy(salaryAdvances.id).for("update");
+        let restore=Number(current.advances||0);
+        for(const advance of advances){
+          if(restore<=0) break;
+          const amount=Math.min(Number(advance.installmentAmount),restore);
+          await tx.update(salaryAdvances).set({
+            remainingAmount:Number(advance.remainingAmount)+amount,
+            status:"active",
+            updatedAt:new Date()
+          }).where(eq(salaryAdvances.id,advance.id));
+          restore-=amount;
+        }
       }
     }
-  }
-  await db.update(payrollRecords).set({status:"draft",approvedAt:null,updatedAt:new Date()}).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId)));
-  await writeAudit(staffAccountId,m.companyId,"payroll.unapproved","payroll",String(id),{month:current.month});
-  await createNotification(current.staffAccountId,"payroll","تم إلغاء اعتماد راتبك","تم فتح مسير راتب شهر "+current.month+" للمراجعة والتعديل.");
-  return (await db.select().from(payrollRecords).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
+    await tx.update(payrollRecords).set({status:"draft",approvedAt:null,updatedAt:new Date()}).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId)));
+    await tx.insert(auditLogs).values({staffAccountId,companyId:m.companyId,action:"payroll.unapproved",entity:"payroll",entityId:String(id),metadata:JSON.stringify({month:current.month})});
+    await tx.insert(notifications).values({staffAccountId:current.staffAccountId,type:"payroll",title:"تم إلغاء اعتماد راتبك",body:"تم فتح مسير راتب شهر "+current.month+" للمراجعة والتعديل."});
+    return (await tx.select().from(payrollRecords).where(and(eq(payrollRecords.id,id),eq(payrollRecords.companyId,m.companyId))).limit(1))[0];
+  });
 }
 
 export async function waiveAttendanceException(actorId:number,input:{staffAccountId:number;date:string;kind:"late"|"early"}) {
@@ -1485,7 +1458,7 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   const staff=(await db.select().from(staffAccounts).where(eq(staffAccounts.id,staffAccountId)).limit(1))[0];
   if(!staff) return null;
   const attendance=await db.select().from(attendanceRecords).where(eq(attendanceRecords.staffAccountId,staffAccountId)).orderBy(desc(attendanceRecords.date));
-  const requests=await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,staffAccountId)).orderBy(desc(staffRequests.createdAt)).limit(50);
+  const requests=await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,staffAccountId)).orderBy(desc(staffRequests.createdAt));
   const payroll=(await db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.staffAccountId,staffAccountId),eq(payrollRecords.month,month))).limit(1))[0] ?? null;
 
   const cairoToday = todayKey();
@@ -1495,7 +1468,7 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   const shifts = await db.select().from(shiftTemplates);
   const restDates = schedules.filter(row => shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
     .map(row => row.scheduleDate);
-  const accrual = calculateAttendanceAccrual(Number(staff.baseSalary), month, attendance, restDates, cairoToday);
+  const accrual = calculateAttendanceAccrual(Number(staff.baseSalary), month, attendance, restDates, cairoToday, approvedLeaveDates(requests));
   const earnedBaseSalaryToDate = accrual.earnedBaseSalary;
   const workedDaysToDate = accrual.workedDays;
   const paidRestDaysToDate = accrual.paidRestDays;
@@ -1506,7 +1479,7 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   ))).map(row => row.fromDate));
   const penalties = calculateAttendancePenalties(Number(staff.baseSalary), currentRecords.map(row => ({...row,
     note: permissionDates.has(row.date) ? `${row.note || ""} بإذن` : row.note,
-  })), accrual.unpaidAbsenceDays, restDates);
+  })), accrual.unpaidAbsenceDays, [...restDates,...approvedLeaveDates(requests)]);
   const overtime = (await db.select().from(staffRequests).where(and(
     eq(staffRequests.staffAccountId,staffAccountId), eq(staffRequests.type,"أوفر تايم"), eq(staffRequests.status,"مقبول")
   ))).filter(row => row.fromDate.startsWith(`${month}-`) && row.fromDate <= cairoToday)

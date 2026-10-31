@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildLastSevenDaysAttendance,
   buildDepartmentStats,
   buildStatusStats,
   buildWeeklyStats,
@@ -58,4 +59,16 @@ describe("مؤشرات Dashboard", () => {
       { netSalary: null, absenceDeduction: null, overtime: null, status: "approved" },
     ])).toEqual({ totalPayroll: 18000, totalAbsenceDeductions: 300, totalOvertime: 750, approvedPayroll: 2, totalPayrollRows: 3 });
   });
+});
+
+it("shows seven actual calendar days, with missing data blank and real absence at zero", () => {
+  const result=buildLastSevenDaysAttendance([
+    {date:"2026-10-30",status:"حاضر",lateMinutes:0},
+    {date:"2026-10-30",status:"غياب",lateMinutes:0},
+    {date:"2026-10-31",status:"غياب",lateMinutes:0},
+  ],"2026-10-31");
+  expect(result).toHaveLength(7);
+  expect(result[0]).toMatchObject({date:"2026-10-25",value:null});
+  expect(result[5].value).toBe(50);
+  expect(result[6].value).toBe(0);
 });
