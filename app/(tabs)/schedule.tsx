@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import { trpc } from "@/lib/trpc";
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
@@ -54,7 +54,14 @@ function tone(s: ShiftTemplate | null | undefined, paletteIndex?: number) {
 export default function ScheduleScreen() {
   const { width } = useWindowDimensions();
   const compact = width < 560;
-  const { role, employee, records, staffMembers, shiftTemplates, schedules, teamSchedules, teamAttendance, saveSchedule } = useAppData();
+  const { role, employee, records, staffMembers: allStaffMembers, shiftTemplates, schedules, teamSchedules: allTeamSchedules, teamAttendance, saveSchedule } = useAppData();
+  // Keep archived history in AppData for payroll and employee records. The
+  // operational schedule, picker and counters all use the same active roster.
+  const staffMembers = useMemo(() => allStaffMembers.filter(person => person.active !== false && !person.employmentEndedOn), [allStaffMembers]);
+  const teamSchedules = useMemo(() => {
+    const ids = new Set(staffMembers.map(person => person.id));
+    return allTeamSchedules.filter(entry => ids.has(String(entry.staffAccountId)));
+  }, [allTeamSchedules, staffMembers]);
   const router = useRouter();
   const updateAttendance = trpc.attendance.managerUpdate.useMutation();
   const [weekOffset, setWeekOffset] = useState(0);
@@ -70,6 +77,12 @@ export default function ScheduleScreen() {
   const [bulkMode, setBulkMode] = useState<"all" | "fiveDays">("fiveDays");
   const [bulkSaving, setBulkSaving] = useState(false);
   const [detailForm, setDetailForm] = useState({ checkIn: "", checkOut: "", lateMinutes: "0", status: "حاضر" as "حاضر" | "متأخر" | "غياب" | "إجازة" | "مأمورية", note: "" });
+  useEffect(() => {
+    if (staffMembers.some(person => person.id === selectedEmployee)) return;
+    setSelectedEmployee(staffMembers[0]?.id ?? "");
+    setDetailOpen(false);
+    setBulkOpen(false);
+  }, [staffMembers, selectedEmployee]);
   const weekRange = `${week[0]?.date ?? ""} — ${week[6]?.date ?? ""}`;
   const adminRole = role === "owner" || role === "manager";
   const visible = adminRole ? teamSchedules : schedules;
@@ -162,7 +175,7 @@ export default function ScheduleScreen() {
   }
 
   async function applyBulkSchedule() {
-    if (!adminRole || !selectedEmployee || bulkShiftId === null) return;
+    if (!adminRole || !member || bulkShiftId === null) return;
     const workShift = shiftTemplates.find(s => s.id === bulkShiftId);
     const weeklyOff = shiftTemplates.find(s => s.kind === "weekly_off");
     if (!workShift) return;
@@ -180,7 +193,7 @@ export default function ScheduleScreen() {
     } finally { setBulkSaving(false); }
   }
   async function assignShift(shift: ShiftTemplate) {
-    if (!adminRole || !selectedEmployee) return;
+    if (!adminRole || !member) return;
     setSaving(true);
     try {
       await saveSchedule({ staffAccountId: Number(selectedEmployee), scheduleDate: selectedDay, shiftTemplateId: shift.id });

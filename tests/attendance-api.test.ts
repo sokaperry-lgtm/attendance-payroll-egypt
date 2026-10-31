@@ -104,6 +104,15 @@ describe("attendance API regression checks", () => {
     await caller.staff.archive({id:20,employmentEndedOn:"٢٠/١٠/٢٠٢٦"});
     expect(archive).toHaveBeenLastCalledWith(20,10,1,"2026-10-20");
   });
+  it.each([{active:false,employmentEndedOn:null},{active:true,employmentEndedOn:"2026-10-20"}])("rejects scheduling an inactive or archived employee (%j)",async state=>{
+    vi.mocked(enterprise.getMembership).mockResolvedValue(membership("owner"));
+    vi.spyOn(db,"getStaffAccountById").mockResolvedValue({...context().staffUser!,...state});
+    vi.spyOn(enterprise,"assertPermission").mockResolvedValue({} as Awaited<ReturnType<typeof enterprise.assertPermission>>);
+    vi.spyOn(enterprise,"assertOperationalTarget").mockResolvedValue({actor:membership("owner"),target:membership()});
+    const save=vi.spyOn(db,"saveSchedule").mockRejectedValue(new Error("Unexpected write"));
+    await expect(appRouter.createCaller(context()).schedule.save({staffAccountId:20,scheduleDate:"2026-10-31",shiftTemplateId:1})).rejects.toThrow("موظف مؤرشف أو موقوف");
+    expect(save).not.toHaveBeenCalled();
+  });
   it("does not let an employee delete staff or generate payroll", async () => {
     const caller=appRouter.createCaller(context());
     await expect(caller.staff.archive({id:20})).rejects.toMatchObject({code:"FORBIDDEN"});
