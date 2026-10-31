@@ -1140,7 +1140,11 @@ export async function getPayroll(staffAccountId:number, month:string) {
   if(!m || !["owner","manager","hr","accountant"].includes(m.role)) throw new Error("غير مصرح");
   // Recover a leaving-month row even when the employee was archived before
   // anyone generated this month's run. Approved records remain locked.
-  const companyStaff = await listCompanyStaff(staffAccountId);
+  // Payroll viewers (including accountants) need this roster without requiring
+  // the separate employees-management role used by listCompanyStaff.
+  const members = await db.select({staffAccountId:companyMembers.staffAccountId}).from(companyMembers).where(eq(companyMembers.companyId,m.companyId));
+  const ids = members.map(member=>member.staffAccountId);
+  const companyStaff = ids.length ? await db.select({id:staffAccounts.id,active:staffAccounts.active,employmentEndedOn:staffAccounts.employmentEndedOn}).from(staffAccounts).where(inArray(staffAccounts.id,ids)) : [];
   const existingRows = await db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.month,month)));
   if (companyStaff.some(staff => !staff.active && staff.employmentEndedOn?.slice(0,7) === month && !existingRows.some(row => row.staffAccountId === staff.id))) {
     await generatePayroll(staffAccountId, month);

@@ -127,15 +127,17 @@ export function buildAttendanceReportHtml(
 }
 
 export async function exportAttendanceReportPdf(report: AttendancePdfReport, options?: { companyName?: string; branchName?: string }) {
-  const html = buildAttendanceReportHtml(report, options);
+  return printReportHtml(buildAttendanceReportHtml(report, options));
+}
+
+export async function printReportHtml(html: string) {
   if (Platform.OS === "web") {
     const popup = window.open("", "_blank", "width=1000,height=800");
     if (!popup) throw new Error("اسمح بفتح النوافذ المنبثقة لتصدير التقرير.");
     popup.document.open();
+    popup.onload = () => { popup.focus(); popup.print(); };
     popup.document.write(html);
     popup.document.close();
-    popup.focus();
-    popup.onload = () => popup.print();
     return;
   }
   await Print.printAsync({ html });

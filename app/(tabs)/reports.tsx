@@ -3,7 +3,7 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { PageHeader, SectionTitle, SurfaceCard, UI } from "@/components/ui/design-system";
-import { exportAttendanceReportPdf, type AttendancePdfReport } from "@/lib/attendance-pdf";
+import { exportSelectedReportPdf, REPORT_TITLES, type ReportView } from "@/lib/report-pdf";
 import { showAlert } from "@/lib/alert";
 import { buildDepartmentStats, buildStatusStats, buildWeeklyStats, calculateAttendanceRate, summarizePayroll } from "@/lib/dashboard-utils";
 import { trpc } from "@/lib/trpc";
@@ -39,7 +39,7 @@ export default function ReportsScreen() {
   const [exporting, setExporting] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | "all">("all");
-  const [reportView, setReportView] = useState<"overview" | "attendance" | "payroll" | "team">("overview");
+  const [reportView, setReportView] = useState<ReportView>("overview");
 
   const report = reportQuery.data;
   const allEmployees = (report?.employees ?? []) as ReportEmployee[];
@@ -65,6 +65,9 @@ export default function ReportsScreen() {
   const topAttendance = [...attendanceByEmployee].sort((a, b) => b.rate - a.rate).slice(0, 8);
   const reportTabs = [{ id: "overview", label: "نظرة عامة", icon: "chart.bar.fill" }, { id: "attendance", label: "الحضور", icon: "clock" }, { id: "payroll", label: "الرواتب", icon: "banknote.fill" }, { id: "team", label: "الفريق", icon: "person.3.fill" }] as const;
 
+  const needsPayrollForExport = payrollAccess && (reportView === "payroll" || reportView === "overview");
+  const exportBusy = exporting || !report || reportQuery.isFetching || (needsPayrollForExport && payrollQuery.isFetching);
+
   if (reportQuery.isLoading) {
     return <ScreenContainer><View style={styles.state}><ActivityIndicator color={UI.primary} /><Text style={styles.stateText}>جاري تجهيز لوحة المؤشرات...</Text></View></ScreenContainer>;
   }
@@ -73,8 +76,13 @@ export default function ReportsScreen() {
     if (!report) return;
     setExporting(true);
     try {
-      const exportReport = { ...report, employees, summary };
-      await exportAttendanceReportPdf(exportReport as AttendancePdfReport, { companyName: "الشركة الرئيسية", branchName: "الفرع الرئيسي" });
+      if (needsPayrollForExport && (payrollQuery.isError || !payrollQuery.data)) {
+        throw new Error("تعذر تحميل بيانات الرواتب. أعد تحميل الصفحة وحاول التصدير مجددًا.");
+      }
+      await exportSelectedReportPdf(reportView, { ...report, employees: allEmployees }, {
+        employeeId: selectedEmployeeId, payrollRows: allPayrollRows, canViewPayroll: payrollAccess,
+        companyName: "الشركة الرئيسية", branchName: "الفرع الرئيسي",
+      });
     } catch (error) {
       showAlert("تعذر تصدير التقرير", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
     } finally {
@@ -93,16 +101,16 @@ export default function ReportsScreen() {
               <IconSymbol name="line.3.horizontal.decrease" size={16} color={UI.primary} />
               <Text style={styles.filterText}>{selectedEmployeeId === "all" ? "كل الموظفين" : employees[0]?.name || "موظف"}</Text>
             </Pressable>
-            <Pressable onPress={handleExport} disabled={exporting} style={({ pressed }) => [styles.exportButton, exporting && styles.disabled, pressed && styles.pressed]}>
+            <Pressable onPress={handleExport} disabled={exportBusy} style={({ pressed }) => [styles.exportButton, exportBusy && styles.disabled, pressed && styles.pressed]}>
               <IconSymbol name="arrow.down.doc.fill" size={17} color="#FFFFFF" />
               <Text style={styles.exportText}>{exporting ? "جاري التجهيز..." : "تصدير PDF"}</Text>
             </Pressable>
           </View>
         </View>
 
-        <View style={[styles.reportTabs, compact && styles.reportTabsCompact]}>{reportTabs.map((tab) => <Pressable key={tab.id} onPress={() => setReportView(tab.id)} style={[styles.reportTab, reportView === tab.id && styles.reportTabActive]}><IconSymbol name={tab.icon as never} size={15} color={reportView === tab.id ? "#FFFFFF" : UI.primary} /><Text style={[styles.reportTabText, reportView === tab.id && styles.reportTabTextActive]}>{tab.label}</Text></Pressable>)}</View>
+        <View style={[styles.reportTabs, compact && styles.reportTabsCompact]}>{reportTabs.filter(tab => tab.id !== "payroll" || payrollAccess).map((tab) => <Pressable key={tab.id} onPress={() => setReportView(tab.id)} style={[styles.reportTab, reportView === tab.id && styles.reportTabActive]}><IconSymbol name={tab.icon as never} size={15} color={reportView === tab.id ? "#FFFFFF" : UI.primary} /><Text style={[styles.reportTabText, reportView === tab.id && styles.reportTabTextActive]}>{tab.label}</Text></Pressable>)}</View>
 
-        <View style={styles.quickActions}><View><Text style={styles.quickTitle}>مركز التقارير</Text><Text style={styles.quickHint}>تقارير الحضور والرواتب والفريق في مكان واحد</Text></View><View style={styles.quickActionButtons}><Pressable onPress={handleExport} disabled={exporting} style={({ pressed }) => [styles.pdfMiniButton, pressed && styles.pressed]}><Text style={styles.pdfMiniText}>{exporting ? "..." : "تصدير PDF"}</Text></Pressable></View></View>
+        <View style={styles.quickActions}><View><Text style={styles.quickTitle}>مركز التقارير</Text><Text style={styles.quickHint}>{REPORT_TITLES[reportView]} · شهر {month}</Text></View><View style={styles.quickActionButtons}><Pressable onPress={handleExport} disabled={exportBusy} style={({ pressed }) => [styles.pdfMiniButton, pressed && styles.pressed]}><Text style={styles.pdfMiniText}>{exporting ? "..." : "تصدير PDF"}</Text></Pressable></View></View>
 
         {reportView === "overview" && <View style={styles.smartAlerts}>
           <View style={styles.smartAlertsHeader}>
