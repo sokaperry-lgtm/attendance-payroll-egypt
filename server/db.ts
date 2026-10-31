@@ -1,5 +1,6 @@
+import { todayKey, isCalendarDate, isEmploymentDate } from "../lib/payroll";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, lt, inArray, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   attendanceRecords,
@@ -143,6 +144,7 @@ export async function createStaffAccount(input: {
   baseSalary?: number;
   shiftStart?: string;
   shiftEnd?: string;
+  employmentStartedOn?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -156,6 +158,7 @@ export async function createStaffAccount(input: {
     baseSalary: input.baseSalary ?? 0,
     shiftStart: input.shiftStart ?? "08:00",
     shiftEnd: input.shiftEnd ?? "17:00",
+    employmentStartedOn: input.employmentStartedOn ?? todayKey(),
   });
   return getStaffAccountById(Number(result[0].insertId));
 }
@@ -183,17 +186,33 @@ export async function listStaffAccounts() {
     baseSalary: staffAccounts.baseSalary,
     shiftStart: staffAccounts.shiftStart,
     shiftEnd: staffAccounts.shiftEnd,
+    employmentStartedOn: staffAccounts.employmentStartedOn,
     employmentEndedOn: staffAccounts.employmentEndedOn,
     active: staffAccounts.active,
     createdAt: staffAccounts.createdAt,
   }).from(staffAccounts).orderBy(desc(staffAccounts.createdAt));
 }
 
-export async function updateStaffAccount(id: number, input: { phone?: string; name?: string; title?: string; department?: string; baseSalary?: number; shiftStart?: string; shiftEnd?: string; active?: boolean; password?: string; role?: "manager" | "supervisor" | "employee" }) {
+export async function updateStaffAccount(id: number, input: { phone?: string; name?: string; title?: string; department?: string; baseSalary?: number; shiftStart?: string; shiftEnd?: string; employmentStartedOn?: string; active?: boolean; password?: string; role?: "manager" | "supervisor" | "employee" }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   if (input.active === true && (await getStaffAccountById(id))?.employmentEndedOn) throw new Error("الموظف مؤرشف بعد انتهاء عمله. لا يمكن إعادة تنشيطه من هذا الزر.");
   const values: Record<string, unknown> = {};
+  if (input.employmentStartedOn !== undefined) {
+    if (!isCalendarDate(input.employmentStartedOn)) throw new Error("تاريخ بدء العمل غير صحيح. استخدم YYYY-MM-DD.");
+    const staff = await getStaffAccountById(id);
+    if (!staff) throw new Error("الموظف غير موجود.");
+    if (staff.employmentEndedOn && input.employmentStartedOn > staff.employmentEndedOn) throw new Error("بدء العمل لا يمكن أن يكون بعد آخر يوم عمل.");
+    if (staff.employmentStartedOn !== input.employmentStartedOn) {
+      const prior = await db.select().from(attendanceRecords).where(and(eq(attendanceRecords.staffAccountId,id),lt(attendanceRecords.date,input.employmentStartedOn)));
+      if (prior.some(row => row.checkIn || row.checkOut || row.status === "مأمورية")) throw new Error("يوجد حضور فعلي قبل تاريخ البدء المحدد. راجع التاريخ أولًا.");
+      const closed = await db.select().from(payrollRecords).where(and(eq(payrollRecords.staffAccountId,id),inArray(payrollRecords.status,["approved","مقبول","معتمد","paid","مدفوع","closed","مغلق","finalized","مقفل"])));
+      const first = [staff.employmentStartedOn || "0000-01-01",input.employmentStartedOn].sort()[0].slice(0,7);
+      const last = [staff.employmentStartedOn || "0000-01-01",input.employmentStartedOn].sort()[1].slice(0,7);
+      if (closed.some(row => row.month >= first && row.month <= last)) throw new Error("تعديل تاريخ البدء يؤثر على مسير معتمد. ألغِ اعتماده أولًا للمراجعة.");
+    }
+    values.employmentStartedOn = input.employmentStartedOn;
+  }
   if (input.phone !== undefined) values.phone = input.phone.trim();
   if (input.name !== undefined) values.name = input.name.trim();
   if (input.title !== undefined) values.title = input.title.trim() || null;
@@ -325,7 +344,9 @@ export async function deleteStaffSession(token: string | null | undefined) {
 export async function listAttendance(staffAccountId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(attendanceRecords).where(eq(attendanceRecords.staffAccountId, staffAccountId)).orderBy(desc(attendanceRecords.date));
+  const employee = (await db.select().from(staffAccounts).where(eq(staffAccounts.id,staffAccountId)).limit(1))[0];
+  const rows = await db.select().from(attendanceRecords).where(eq(attendanceRecords.staffAccountId, staffAccountId)).orderBy(desc(attendanceRecords.date));
+  return rows.filter(row => !employee || isEmploymentDate(employee,row.date));
 }
 
 export async function upsertAttendance(input: Omit<AttendanceRecord, "id" | "createdAt" | "updatedAt">) {
@@ -413,7 +434,7 @@ export async function getMonthlyStaffReports(month: string, companyId?: number) 
     companyStaffIds = new Set(members.map(member => member.staffAccountId));
   }
   const employees = staff.filter((member) => (companyStaffIds === null || companyStaffIds.has(member.id)) && includeEmployeeInPayroll(member,month,attendance.some(row=>row.staffAccountId===member.id && row.date.startsWith(month)))).map((member) => {
-    const records = attendance.filter((record) => record.staffAccountId === member.id && record.date.startsWith(month) && record.date <= employeePayrollCutoff(member));
+    const records = attendance.filter((record) => record.staffAccountId === member.id && record.date.startsWith(month) && record.date <= employeePayrollCutoff(member) && isEmploymentDate(member,record.date));
     const memberRequests = requests.filter((request) => request.staffAccountId === member.id && (request.fromDate.startsWith(month) || request.toDate.startsWith(month)));
     const attendanceSummary = summarizeAttendance(records);
     const requestSummary = summarizeRequests(memberRequests);

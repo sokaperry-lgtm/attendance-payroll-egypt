@@ -13,6 +13,7 @@ export async function archiveStaffAccount(id:number, actorId:number, companyId:n
     if(!member || member.role==="owner" || id===actorId) throw new Error("لا يمكن أرشفة حساب المالك أو حساب خارج الشركة.");
     const staff=(await tx.select().from(staffAccounts).where(eq(staffAccounts.id,id)).limit(1).for("update"))[0];
     if(!staff) throw new Error("الموظف غير موجود.");
+    if(staff.employmentStartedOn && employmentEndedOn < staff.employmentStartedOn) throw new Error("آخر يوم عمل لا يمكن أن يسبق تاريخ بدء العمل.");
     if(staff.employmentEndedOn) return {id:staff.id,name:staff.name,employmentEndedOn:staff.employmentEndedOn};
     const laterAttendance=(await tx.select().from(attendanceRecords).where(and(eq(attendanceRecords.staffAccountId,id),gt(attendanceRecords.date,employmentEndedOn),or(isNotNull(attendanceRecords.checkIn),isNotNull(attendanceRecords.checkOut),eq(attendanceRecords.status,"مأمورية")))).limit(1))[0];
     if(laterAttendance) throw new Error("توجد سجلات حضور بعد آخر يوم عمل المحدد. راجع التاريخ قبل الأرشفة.");

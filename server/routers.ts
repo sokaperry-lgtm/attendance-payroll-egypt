@@ -1,3 +1,4 @@
+import { isCalendarDate } from "../lib/payroll";
 import { z } from "zod";
 import { parse as parseCookieHeader } from "cookie";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -47,6 +48,7 @@ const staffView = async (staff: Awaited<ReturnType<typeof db.getStaffAccountById
   return {
     id: staff.id, phone: staff.phone, name: staff.name, title: staff.title, department: staff.department,
     role: staff.role, baseSalary: staff.baseSalary, shiftStart: staff.shiftStart, shiftEnd: staff.shiftEnd, active: staff.active,
+    employmentStartedOn: staff.employmentStartedOn, employmentEndedOn: staff.employmentEndedOn,
     membershipRole: effectiveMembershipRole,
   };
 };
@@ -127,7 +129,7 @@ export const appRouter = router({
   }),
   staff: router({
     list: hrProcedure.query(async ({ ctx }) => { await enterprise.assertPermission(ctx.staffUser.id, "employees.view"); const canViewPayroll = (await enterprise.getEffectivePermissions(ctx.staffUser.id))["payroll.view"]; return (await enterprise.listCompanyStaff(ctx.staffUser.id)).map((item) => { if (canViewPayroll) return { ...item }; const { baseSalary: _baseSalary, ...safeItem } = item; return safeItem; }); }),
-    create: hrProcedure.input(z.object({ phone: z.string().min(3).max(32), password: z.string().min(6).max(120), name: z.string().min(2).max(160), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).default(0), role: z.enum(["manager","supervisor","employee"]).default("employee"), shiftStart: z.string().max(8).default("08:00"), shiftEnd: z.string().max(8).default("17:00") })).mutation(async ({ ctx, input }) => {
+    create: hrProcedure.input(z.object({ phone: z.string().min(3).max(32), password: z.string().min(6).max(120), name: z.string().min(2).max(160), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).default(0), role: z.enum(["manager","supervisor","employee"]).default("employee"), shiftStart: z.string().max(8).default("08:00"), shiftEnd: z.string().max(8).default("17:00"), employmentStartedOn: z.string().refine(isCalendarDate, "تاريخ بدء العمل غير صحيح؛ استخدم YYYY-MM-DD").optional() })).mutation(async ({ ctx, input }) => {
       await enterprise.assertPermission(ctx.staffUser.id, "employees.manage");
       const actorMembership = await enterprise.getMembership(ctx.staffUser.id);
       if (input.role === "manager" && actorMembership?.role !== "owner") {
@@ -157,7 +159,7 @@ export const appRouter = router({
         }
       }
       return await staffView(staff); }),
-    update: hrProcedure.input(z.object({ id: z.number().int(), phone: z.string().min(3).max(32).optional(), password: z.string().min(6).max(120).optional(), name: z.string().min(2).max(160).optional(), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).optional(), role: z.enum(["manager","supervisor","employee"]).optional(), shiftStart: z.string().max(8).optional(), shiftEnd: z.string().max(8).optional(), active: z.boolean().optional() })).mutation(async ({ ctx, input }) => {
+    update: hrProcedure.input(z.object({ id: z.number().int(), phone: z.string().min(3).max(32).optional(), password: z.string().min(6).max(120).optional(), name: z.string().min(2).max(160).optional(), title: z.string().max(120).optional(), department: z.string().max(120).optional(), baseSalary: z.number().int().min(0).optional(), role: z.enum(["manager","supervisor","employee"]).optional(), shiftStart: z.string().max(8).optional(), shiftEnd: z.string().max(8).optional(), employmentStartedOn: z.string().refine(isCalendarDate, "تاريخ بدء العمل غير صحيح؛ استخدم YYYY-MM-DD").optional(), active: z.boolean().optional() })).mutation(async ({ ctx, input }) => {
       await enterprise.assertPermission(ctx.staffUser.id, "employees.manage");
       const { id, ...changes } = input;
       const access = await enterprise.assertStaffInCompany(ctx.staffUser.id, id);
@@ -214,6 +216,7 @@ export const appRouter = router({
       if (access.target.role === "owner" && access.actor.role !== "owner") throw new Error("لا يمكن تعديل حضور المالك من هذا الحساب.");
       if (input.date > cairoToday()) throw new Error("لا يمكن تسجيل حضور بتاريخ مستقبلي.");
       const targetStaff = await db.getStaffAccountById(input.staffAccountId);
+      if (targetStaff?.employmentStartedOn && input.date < targetStaff.employmentStartedOn) throw new Error("لا يمكن تسجيل حضور قبل تاريخ بدء العمل.");
       if (targetStaff?.employmentEndedOn && input.date > targetStaff.employmentEndedOn) throw new Error("لا يمكن إضافة حضور بعد آخر يوم عمل للموظف المؤرشف.");
       if (input.checkIn) timeMinutes(input.checkIn);
       if (input.checkOut) timeMinutes(input.checkOut);
@@ -338,6 +341,8 @@ export const appRouter = router({
     checkIn: staffProcedure.input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), time: z.string().max(8), status: z.string().max(32), lateMinutes: z.number().int().min(0), latitude: gpsCoordinate.min(-90).max(90), longitude: gpsCoordinate.min(-180).max(180) })).mutation(async ({ ctx, input }) => {
       // Device dates/times are compatibility fields only; live punches use the server clock.
       input = {...input,...cairoClock()};
+      const employee = await db.getStaffAccountById(ctx.staffUser.id);
+      if (employee?.employmentStartedOn && input.date < employee.employmentStartedOn) throw new Error("لم يحن تاريخ بدء العمل بعد.");
       await enterprise.assertPayrollEditable(ctx.staffUser.id, input.date.slice(0,7));
       const branch = await enterprise.getBranchForStaff(ctx.staffUser.id);
       if (!branch) throw new Error("لم يتم إعداد موقع GPS لهذا الفرع.");

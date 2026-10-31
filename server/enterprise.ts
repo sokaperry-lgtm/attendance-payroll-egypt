@@ -4,7 +4,7 @@ import { getDb, getStaffAccountById } from "./db";
 import * as dbQueries from "./db";
 import { redactAuditMetadata, redactStoredAuditMetadata } from "../lib/audit-utils";
 import { calculateEgyptPayroll } from "./egypt-payroll";
-import { PAYROLL_RULES, calculateAttendanceAccrual, calculateAttendancePenalties, approvedLeaveDates, employeePayrollCutoff, includeEmployeeInPayroll, todayKey } from "../lib/payroll";
+import { PAYROLL_RULES, calculateAttendanceAccrual, calculateAttendancePenalties, approvedLeaveDates, employeePayrollCutoff, includeEmployeeInPayroll, isEmploymentDate, todayKey } from "../lib/payroll";
 import {
   companies, branches, companyMembers, leaveBalances,
   payrollRecords, notifications, subscriptions, auditLogs, staffAccounts,
@@ -127,6 +127,8 @@ export async function getDailyAttendanceOverview(staffAccountId: number, date: s
     title: staffAccounts.title,
     role: staffAccounts.role,
     active: staffAccounts.active,
+    employmentStartedOn: staffAccounts.employmentStartedOn,
+    employmentEndedOn: staffAccounts.employmentEndedOn,
   }).from(staffAccounts).where(inArray(staffAccounts.id, ids));
 
   const rows = await db.select().from(attendanceRecords).where(
@@ -135,7 +137,7 @@ export async function getDailyAttendanceOverview(staffAccountId: number, date: s
 
   const byStaff = new Map(rows.map(row => [row.staffAccountId, row]));
   const employees = staff
-    .filter(s => s.active)
+    .filter(s => s.active && isEmploymentDate(s,date))
     .map(s => {
       const row = byStaff.get(s.id);
       return {
@@ -165,7 +167,9 @@ export async function listCompanyAttendance(staffAccountId: number) {
   const visibleMembers = m.role === "supervisor" ? members.filter(x => ["employee","supervisor"].includes(x.role)) : members;
   const ids = visibleMembers.map(x => x.staffAccountId);
   if (!ids.length) return [];
-  return db.select().from(attendanceRecords).where(inArray(attendanceRecords.staffAccountId, ids)).orderBy(desc(attendanceRecords.date));
+  const staff = await db.select().from(staffAccounts).where(inArray(staffAccounts.id,ids));
+  const rows = await db.select().from(attendanceRecords).where(inArray(attendanceRecords.staffAccountId, ids)).orderBy(desc(attendanceRecords.date));
+  return rows.filter(row => {const employee=staff.find(s=>s.id===row.staffAccountId);return employee && isEmploymentDate(employee,row.date);});
 }
 
 export async function listCompanyStaff(staffAccountId: number) {
@@ -185,6 +189,7 @@ export async function listCompanyStaff(staffAccountId: number) {
         baseSalary: staffAccounts.baseSalary,
         shiftStart: staffAccounts.shiftStart,
         shiftEnd: staffAccounts.shiftEnd,
+        employmentStartedOn: staffAccounts.employmentStartedOn,
         employmentEndedOn: staffAccounts.employmentEndedOn,
         active: staffAccounts.active,
         createdAt: staffAccounts.createdAt,
@@ -223,6 +228,7 @@ export async function getManagementDashboard(staffAccountId: number, month: stri
         title: staffAccounts.title,
         department: staffAccounts.department,
         role: staffAccounts.role,
+        employmentStartedOn: staffAccounts.employmentStartedOn,
         employmentEndedOn: staffAccounts.employmentEndedOn,
         active: staffAccounts.active,
       }).from(staffAccounts).where(inArray(staffAccounts.id, staffIds))
@@ -646,6 +652,7 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
   for (const employee of staff) {
     if (closedStaffIds.has(employee.id)) continue;
     for (const date of dateRange(month)) {
+      if (!isEmploymentDate(employee,date)) continue;
       const todayParts = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Africa/Cairo",
         year: "numeric",
@@ -777,7 +784,7 @@ export async function getAttendanceWorkSummary(staffAccountId: number, month: st
   ));
 
   const employees = staff.map(employee => {
-    const rows = attendance.filter(x => x.staffAccountId === employee.id && x.checkIn && x.checkOut);
+    const rows = attendance.filter(x => x.staffAccountId === employee.id && isEmploymentDate(employee,x.date) && x.checkIn && x.checkOut);
     let workMinutes = 0;
     let approvedOvertimeMinutes = 0;
 
@@ -837,7 +844,7 @@ export async function recalculateHistoricalPenaltyDeductions(staffAccountId:numb
   for(const row of drafts) {
     const staffRow=staffById.get(Number(row.staffAccountId));
     if(!staffRow) continue;
-    const monthRecords=attendance.filter(a=>Number(a.staffAccountId)===Number(row.staffAccountId) && String(a.date).startsWith(row.month))
+    const monthRecords=attendance.filter(a=>Number(a.staffAccountId)===Number(row.staffAccountId) && String(a.date).startsWith(row.month) && isEmploymentDate(staffRow,a.date))
       .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
     const monthlySalary=row.month===currentMonth
       ? Math.max(0,Number(staffRow.baseSalary||0))
@@ -912,7 +919,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     )).limit(1))[0];
     if(existing && ["approved","مقبول","معتمد"].includes(String(existing.status))) { result.push(existing); skippedApproved++; continue; }
     const records=attendance
-      .filter(x=>x.staffAccountId===s.id && x.date.startsWith(month) && x.date <= cutoff)
+      .filter(x=>x.staffAccountId===s.id && x.date.startsWith(month) && x.date <= cutoff && isEmploymentDate(s,x.date))
       .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
 
     const monthlyBaseSalary = Math.max(0, Math.round(Number(s.baseSalary) || 0));
@@ -921,7 +928,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
       .map(row => row.scheduleDate);
     const leaveRequests = await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,s.id));
-    const accrual = calculateAttendanceAccrual(monthlyBaseSalary, month, records, restDates, todayCairo, approvedLeaveDates(leaveRequests));
+    const accrual = calculateAttendanceAccrual(monthlyBaseSalary, month, records, restDates, todayCairo, approvedLeaveDates(leaveRequests), s.employmentStartedOn);
     const earnedBaseSalary = accrual.earnedBaseSalary - accrual.restOvertimeValue;
     const dailyValue=monthlyBaseSalary/PAYROLL_RULES.calendarDays;
     const hourlyValue=dailyValue/PAYROLL_RULES.dailyHours;
@@ -959,7 +966,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const earlyDeduction=Math.round(hourlyValue*earlyMinutes/60);
 
     const approvedOvertimeHours=approvedOvertime
-      .filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month) && r.fromDate <= todayCairo)
+      .filter(r=>r.staffAccountId===s.id && r.fromDate.startsWith(month) && r.fromDate <= todayCairo && isEmploymentDate(s,r.fromDate))
       .reduce((sum,r)=>sum+Math.max(0, Number(r.hours ?? 0)),0);
     const overtimeHours=approvedOvertimeHours;
     const overtimeRate=hourlyValue;
@@ -1350,13 +1357,13 @@ export async function listCompanyRequests(staffAccountId:number) {
   const visibleMembers=m.role === "supervisor" ? members.filter(x=>["employee","supervisor"].includes(x.role)) : members;
   const ids=visibleMembers.map(x=>x.staffAccountId);
   if(!ids.length) return [];
-  const staff=await db.select({id:staffAccounts.id,name:staffAccounts.name}).from(staffAccounts);
+  const staff=await db.select({id:staffAccounts.id,name:staffAccounts.name,employmentStartedOn:staffAccounts.employmentStartedOn,employmentEndedOn:staffAccounts.employmentEndedOn}).from(staffAccounts);
   const rows=await db.select().from(staffRequests).orderBy(desc(staffRequests.createdAt));
   const penalties=await db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.companyId,m.companyId),eq(salaryAdjustments.type,"penalty"))).orderBy(desc(salaryAdjustments.createdAt));
   const attendance=await db.select().from(attendanceRecords).orderBy(desc(attendanceRecords.date));
   const regular=rows.filter(r=>ids.includes(r.staffAccountId) && r.fromDate >= "2026-10-01" && r.toDate >= "2026-10-01").map(r=>({...r,source:"request",staffName:staff.find(s=>s.id===r.staffAccountId)?.name ?? "موظف",actionable:r.status==="قيد المراجعة"}));
   const exceptions:any[]=[];
-  for(const r of attendance.filter(a=>ids.includes(a.staffAccountId) && a.date >= "2026-10-01")){
+  for(const r of attendance.filter(a=>ids.includes(a.staffAccountId) && a.date >= "2026-10-01" && isEmploymentDate(staff.find(s=>s.id===a.staffAccountId) || {},a.date))){
     const name=staff.find(s=>s.id===r.staffAccountId)?.name ?? "موظف";
     if(Number(r.lateMinutes||0)>0 || (r.note||"").includes("تم إلغاء التأخير")) {
       const status = (r.note||"").includes("تم اعتماد التأخير") ? "مقبول" : (r.note||"").includes("تم إلغاء التأخير") ? "مرفوض" : "قيد المراجعة";
@@ -1418,10 +1425,10 @@ export async function reviewAttendanceException(actorId:number,input:{staffAccou
 export async function listAttendancePenaltyRequests(staffAccountId:number) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId); if(!m || !["owner","manager"].includes(m.role)) return [];
-  const staff=await db.select({id:staffAccounts.id,name:staffAccounts.name}).from(staffAccounts).innerJoin(companyMembers,eq(companyMembers.staffAccountId,staffAccounts.id)).where(and(eq(companyMembers.companyId,m.companyId),eq(companyMembers.active,true)));
+  const staff=await db.select({id:staffAccounts.id,name:staffAccounts.name,employmentStartedOn:staffAccounts.employmentStartedOn,employmentEndedOn:staffAccounts.employmentEndedOn}).from(staffAccounts).innerJoin(companyMembers,eq(companyMembers.staffAccountId,staffAccounts.id)).where(and(eq(companyMembers.companyId,m.companyId),eq(companyMembers.active,true)));
   const names=new Map(staff.map(x=>[x.id,x.name]));
   const rows=await db.select().from(attendanceRecords).orderBy(desc(attendanceRecords.date));
-  return rows.filter(r=>names.has(r.staffAccountId)).flatMap(r=>{
+  return rows.filter(r=>names.has(r.staffAccountId) && isEmploymentDate(staff.find(s=>s.id===r.staffAccountId) || {},r.date)).flatMap(r=>{
     const note=String(r.note||"");
     const latePending=Number(r.lateMinutes||0)>=PAYROLL_RULES.lateQuarterDayMinutes && !note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
     const lateApproved=Number(r.lateMinutes||0)>=PAYROLL_RULES.lateQuarterDayMinutes && note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");
@@ -1479,12 +1486,12 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   const shifts = await db.select().from(shiftTemplates);
   const restDates = schedules.filter(row => shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
     .map(row => row.scheduleDate);
-  const accrual = calculateAttendanceAccrual(Number(staff.baseSalary), month, attendance, restDates, cairoToday, approvedLeaveDates(requests));
+  const accrual = calculateAttendanceAccrual(Number(staff.baseSalary), month, attendance, restDates, cairoToday, approvedLeaveDates(requests), staff.employmentStartedOn);
   const earnedBaseSalaryToDate = accrual.earnedBaseSalary - accrual.restOvertimeValue;
   const workedDaysToDate = accrual.workedDays;
   const paidRestDaysToDate = accrual.paidRestDays;
 
-  const currentRecords = attendance.filter(row => row.date.startsWith(`${month}-`) && row.date <= cairoToday);
+  const currentRecords = attendance.filter(row => row.date.startsWith(`${month}-`) && row.date <= cairoToday && isEmploymentDate(staff,row.date));
   const permissionDates = new Set((await db.select().from(staffRequests).where(and(
     eq(staffRequests.staffAccountId,staffAccountId), eq(staffRequests.type,"إذن"), eq(staffRequests.status,"مقبول")
   ))).map(row => row.fromDate));
@@ -1493,7 +1500,7 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   })), accrual.unpaidAbsenceDays, [...restDates,...approvedLeaveDates(requests)]);
   const overtime = (await db.select().from(staffRequests).where(and(
     eq(staffRequests.staffAccountId,staffAccountId), eq(staffRequests.type,"أوفر تايم"), eq(staffRequests.status,"مقبول")
-  ))).filter(row => row.fromDate.startsWith(`${month}-`) && row.fromDate <= cairoToday)
+  ))).filter(row => row.fromDate.startsWith(`${month}-`) && row.fromDate <= cairoToday && isEmploymentDate(staff,row.fromDate))
     .reduce((sum,row) => sum + Math.max(0,Number(row.hours) || 0),0) * Number(staff.baseSalary) / 30 / 9 + accrual.restOvertimeValue;
   const earlyMinutes = currentRecords.reduce((total,record) => {
     if (!record.checkOut || !String(record.note || "").includes("تم اعتماد الانصراف المبكر")) return total;
@@ -1526,7 +1533,7 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
 
   const balance=await ensureLeaveBalance(staffAccountId,Number(month.slice(0,4)));
   const { passwordHash: _passwordHash, ...safeStaff } = staff;
-  return { staff:safeStaff, attendance: attendance.slice(0,90), requests, payroll, leaveBalance: balance, livePayroll, earnedBaseSalaryToDate, workedDaysToDate, paidRestDaysToDate, isCurrentMonth };
+  return { staff:safeStaff, attendance: attendance.filter(row=>isEmploymentDate(staff,row.date)).slice(0,90), requests, payroll, leaveBalance: balance, livePayroll, earnedBaseSalaryToDate, workedDaysToDate, paidRestDaysToDate, isCurrentMonth };
 }
 
 export function toCsv(rows: Array<Record<string, unknown>>) {
@@ -1748,5 +1755,5 @@ export async function listEmployee360(actorId:number,targetId:number) {
   });
 
   const { passwordHash: _passwordHash, ...safeStaff } = staff;
-  return {staff:safeStaff,attendance,requests,adjustments:companyAdjustments,advances:companyAdvances,documents:companyDocuments,payroll,schedules:employeeSchedules,audit:employeeAudit.map(log => ({...log,metadata:redactStoredAuditMetadata(log.metadata)}))};
+  return {staff:safeStaff,attendance:attendance.filter(row=>isEmploymentDate(staff,row.date)),requests,adjustments:companyAdjustments,advances:companyAdvances,documents:companyDocuments,payroll,schedules:employeeSchedules,audit:employeeAudit.map(log => ({...log,metadata:redactStoredAuditMetadata(log.metadata)}))};
 }

@@ -6,13 +6,13 @@ import {generatePayroll,getPayroll} from "../server/enterprise";
 import {staffAccounts,companyMembers,attendanceRecords,weeklySchedules,shiftTemplates,staffRequests,payrollRecords,leaveBalances} from "../drizzle/schema";
 
 afterEach(()=>{vi.restoreAllMocks();vi.useRealTimers();});
-it.each([generatePayroll,getPayroll])("retains the archived employee leaving-month pay through generation and payroll listing (%s)",async(loadPayroll)=>{
+it.each([[generatePayroll,null,900],[getPayroll,null,900],[generatePayroll,"2026-10-10",300],[getPayroll,"2026-10-10",300]] as const)("retains pay inside employment dates through generation and listing (%s, %s)",async(loadPayroll,employmentStartedOn,expectedBase)=>{
   vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date("2026-10-31T12:00:00Z"));
   const payroll:Record<string,unknown>[]=[];
   const data=new Map<unknown,any[]>([
     [companyMembers,[{companyId:1,staffAccountId:1,role:"owner",active:true},{companyId:1,staffAccountId:20,role:"employee",active:false}]],
-    [staffAccounts,[{id:20,active:false,employmentEndedOn:"2026-10-20",baseSalary:9000,shiftStart:"08:00",shiftEnd:"17:00"}]],
-    [attendanceRecords,[{staffAccountId:20,date:"2026-10-01",checkIn:"08:00",status:"حاضر",lateMinutes:0}]],
+    [staffAccounts,[{id:20,active:false,employmentStartedOn,employmentEndedOn:"2026-10-20",baseSalary:9000,shiftStart:"08:00",shiftEnd:"17:00"}]],
+    [attendanceRecords,[{staffAccountId:20,date:"2026-10-01",checkIn:"08:00",status:"حاضر",lateMinutes:0},...(employmentStartedOn ? [{staffAccountId:20,date:"2026-10-02",status:"غياب",lateMinutes:0}] : [])]],
     [weeklySchedules,[{staffAccountId:20,scheduleDate:"2026-10-10",shiftTemplateId:1},{staffAccountId:20,scheduleDate:"2026-10-29",shiftTemplateId:1}]],
     [shiftTemplates,[{id:1,active:true,kind:"weekly_off"}]],
     [staffRequests,[{staffAccountId:20,type:"إجازة",status:"مقبول",fromDate:"2026-10-05",toDate:"2026-10-05"}]],
@@ -33,5 +33,5 @@ it.each([generatePayroll,getPayroll])("retains the archived employee leaving-mon
   vi.spyOn(dbQueries,"getDb").mockResolvedValue(database as unknown as NonNullable<Awaited<ReturnType<typeof dbQueries.getDb>>>);
   const rows=await loadPayroll(1,"2026-10");
   expect(rows).toHaveLength(1);
-  expect(rows[0]).toMatchObject({staffAccountId:20,baseSalary:900,status:"draft"});
+  expect(rows[0]).toMatchObject({staffAccountId:20,baseSalary:expectedBase,absenceDeduction:0,status:"draft"});
 });

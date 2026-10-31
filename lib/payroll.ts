@@ -40,8 +40,9 @@ export function calculateAttendanceAccrual(
   restDates: string[],
   today = todayKey(),
   paidLeaveDates: string[] = [],
+  employmentStartedOn?: string | null,
 ) {
-  const eligible = (date: string) => date.startsWith(`${month}-`) && date <= today;
+  const eligible = (date: string) => date.startsWith(`${month}-`) && date <= today && (!employmentStartedOn || date >= employmentStartedOn);
   const worked = new Set(attendance.filter(r => eligible(r.date) && Boolean(r.checkIn) &&
     ["حاضر", "متأخر"].includes(r.status)).map(r => r.date));
   const rest = new Set(restDates.filter(eligible));
@@ -178,7 +179,18 @@ export function approvedLeaveDates(requests: Array<{type:string;status:string;fr
 export function employeePayrollCutoff(employee:{employmentEndedOn?:string|null}, today=todayKey()) {
   return employee.employmentEndedOn && employee.employmentEndedOn < today ? employee.employmentEndedOn : today;
 }
-export function includeEmployeeInPayroll(employee:{active:boolean;employmentEndedOn?:string|null}, month:string, hasMonthActivity=false) {
+export function includeEmployeeInPayroll(employee:{active:boolean;employmentStartedOn?:string|null;employmentEndedOn?:string|null}, month:string, hasMonthActivity=false) {
+  if (employee.employmentStartedOn && month < employee.employmentStartedOn.slice(0,7)) return false;
   if (employee.employmentEndedOn) return month <= employee.employmentEndedOn.slice(0,7);
   return employee.active || hasMonthActivity;
+}
+
+/** ISO calendar dates sort chronologically, with employment boundaries inclusive. */
+export function isEmploymentDate(employee:{employmentStartedOn?:string|null;employmentEndedOn?:string|null}, date:string) {
+  return (!employee.employmentStartedOn || date >= employee.employmentStartedOn) &&
+    (!employee.employmentEndedOn || date <= employee.employmentEndedOn);
+}
+export function isCalendarDate(date:string) {
+  const parsed = new Date(`${date}T12:00:00Z`);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0,10) === date;
 }

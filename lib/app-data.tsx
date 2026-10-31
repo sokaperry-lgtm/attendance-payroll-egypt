@@ -14,13 +14,13 @@ export type ShiftTemplate = { id: number; name: string; kind: "shift" | "weekly_
 export type ScheduleEntry = { id: number; staffAccountId: number; scheduleDate: string; shiftTemplateId: number; note?: string | null; shift: ShiftTemplate | null };
 export type AttendanceRecord = { id: string; date: string; checkIn?: string | null; checkOut?: string | null; status: AttendanceState; lateMinutes: number; distanceMeters?: number | null; note?: string | null };
 export type LeaveRequest = { id: string; type: RequestType | string; from: string; to: string; reason: string; status: RequestStatus | string; staffAccountId?: number; staffName?: string; source?: "request" | "attendance" | "penalty"; exceptionKind?: "late" | "early" | "absence"; fromDate?: string; adjustmentId?: number; actionable?: boolean; hours?: number | null };
-export type Employee = { id: string; name: string; title: string; department: string; baseSalary: number; initials: string; phone?: string; role?: Role; employmentEndedOn?: string | null; active?: boolean };
+export type Employee = { id: string; name: string; title: string; department: string; baseSalary: number; initials: string; phone?: string; role?: Role; employmentStartedOn?: string | null; employmentEndedOn?: string | null; active?: boolean };
 
 export const defaultBranch: Branch = { name: "الفرع الرئيسي", address: "مدينة نصر، القاهرة", latitude: 30.0444, longitude: 31.2357, radiusMeters: 200 };
 
 function initials(name: string) { return name.split(" ").slice(0, 2).map((part) => part[0] ?? "").join(""); }
-function mapEmployee(staff: { id: number; name: string; title: string | null; department: string | null; baseSalary?: number; phone?: string; role?: Role; employmentEndedOn?: string | null; active?: boolean }): Employee {
-  return { id: String(staff.id), name: staff.name, title: staff.title ?? "موظف", department: staff.department ?? "عام", baseSalary: Number(staff.baseSalary ?? 0), initials: initials(staff.name), phone: staff.phone, role: staff.role, employmentEndedOn: staff.employmentEndedOn, active: staff.active };
+function mapEmployee(staff: { id: number; name: string; title: string | null; department: string | null; baseSalary?: number; phone?: string; role?: Role; employmentStartedOn?: string | null; employmentEndedOn?: string | null; active?: boolean }): Employee {
+  return { id: String(staff.id), name: staff.name, title: staff.title ?? "موظف", department: staff.department ?? "عام", baseSalary: Number(staff.baseSalary ?? 0), initials: initials(staff.name), phone: staff.phone, role: staff.role, employmentStartedOn: staff.employmentStartedOn, employmentEndedOn: staff.employmentEndedOn, active: staff.active };
 }
 
 export type AppDataContext = {
@@ -41,7 +41,7 @@ export type AppDataContext = {
   checkOut: (payload: { time: string; latitude: number; longitude: number }) => Promise<void>;
   submitRequest: (request: Omit<LeaveRequest, "id" | "status">) => Promise<void>;
   approveRequest: (id: string, status: RequestStatus) => Promise<void>;
-  createStaffAccount: (input: { phone: string; password: string; name: string; title?: string; department?: string; baseSalary: number; role: "manager" | "supervisor" | "employee" }) => Promise<void>;
+  createStaffAccount: (input: { phone: string; password: string; name: string; title?: string; department?: string; baseSalary: number; employmentStartedOn?: string; role: "manager" | "supervisor" | "employee" }) => Promise<void>;
   updateStaffAccount: (input: { id: number; phone?: string; password?: string; name?: string; title?: string; department?: string; baseSalary?: number; role?: "manager" | "supervisor" | "employee"; shiftStart?: string; shiftEnd?: string; active?: boolean }) => Promise<void>;
   deleteStaffAccount: (id: number, employmentEndedOn?: string) => Promise<void>;
   updateBranch: (input: { name: string; address: string; latitude: string; longitude: string; radiusMeters: number }) => Promise<void>;

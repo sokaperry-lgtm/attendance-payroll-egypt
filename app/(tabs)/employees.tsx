@@ -18,7 +18,7 @@ export default function EmployeesScreen() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [form, setForm] = useState({ name: "", phone: "", password: "", title: "", department: "", baseSalary: "", role: "employee" as "manager" | "supervisor" | "employee" });
+  const [form, setForm] = useState({ name: "", phone: "", password: "", title: "", department: "", baseSalary: "", employmentStartedOn: todayKey(), role: "employee" as "manager" | "supervisor" | "employee" });
   const [archiveTarget,setArchiveTarget]=useState<{id:string;name:string}|null>(null);
   const [lastWorkingDate,setLastWorkingDate]=useState(todayKey());
   const [archiveError,setArchiveError]=useState("");
@@ -44,7 +44,7 @@ export default function EmployeesScreen() {
   if (loading) return <ScreenContainer><State text="جاري تحميل الفريق..." loading /></ScreenContainer>;
 
   const reset = () => {
-    setForm({ name: "", phone: "", password: "", title: "", department: "", baseSalary: "", role: "employee" });
+    setForm({ name: "", phone: "", password: "", title: "", department: "", baseSalary: "", employmentStartedOn: todayKey(), role: "employee" });
     setOpen(false);
   };
 
@@ -77,6 +77,7 @@ export default function EmployeesScreen() {
         department: form.department.trim() || "عام",
         baseSalary: Number(form.baseSalary) || 0,
         role: form.role,
+        employmentStartedOn: form.employmentStartedOn,
       });
       showAlert("تم إنشاء الحساب", "تم إضافة " + form.name + " كـ " + roleLabels[form.role] + " ويمكنه تسجيل الدخول من صفحة الدخول.");
       reset();
@@ -200,6 +201,9 @@ export default function EmployeesScreen() {
               <Text style={styles.label}>الاسم بالكامل</Text>
               <TextInput style={styles.input} value={form.name} onChangeText={name => setForm(f => ({ ...f, name }))} placeholder="مثال: أحمد محمد" textAlign="right" />
 
+              <Text style={styles.label}>تاريخ بدء العمل (YYYY-MM-DD)</Text>
+              <TextInput accessibilityLabel="تاريخ بدء العمل" style={styles.input} value={form.employmentStartedOn} onChangeText={employmentStartedOn => setForm(f => ({...f,employmentStartedOn}))} placeholder="YYYY-MM-DD" />
+              <Text style={styles.sub}>أول يوم عمل شامل هذا اليوم؛ الأيام السابقة لا تُحسب غيابًا.</Text>
               <Text style={styles.label}>رقم الهاتف</Text>
               <TextInput style={styles.input} value={form.phone} onChangeText={phone => setForm(f => ({ ...f, phone }))} placeholder="01xxxxxxxxx" keyboardType="phone-pad" textAlign="right" />
 

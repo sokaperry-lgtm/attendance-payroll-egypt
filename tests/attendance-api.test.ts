@@ -7,7 +7,7 @@ import type { TrpcContext } from "../server/_core/context";
 import { todayKey } from "../lib/payroll";
 
 function context(): TrpcContext {
-  return { user:null, staffUser:{id:10,name:"Employee",phone:"01000000000",passwordHash:"test",title:null,department:null,role:"employee",baseSalary:9000,shiftStart:"08:00",shiftEnd:"17:00",employmentEndedOn:null,active:true,createdAt:new Date(),updatedAt:new Date()},
+  return { user:null, staffUser:{id:10,name:"Employee",phone:"01000000000",passwordHash:"test",title:null,department:null,role:"employee",baseSalary:9000,shiftStart:"08:00",shiftEnd:"17:00",employmentStartedOn:null,employmentEndedOn:null,active:true,createdAt:new Date(),updatedAt:new Date()},
     req:{headers:{}} as TrpcContext["req"],res:{} as TrpcContext["res"] };
 }
 function membership(role="employee") {
@@ -35,6 +35,11 @@ describe("attendance API regression checks", () => {
     vi.setSystemTime(new Date(`2026-10-30T${time}:00+02:00`));
     await appRouter.createCaller(context()).attendance.checkIn(input("00:00"));
     expect(db.upsertAttendance).toHaveBeenCalledWith(expect.objectContaining({lateMinutes:minutes,status:"متأخر"}));
+  });
+  it("rejects a live punch before the employee start date", async () => {
+    vi.spyOn(db,"getStaffAccountById").mockResolvedValue({...context().staffUser!,employmentStartedOn:"2026-11-01"});
+    await expect(appRouter.createCaller(context()).attendance.checkIn(input())).rejects.toThrow("تاريخ بدء العمل");
+    expect(db.upsertAttendance).not.toHaveBeenCalled();
   });
   it("rejects a second attendance while an older shift is open", async () => {
     vi.mocked(db.listAttendance).mockResolvedValue([record("2026-10-29")]);

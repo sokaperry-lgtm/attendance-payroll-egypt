@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -8,13 +9,14 @@ type Tab = "overview" | "schedule" | "attendance" | "requests" | "payroll" | "au
 
 export default function EmployeeProfileScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const params = useLocalSearchParams();
   const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
   const staffAccountId = Number(rawId);
   const [tab, setTab] = useState<Tab>("overview");
   const [editOpen, setEditOpen] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", phone: "", title: "", department: "", baseSalary: "", shiftStart: "", shiftEnd: "", active: true });
+  const [editForm, setEditForm] = useState({ name: "", phone: "", title: "", department: "", baseSalary: "", shiftStart: "", shiftEnd: "", employmentStartedOn: "", active: true });
   const { width } = useWindowDimensions();
   const compact = width < 700;
 
@@ -68,14 +70,15 @@ export default function EmployeeProfileScreen() {
   const lateTrend = recentLate - previousLate;
 
   const openEdit = () => {
-    setEditForm({ name: employee.name || "", phone: employee.phone || "", title: employee.title || "", department: employee.department || "", baseSalary: String(employee.baseSalary ?? 0), shiftStart: employee.shiftStart || "", shiftEnd: employee.shiftEnd || "", active: employee.active !== false });
+    setEditForm({ name: employee.name || "", phone: employee.phone || "", title: employee.title || "", department: employee.department || "", baseSalary: String(employee.baseSalary ?? 0), shiftStart: employee.shiftStart || "", shiftEnd: employee.shiftEnd || "", employmentStartedOn: employee.employmentStartedOn || "", active: employee.active !== false });
     setEditOpen(true);
   };
   const saveEdit = async () => {
     if (!editForm.name.trim() || !editForm.department.trim()) { Alert.alert("بيانات ناقصة", "اكتب الاسم ومكان/قسم العمل."); return; }
     setSavingEdit(true);
     try {
-      await updateStaff.mutateAsync({ id: staffAccountId, name: editForm.name.trim(), phone: editForm.phone.trim() || undefined, title: editForm.title.trim() || undefined, department: editForm.department.trim(), baseSalary: Math.max(0, Number(editForm.baseSalary) || 0), shiftStart: editForm.shiftStart.trim() || undefined, shiftEnd: editForm.shiftEnd.trim() || undefined, active: editForm.active });
+      await updateStaff.mutateAsync({ id: staffAccountId, name: editForm.name.trim(), phone: editForm.phone.trim() || undefined, title: editForm.title.trim() || undefined, department: editForm.department.trim(), baseSalary: Math.max(0, Number(editForm.baseSalary) || 0), shiftStart: editForm.shiftStart.trim() || undefined, shiftEnd: editForm.shiftEnd.trim() || undefined, employmentStartedOn: editForm.employmentStartedOn.trim() || undefined, active: editForm.active });
+      await queryClient.invalidateQueries();
       await profile.refetch();
       setEditOpen(false);
       Alert.alert("تم الحفظ", "تم تحديث بيانات الموظف بنجاح.");
@@ -105,6 +108,7 @@ export default function EmployeeProfileScreen() {
             <Text style={styles.kicker}>EMPLOYEE 360</Text>
             <Text style={styles.name}>{employee.name}</Text>
             <Text style={styles.role}>{employee.title || "موظف"} · {employee.department || "—"}</Text>
+            <Text style={styles.phone}>بدء العمل: {employee.employmentStartedOn || "لم يُحدد"}</Text>
             <Text style={styles.phone}>{employee.phone || "لا يوجد رقم هاتف"}</Text>            <View style={styles.heroActions}><Pressable onPress={openEdit} style={styles.editButton}><Text style={styles.editButtonText}>تعديل بيانات الموظف</Text></Pressable></View><View style={styles.heroBadges}><Text style={styles.heroBadge}>{employee.active ? "نشط" : "غير نشط"}</Text><Text style={styles.heroBadgeGhost}>{(data as any).staff?.membershipRole === "owner" ? "مالك" : (data as any).staff?.membershipRole === "manager" ? "مدير" : (data as any).staff?.membershipRole === "hr" ? "HR" : (data as any).staff?.membershipRole === "accountant" ? "محاسب" : (data as any).staff?.membershipRole === "supervisor" ? "مشرف" : "موظف"}</Text></View>
           </View>
         </View>
@@ -210,6 +214,8 @@ export default function EmployeeProfileScreen() {
               <EditField label="رقم الهاتف" value={editForm.phone} onChangeText={phone => setEditForm(v => ({...v,phone}))} keyboardType="phone-pad" />
               <EditField label="المسمى الوظيفي" value={editForm.title} onChangeText={title => setEditForm(v => ({...v,title}))} />
               <EditField label="مكان العمل / القسم" value={editForm.department} onChangeText={department => setEditForm(v => ({...v,department}))} placeholder="مثال: Bar أو Kitchen" />
+              <EditField label="تاريخ بدء العمل (YYYY-MM-DD)" value={editForm.employmentStartedOn} onChangeText={employmentStartedOn => setEditForm(v => ({...v,employmentStartedOn}))} placeholder="YYYY-MM-DD" />
+              <Text style={styles.editLabel}>الأيام قبل تاريخ البدء لا تُحسب غيابًا أو ضمن خصومات المسير غير المعتمد.</Text>
               <EditField label="الراتب الأساسي" value={editForm.baseSalary} onChangeText={baseSalary => setEditForm(v => ({...v,baseSalary}))} keyboardType="numeric" />
               <View style={styles.editRow}>
                 <View style={styles.editHalf}><EditField label="بداية الشيفت" value={editForm.shiftStart} onChangeText={shiftStart => setEditForm(v => ({...v,shiftStart}))} placeholder="08:00" /></View>

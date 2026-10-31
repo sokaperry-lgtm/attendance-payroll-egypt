@@ -20,7 +20,7 @@ describe("auth.logout", () => {
         baseSalary: 0,
         shiftStart: "09:00",
         shiftEnd: "18:00",
-        employmentEndedOn: null,
+        employmentStartedOn:null,employmentEndedOn: null,
         active: true,
         createdAt: new Date(),
         updatedAt: new Date(),
