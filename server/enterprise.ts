@@ -922,7 +922,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       .map(row => row.scheduleDate);
     const leaveRequests = await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,s.id));
     const accrual = calculateAttendanceAccrual(monthlyBaseSalary, month, records, restDates, todayCairo, approvedLeaveDates(leaveRequests));
-    const earnedBaseSalary = accrual.earnedBaseSalary;
+    const earnedBaseSalary = accrual.earnedBaseSalary - accrual.restOvertimeValue;
     const dailyValue=monthlyBaseSalary/PAYROLL_RULES.calendarDays;
     const hourlyValue=dailyValue/PAYROLL_RULES.dailyHours;
 
@@ -963,7 +963,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       .reduce((sum,r)=>sum+Math.max(0, Number(r.hours ?? 0)),0);
     const overtimeHours=approvedOvertimeHours;
     const overtimeRate=hourlyValue;
-    const overtimeValue=Math.round(overtimeHours*overtimeRate); // Standard hourly rate; no double multiplier.
+    const overtimeValue=Math.round(overtimeHours*overtimeRate) + accrual.restOvertimeValue; // Standard hourly rate; no double multiplier.
     const adjustments=await db.select().from(salaryAdjustments).where(and(
       eq(salaryAdjustments.companyId,m.companyId),
       eq(salaryAdjustments.staffAccountId,s.id),
@@ -1131,6 +1131,13 @@ export async function getPayroll(staffAccountId:number, month:string) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId);
   if(!m || !["owner","manager","hr","accountant"].includes(m.role)) throw new Error("غير مصرح");
+  // Recover a leaving-month row even when the employee was archived before
+  // anyone generated this month's run. Approved records remain locked.
+  const companyStaff = await listCompanyStaff(staffAccountId);
+  const existingRows = await db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.month,month)));
+  if (companyStaff.some(staff => !staff.active && staff.employmentEndedOn?.slice(0,7) === month && !existingRows.some(row => row.staffAccountId === staff.id))) {
+    await generatePayroll(staffAccountId, month);
+  }
   const rows = await db.select().from(payrollRecords).where(and(eq(payrollRecords.companyId,m.companyId),eq(payrollRecords.month,month)));
   const result = await Promise.all(rows.map(async row => {
     if (["approved","مقبول","معتمد","paid","مدفوع","closed","مغلق","finalized","مقفل"].includes(row.status)) return row;
@@ -1458,7 +1465,7 @@ export async function listAuditLogs(staffAccountId:number, limit=100) {
 export async function getEmployeeSelfService(staffAccountId:number, month:string) {
   const db=await getDb(); if(!db) return null;
   const m=await getCompanyForStaff(staffAccountId); if(!m) return null;
-  const membership=await getMembership(staffAccountId); if(!membership || membership.companyId!==m.companyId || !membership.active) return null;
+  const membership=await getMembership(staffAccountId); if(!membership || membership.companyId!==m.companyId) return null;
   const staff=(await db.select().from(staffAccounts).where(eq(staffAccounts.id,staffAccountId)).limit(1))[0];
   if(!staff) return null;
   const attendance=await db.select().from(attendanceRecords).where(eq(attendanceRecords.staffAccountId,staffAccountId)).orderBy(desc(attendanceRecords.date));
@@ -1473,7 +1480,7 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   const restDates = schedules.filter(row => shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
     .map(row => row.scheduleDate);
   const accrual = calculateAttendanceAccrual(Number(staff.baseSalary), month, attendance, restDates, cairoToday, approvedLeaveDates(requests));
-  const earnedBaseSalaryToDate = accrual.earnedBaseSalary;
+  const earnedBaseSalaryToDate = accrual.earnedBaseSalary - accrual.restOvertimeValue;
   const workedDaysToDate = accrual.workedDays;
   const paidRestDaysToDate = accrual.paidRestDays;
 
@@ -1487,7 +1494,7 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   const overtime = (await db.select().from(staffRequests).where(and(
     eq(staffRequests.staffAccountId,staffAccountId), eq(staffRequests.type,"أوفر تايم"), eq(staffRequests.status,"مقبول")
   ))).filter(row => row.fromDate.startsWith(`${month}-`) && row.fromDate <= cairoToday)
-    .reduce((sum,row) => sum + Math.max(0,Number(row.hours) || 0),0) * Number(staff.baseSalary) / 30 / 9;
+    .reduce((sum,row) => sum + Math.max(0,Number(row.hours) || 0),0) * Number(staff.baseSalary) / 30 / 9 + accrual.restOvertimeValue;
   const earlyMinutes = currentRecords.reduce((total,record) => {
     if (!record.checkOut || !String(record.note || "").includes("تم اعتماد الانصراف المبكر")) return total;
     const schedule = schedules.find(row => row.scheduleDate === record.date);

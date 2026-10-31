@@ -53,8 +53,20 @@ export function calculateAttendanceAccrual(
   // two days of the three-day penalty may be deducted from this basis.
   const unpaidAbsence = new Set(attendance.filter(r => eligible(r.date) && r.status === "غياب" &&
     !paid.has(r.date)).map(r => r.date));
+  // Settle unused monthly rest only after the actual month ends. Extra worked
+  // days above 26 prove work in lieu of rest; absence/leave cannot earn it.
+  const monthEnd = new Date(Date.UTC(Number(month.slice(0,4)), Number(month.slice(5,7)), 0)).toISOString().slice(0,10);
+  const actualRestDays = [...rest].filter(date => !worked.has(date)).length;
+  const settlementDays = today >= monthEnd
+    ? Math.min(Math.max(0, PAYROLL_RULES.paidLeaveDays - actualRestDays), Math.max(0, worked.size - PAYROLL_RULES.workDays))
+    : 0;
+  const restOvertimeDays = Math.max(workedRestDays, settlementDays);
+  const restOvertimeValue = Math.round(Math.max(0, Number(baseSalary) || 0) * restOvertimeDays / PAYROLL_RULES.calendarDays);
   return {
-    earnedBaseSalary: Math.round(Math.max(0, Number(baseSalary) || 0) * (Math.min(PAYROLL_RULES.calendarDays, paid.size) + workedRestDays) / PAYROLL_RULES.calendarDays),
+    restOvertimeDays,
+    restOvertimeValue,
+    // Preserve the legacy total for callers; payroll displays the premium separately.
+    earnedBaseSalary: Math.round(Math.max(0, Number(baseSalary) || 0) * (Math.min(PAYROLL_RULES.calendarDays, paid.size) + restOvertimeDays) / PAYROLL_RULES.calendarDays),
     workedDays: worked.size,
     paidRestDays: [...rest].filter(date => !worked.has(date)).length,
     unpaidAbsenceDays: unpaidAbsence.size,

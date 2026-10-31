@@ -95,7 +95,7 @@ describe("attendance based accrual", () => {
       {date:"2026-09-30",checkIn:"09:00",status:"حاضر"},
     ];
     const result = calculateAttendanceAccrual(9000,"2026-10",records,["2026-10-01","2026-10-03","2026-10-06"],"2026-10-04");
-    expect(result).toEqual({earnedBaseSalary:900,workedDays:1,paidRestDays:1,unpaidAbsenceDays:1});
+    expect(result).toMatchObject({earnedBaseSalary:900,workedDays:1,paidRestDays:1,unpaidAbsenceDays:1,restOvertimeValue:300});
   });
   it("does not pay unrecorded calendar days, past or future months", () => {
     expect(calculateAttendanceAccrual(9000,"2026-09",[],[],"2026-10-04").earnedBaseSalary).toBe(0);
@@ -111,9 +111,9 @@ describe("attendance based accrual", () => {
     expect(accrual.earnedBaseSalary).toBe(300);
     expect(calculateAttendancePenalties(9000,[record],accrual.unpaidAbsenceDays,rest).absenceDeduction).toBe(0);
   });
-  it("caps the base at the monthly salary even in a 31-day month", () => {
+  it("caps the base and adds four worked-rest days even in a 31-day month", () => {
     const dates = Array.from({length:31},(_,i)=>`2026-10-${String(i+1).padStart(2,"0")}`);
-    expect(calculateAttendanceAccrual(9000,"2026-10",dates.map(date=>({date,checkIn:"09:00",status:"حاضر"})),[],"2026-10-31").earnedBaseSalary).toBe(9000);
+    expect(calculateAttendanceAccrual(9000,"2026-10",dates.map(date=>({date,checkIn:"09:00",status:"حاضر"})),[],"2026-10-31").earnedBaseSalary).toBe(10200);
   });
   it("keeps the total absence penalty at three days without double deduction", () => {
     const records = [{date:"2026-10-01",status:"غياب",note:""}];
@@ -143,7 +143,7 @@ describe("paid leave and worked rest accrual", () => {
   it("pays two days for worked rest and keeps the premium above the monthly cap", () => {
     const dates=Array.from({length:30},(_,i)=>`2026-10-${String(i+1).padStart(2,"0")}`);
     const records=dates.map(date=>({date,checkIn:"08:00",status:"حاضر"}));
-    expect(calculateAttendanceAccrual(9000,"2026-10",records,[dates[0]],"2026-10-31").earnedBaseSalary).toBe(9300);
+    expect(calculateAttendanceAccrual(9000,"2026-10",records,[dates[0]],"2026-10-31").earnedBaseSalary).toBe(10200);
     expect(calculateAttendanceAccrual(9000,"2026-10",[records[0]],[dates[0]],"2026-10-31").earnedBaseSalary).toBe(600);
   });
 });
