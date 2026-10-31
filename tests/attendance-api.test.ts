@@ -101,7 +101,7 @@ describe("attendance API regression checks", () => {
     const caller=appRouter.createCaller(context());
     await caller.staff.delete({id:20});
     expect(archive).toHaveBeenCalledWith(20,10,1,undefined);
-    await caller.staff.archive({id:20,employmentEndedOn:"2026-10-20"});
+    await caller.staff.archive({id:20,employmentEndedOn:"٢٠/١٠/٢٠٢٦"});
     expect(archive).toHaveBeenLastCalledWith(20,10,1,"2026-10-20");
   });
   it("does not let an employee delete staff or generate payroll", async () => {

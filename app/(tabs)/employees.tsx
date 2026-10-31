@@ -1,3 +1,5 @@
+import { DateField } from "@/components/date-field";
+import { normalizeCalendarDate, validDateInput } from "@/lib/date-input";
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
@@ -55,7 +57,8 @@ export default function EmployeesScreen() {
     if(!archiveTarget || deletingId!==null) return;
     setDeletingId(Number(archiveTarget.id));setArchiveError("");
     try {
-      await deleteStaffAccount(Number(archiveTarget.id),lastWorkingDate);
+      if (!validDateInput(lastWorkingDate)) throw new Error("اختار تاريخ آخر يوم عمل من التقويم أو اكتب اليوم والشهر والسنة.");
+      await deleteStaffAccount(Number(archiveTarget.id),normalizeCalendarDate(lastWorkingDate));
       setArchiveTarget(null);
       showAlert("تم نقل الموظف للأرشيف", "تم إيقاف دخوله مع الاحتفاظ بحضوره ومرتباته ومستحقاته حتى آخر يوم عمل.");
     } catch(error) {setArchiveError(error instanceof Error ? error.message : "تعذرت الأرشفة. حاول مرة أخرى.");}
@@ -67,6 +70,7 @@ export default function EmployeesScreen() {
       showAlert("بيانات ناقصة", "اكتب الاسم ورقم الهاتف وكلمة مرور لا تقل عن 6 أحرف.");
       return;
     }
+    if (!validDateInput(form.employmentStartedOn)) { showAlert("راجع تاريخ بدء العمل", "اختار التاريخ من التقويم أو اكتب اليوم والشهر والسنة في الخانات."); return; }
     setSaving(true);
     try {
       await createStaffAccount({
@@ -77,7 +81,7 @@ export default function EmployeesScreen() {
         department: form.department.trim() || "عام",
         baseSalary: Number(form.baseSalary) || 0,
         role: form.role,
-        employmentStartedOn: form.employmentStartedOn,
+        employmentStartedOn: normalizeCalendarDate(form.employmentStartedOn),
       });
       showAlert("تم إنشاء الحساب", "تم إضافة " + form.name + " كـ " + roleLabels[form.role] + " ويمكنه تسجيل الدخول من صفحة الدخول.");
       reset();
@@ -179,14 +183,15 @@ export default function EmployeesScreen() {
 
       <Modal visible={archiveTarget!==null} animationType="fade" transparent onRequestClose={()=>deletingId===null&&setArchiveTarget(null)}>
         <View style={styles.modalBackdrop}><View style={styles.modalCard}>
+          <ScrollView keyboardShouldPersistTaps="handled" style={{flexShrink:1}} contentContainerStyle={{paddingBottom:16}}>
           <Text style={styles.modalTitle}>إنهاء العمل ونقل للأرشيف</Text>
           <Text style={styles.sub}>{archiveTarget?.name}</Text>
           <Text style={styles.sub}>هيتقفل حساب الدخول، وتفضل بيانات الحضور والمرتبات والسلف والخصومات محفوظة للمحاسبة. الموظف يفضل ظاهر في مسير شهر خروجه.</Text>
-          <Text style={styles.label}>آخر يوم عمل (شامل اليوم ده)</Text>
-          <TextInput accessibilityLabel="آخر يوم عمل" style={styles.input} value={lastWorkingDate} onChangeText={setLastWorkingDate} placeholder="YYYY-MM-DD" editable={deletingId===null} />
+          <DateField label="آخر يوم عمل (شامل اليوم ده)" value={lastWorkingDate} onChange={setLastWorkingDate} disabled={deletingId!==null} maxDate={todayKey()} />
           {archiveError ? <Text accessibilityRole="alert" style={[styles.sub,{color:"#B42318"}]}>{archiveError}</Text> : null}
           <Pressable disabled={deletingId!==null} style={[styles.saveButton,deletingId!==null&&styles.disabled]} onPress={archive}><Text style={styles.saveText}>{deletingId!==null?"جاري الأرشفة...":"تأكيد النقل للأرشيف"}</Text></Pressable>
           <Pressable disabled={deletingId!==null} style={styles.closeArchive} onPress={()=>setArchiveTarget(null)}><Text style={styles.filterText}>إلغاء</Text></Pressable>
+          </ScrollView>
         </View></View>
       </Modal>
       <Modal visible={open} animationType="slide" transparent onRequestClose={() => !saving && setOpen(false)}>
@@ -201,8 +206,7 @@ export default function EmployeesScreen() {
               <Text style={styles.label}>الاسم بالكامل</Text>
               <TextInput style={styles.input} value={form.name} onChangeText={name => setForm(f => ({ ...f, name }))} placeholder="مثال: أحمد محمد" textAlign="right" />
 
-              <Text style={styles.label}>تاريخ بدء العمل (YYYY-MM-DD)</Text>
-              <TextInput accessibilityLabel="تاريخ بدء العمل" style={styles.input} value={form.employmentStartedOn} onChangeText={employmentStartedOn => setForm(f => ({...f,employmentStartedOn}))} placeholder="YYYY-MM-DD" />
+              <DateField label="تاريخ بدء العمل" value={form.employmentStartedOn} onChange={employmentStartedOn => setForm(f => ({...f,employmentStartedOn}))} disabled={saving} />
               <Text style={styles.sub}>أول يوم عمل شامل هذا اليوم؛ الأيام السابقة لا تُحسب غيابًا.</Text>
               <Text style={styles.label}>رقم الهاتف</Text>
               <TextInput style={styles.input} value={form.phone} onChangeText={phone => setForm(f => ({ ...f, phone }))} placeholder="01xxxxxxxxx" keyboardType="phone-pad" textAlign="right" />

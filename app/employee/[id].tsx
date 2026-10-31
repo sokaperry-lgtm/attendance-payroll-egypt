@@ -1,3 +1,5 @@
+import { DateField } from "@/components/date-field";
+import { normalizeCalendarDate, validDateInput } from "@/lib/date-input";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
@@ -75,9 +77,10 @@ export default function EmployeeProfileScreen() {
   };
   const saveEdit = async () => {
     if (!editForm.name.trim() || !editForm.department.trim()) { Alert.alert("بيانات ناقصة", "اكتب الاسم ومكان/قسم العمل."); return; }
+    if (editForm.employmentStartedOn && !validDateInput(editForm.employmentStartedOn)) { Alert.alert("راجع تاريخ بدء العمل", "اختار التاريخ من التقويم أو اكتب اليوم والشهر والسنة في الخانات."); return; }
     setSavingEdit(true);
     try {
-      await updateStaff.mutateAsync({ id: staffAccountId, name: editForm.name.trim(), phone: editForm.phone.trim() || undefined, title: editForm.title.trim() || undefined, department: editForm.department.trim(), baseSalary: Math.max(0, Number(editForm.baseSalary) || 0), shiftStart: editForm.shiftStart.trim() || undefined, shiftEnd: editForm.shiftEnd.trim() || undefined, employmentStartedOn: editForm.employmentStartedOn.trim() || undefined, active: editForm.active });
+      await updateStaff.mutateAsync({ id: staffAccountId, name: editForm.name.trim(), phone: editForm.phone.trim() || undefined, title: editForm.title.trim() || undefined, department: editForm.department.trim(), baseSalary: Math.max(0, Number(editForm.baseSalary) || 0), shiftStart: editForm.shiftStart.trim() || undefined, shiftEnd: editForm.shiftEnd.trim() || undefined, employmentStartedOn: editForm.employmentStartedOn.trim() ? normalizeCalendarDate(editForm.employmentStartedOn) : undefined, active: editForm.active });
       await queryClient.invalidateQueries();
       await profile.refetch();
       setEditOpen(false);
@@ -214,7 +217,7 @@ export default function EmployeeProfileScreen() {
               <EditField label="رقم الهاتف" value={editForm.phone} onChangeText={phone => setEditForm(v => ({...v,phone}))} keyboardType="phone-pad" />
               <EditField label="المسمى الوظيفي" value={editForm.title} onChangeText={title => setEditForm(v => ({...v,title}))} />
               <EditField label="مكان العمل / القسم" value={editForm.department} onChangeText={department => setEditForm(v => ({...v,department}))} placeholder="مثال: Bar أو Kitchen" />
-              <EditField label="تاريخ بدء العمل (YYYY-MM-DD)" value={editForm.employmentStartedOn} onChangeText={employmentStartedOn => setEditForm(v => ({...v,employmentStartedOn}))} placeholder="YYYY-MM-DD" />
+              <DateField label="تاريخ بدء العمل" value={editForm.employmentStartedOn} onChange={employmentStartedOn => setEditForm(v => ({...v,employmentStartedOn}))} disabled={savingEdit} />
               <Text style={styles.editLabel}>الأيام قبل تاريخ البدء لا تُحسب غيابًا أو ضمن خصومات المسير غير المعتمد.</Text>
               <EditField label="الراتب الأساسي" value={editForm.baseSalary} onChangeText={baseSalary => setEditForm(v => ({...v,baseSalary}))} keyboardType="numeric" />
               <View style={styles.editRow}>
