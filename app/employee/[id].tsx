@@ -1,8 +1,8 @@
 import { DateField } from "@/components/date-field";
-import { normalizeCalendarDate, validDateInput } from "@/lib/date-input";
+import { employeeUpdateFromForm } from "@/lib/employee-edit";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/lib/payroll";
@@ -18,6 +18,8 @@ export default function EmployeeProfileScreen() {
   const [tab, setTab] = useState<Tab>("overview");
   const [editOpen, setEditOpen] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [savedNotice, setSavedNotice] = useState("");
   const [editForm, setEditForm] = useState({ name: "", phone: "", title: "", department: "", baseSalary: "", shiftStart: "", shiftEnd: "", employmentStartedOn: "", active: true });
   const { width } = useWindowDimensions();
   const compact = width < 700;
@@ -72,21 +74,24 @@ export default function EmployeeProfileScreen() {
   const lateTrend = recentLate - previousLate;
 
   const openEdit = () => {
+    setEditError("");
     setEditForm({ name: employee.name || "", phone: employee.phone || "", title: employee.title || "", department: employee.department || "", baseSalary: String(employee.baseSalary ?? 0), shiftStart: employee.shiftStart || "", shiftEnd: employee.shiftEnd || "", employmentStartedOn: employee.employmentStartedOn || "", active: employee.active !== false });
     setEditOpen(true);
   };
   const saveEdit = async () => {
-    if (!editForm.name.trim() || !editForm.department.trim()) { Alert.alert("بيانات ناقصة", "اكتب الاسم ومكان/قسم العمل."); return; }
-    if (editForm.employmentStartedOn && !validDateInput(editForm.employmentStartedOn)) { Alert.alert("راجع تاريخ بدء العمل", "اختار التاريخ من التقويم أو اكتب اليوم والشهر والسنة في الخانات."); return; }
+    if (savingEdit) return;
+    setEditError("");
     setSavingEdit(true);
     try {
-      await updateStaff.mutateAsync({ id: staffAccountId, name: editForm.name.trim(), phone: editForm.phone.trim() || undefined, title: editForm.title.trim() || undefined, department: editForm.department.trim(), baseSalary: Math.max(0, Number(editForm.baseSalary) || 0), shiftStart: editForm.shiftStart.trim() || undefined, shiftEnd: editForm.shiftEnd.trim() || undefined, employmentStartedOn: editForm.employmentStartedOn.trim() ? normalizeCalendarDate(editForm.employmentStartedOn) : undefined, active: editForm.active });
-      await queryClient.invalidateQueries();
-      await profile.refetch();
+      const changes = employeeUpdateFromForm(employee, editForm);
+      if (Object.keys(changes).length > 1) await updateStaff.mutateAsync(changes);
       setEditOpen(false);
-      Alert.alert("تم الحفظ", "تم تحديث بيانات الموظف بنجاح.");
-    } catch (error) { Alert.alert("تعذر الحفظ", error instanceof Error ? error.message : "حدث خطأ غير متوقع."); }
-    finally { setSavingEdit(false); }
+      setSavedNotice(changes.employmentStartedOn ? `تم حفظ تاريخ بدء العمل: ${changes.employmentStartedOn}` : "تم حفظ بيانات الموظف بنجاح.");
+      // A refresh failure must not turn a successful write into a save error.
+      void queryClient.invalidateQueries();
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : "تعذر الحفظ. حاول مرة أخرى.");
+    } finally { setSavingEdit(false); }
   };
   const smartInsight = !attendance.length
     ? { tone: "neutral", title: "لسه مفيش بيانات كفاية", text: "أول ما يبدأ تسجيل الحضور والطلبات، الملف هيبدأ يطلع مؤشرات ذكية." }
@@ -104,6 +109,7 @@ export default function EmployeeProfileScreen() {
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
         <Pressable onPress={() => router.back()}><Text style={styles.back}>‹ رجوع للموظفين</Text></Pressable>
+        {savedNotice ? <Text accessibilityRole="alert" style={styles.savedNotice}>{savedNotice}</Text> : null}
 
         <View style={[styles.hero, compact && styles.heroCompact]}>
           <View style={styles.avatar}><Text style={styles.avatarText}>{initials(employee.name)}</Text></View>
@@ -225,6 +231,7 @@ export default function EmployeeProfileScreen() {
                 <View style={styles.editHalf}><EditField label="نهاية الشيفت" value={editForm.shiftEnd} onChangeText={shiftEnd => setEditForm(v => ({...v,shiftEnd}))} placeholder="17:00" /></View>
               </View>
               <Pressable onPress={() => setEditForm(v => ({...v,active:!v.active}))} style={[styles.activeToggle, editForm.active ? styles.activeToggleOn : styles.activeToggleOff]}><Text style={styles.activeToggleText}>{editForm.active ? "الموظف نشط" : "الموظف موقوف"}</Text></Pressable>
+              {editError ? <View accessibilityRole="alert" style={styles.editErrorBox}><Text style={styles.editErrorTitle}>لم يتم حفظ التعديلات</Text><Text style={styles.editErrorText}>{editError}</Text></View> : null}
               <Pressable disabled={savingEdit} onPress={saveEdit} style={[styles.saveButton, savingEdit && styles.disabled]}>{savingEdit ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveText}>حفظ التعديلات</Text>}</Pressable>
             </ScrollView>
           </View>
@@ -264,6 +271,8 @@ const styles = StyleSheet.create({
   role: { color: "#D9E6F2", fontSize: 12, textAlign: "right", marginTop: 4 },
   phone: { color: "#FFFFFF", opacity: 0.75, fontSize: 11, textAlign: "right", marginTop: 5 },
   heroActions:{flexDirection:"row-reverse",marginTop:12},editButton:{backgroundColor:"#FFFFFF",borderRadius:11,paddingHorizontal:14,paddingVertical:9,alignSelf:"flex-end"},editButtonText:{color:"#163A63",fontSize:10,fontWeight:"900"},heroBadges:{flexDirection:"row-reverse",gap:7,marginTop:10},heroBadge:{color:"#163A63",backgroundColor:"#FFFFFF",borderRadius:8,paddingHorizontal:9,paddingVertical:4,fontSize:9,fontWeight:"900"},heroBadgeGhost:{color:"#FFFFFF",backgroundColor:"rgba(255,255,255,0.12)",borderRadius:8,paddingHorizontal:9,paddingVertical:4,fontSize:9,fontWeight:"800"},
+  savedNotice:{backgroundColor:"#EEF4FB",color:"#163A63",fontSize:13,fontWeight:"700",textAlign:"right",padding:12,borderRadius:12},
+  editErrorBox:{backgroundColor:"#FEF3F2",borderWidth:1,borderColor:"#FDA29B",borderRadius:12,padding:12,gap:4},editErrorTitle:{color:"#912018",fontSize:12,fontWeight:"800",textAlign:"right"},editErrorText:{color:"#B42318",fontSize:12,lineHeight:20,textAlign:"right"},
   modalBackdrop:{flex:1,backgroundColor:"rgba(2,6,23,0.58)",justifyContent:"flex-end"},modalCard:{backgroundColor:"#FFFFFF",borderTopLeftRadius:28,borderTopRightRadius:28,maxHeight:"92%",padding:20},modalHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",marginBottom:10},modalEyebrow:{color:"#98A6B8",fontSize:9,fontWeight:"900",textAlign:"right"},modalTitle:{color:"#172033",fontSize:22,fontWeight:"900",textAlign:"right"},close:{width:36,height:36,borderRadius:18,backgroundColor:"#EEF4FB",alignItems:"center",justifyContent:"center"},closeText:{color:"#98A6B8",fontSize:25,lineHeight:28},editForm:{paddingBottom:30,gap:8},editField:{gap:5},editLabel:{color:"#667085",fontSize:10,fontWeight:"800",textAlign:"right"},editInput:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:"#D5DCE5",borderRadius:12,paddingHorizontal:12,paddingVertical:11,fontSize:12,color:"#172033"},editRow:{flexDirection:"row-reverse",gap:10},editHalf:{flex:1},activeToggle:{borderRadius:12,padding:12,alignItems:"center"},activeToggleOn:{backgroundColor:"#EEF4FB"},activeToggleOff:{backgroundColor:"#F2F4F7"},activeToggleText:{color:"#163A63",fontSize:11,fontWeight:"900"},saveButton:{backgroundColor:"#163A63",borderRadius:14,padding:14,alignItems:"center",justifyContent:"center",marginTop:8},saveText:{color:"#FFFFFF",fontWeight:"900"},disabled:{opacity:0.6},
   smartInsight:{backgroundColor:"#F7F9FC",borderWidth:1,borderColor:"#D9E2EC",borderRadius:18,padding:16,flexDirection:"row-reverse",alignItems:"center",gap:12},
   smartInsightIcon:{width:42,height:42,borderRadius:14,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},

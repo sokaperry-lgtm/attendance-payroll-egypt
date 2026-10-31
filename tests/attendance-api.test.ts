@@ -1,3 +1,4 @@
+import { employeeUpdateFromForm } from "../lib/employee-edit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouter } from "../server/routers";
 import * as db from "../server/db";
@@ -103,6 +104,19 @@ describe("attendance API regression checks", () => {
     expect(archive).toHaveBeenCalledWith(20,10,1,undefined);
     await caller.staff.archive({id:20,employmentEndedOn:"٢٠/١٠/٢٠٢٦"});
     expect(archive).toHaveBeenLastCalledWith(20,10,1,"2026-10-20");
+  });
+  it("saves a date-only profile edit with an empty legacy department",async()=>{
+    vi.mocked(enterprise.getMembership).mockResolvedValue(membership("owner"));
+    vi.spyOn(enterprise,"assertPermission").mockResolvedValue({} as Awaited<ReturnType<typeof enterprise.assertPermission>>);
+    vi.spyOn(enterprise,"assertStaffInCompany").mockResolvedValue({actor:membership("owner"),target:membership()});
+    vi.spyOn(enterprise,"getCompanyForStaff").mockResolvedValue(membership("owner"));
+    vi.spyOn(enterprise,"writeAudit").mockResolvedValue(undefined);
+    const original={...context().staffUser!,id:20};
+    const save=vi.spyOn(db,"updateStaffAccount").mockResolvedValue({...original,employmentStartedOn:"2026-10-01"});
+    const changes=employeeUpdateFromForm(original,{name:original.name,phone:original.phone,title:"",department:"",baseSalary:"9000",shiftStart:"08:00",shiftEnd:"17:00",employmentStartedOn:"١/١٠/٢٠٢٦",active:true});
+    const result=await appRouter.createCaller(context()).staff.update(changes);
+    expect(save).toHaveBeenCalledWith(20,{employmentStartedOn:"2026-10-01"});
+    expect(result?.employmentStartedOn).toBe("2026-10-01");
   });
   it.each([{active:false,employmentEndedOn:null},{active:true,employmentEndedOn:"2026-10-20"}])("rejects scheduling an inactive or archived employee (%j)",async state=>{
     vi.mocked(enterprise.getMembership).mockResolvedValue(membership("owner"));
