@@ -88,16 +88,16 @@ export async function ensureCompanyForStaff(staffAccountId: number, companyName 
   return (await db.select().from(companyMembers).where(eq(companyMembers.id, Number(result[0].insertId))).limit(1))[0];
 }
 
-export async function assertStaffInCompany(actorStaffAccountId: number, targetStaffAccountId: number) {
+export async function assertStaffInCompany(actorStaffAccountId: number, targetStaffAccountId: number, allowArchived = false) {
   const actor = await getCompanyForStaff(actorStaffAccountId);
   if (!actor) throw new Error("Company not found");
   const target = await getMembership(targetStaffAccountId);
-  if (!target || target.companyId !== actor.companyId || !target.active) throw new Error("الموظف غير موجود في الشركة");
+  if (!target || target.companyId !== actor.companyId || (!allowArchived && !target.active)) throw new Error("الموظف غير موجود في الشركة");
   return { actor, target };
 }
 
-export async function assertOperationalTarget(actorStaffAccountId: number, targetStaffAccountId: number) {
-  const access = await assertStaffInCompany(actorStaffAccountId, targetStaffAccountId);
+export async function assertOperationalTarget(actorStaffAccountId: number, targetStaffAccountId: number, allowArchived = false) {
+  const access = await assertStaffInCompany(actorStaffAccountId, targetStaffAccountId, allowArchived);
   if (access.target.role === "owner") {
     if (access.actor.role !== "owner") throw new Error("لا يمكن تعديل بيانات المالك من هذا الحساب.");
     return access;
@@ -1103,7 +1103,7 @@ export async function waiveAttendanceException(actorId:number,input:{staffAccoun
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId);
   if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
-  await assertOperationalTarget(actorId,input.staffAccountId);
+  await assertOperationalTarget(actorId,input.staffAccountId,input.action === "cancel");
   await assertPayrollEditable(actorId,input.date.slice(0,7),input.staffAccountId);
   const row=(await db.select().from(attendanceRecords).where(and(eq(attendanceRecords.staffAccountId,input.staffAccountId),eq(attendanceRecords.date,input.date))).limit(1))[0];
   if(!row) throw new Error("سجل الحضور غير موجود.");
@@ -1126,7 +1126,7 @@ export async function cancelSalaryAdjustment(actorId:number,id:number) {
   if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   const row=(await db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.id,id),eq(salaryAdjustments.companyId,m.companyId))).limit(1))[0];
   if(!row) throw new Error("الجزاء غير موجود.");
-  await assertOperationalTarget(actorId,row.staffAccountId);
+  await assertOperationalTarget(actorId,row.staffAccountId,true);
   await assertPayrollEditable(actorId,row.month,row.staffAccountId);
   await db.delete(salaryAdjustments).where(and(eq(salaryAdjustments.id,id),eq(salaryAdjustments.companyId,m.companyId)));
   await writeAudit(actorId,m.companyId,"salary_adjustment.cancelled","salary_adjustment",String(id),{staffAccountId:row.staffAccountId,month:row.month,title:row.title,amount:row.amount});
@@ -1410,7 +1410,7 @@ export async function reviewAttendanceException(actorId:number,input:{staffAccou
   if(input.action==="cancel" && noteText.includes(cancelledMarker)) throw new Error("تم إلغاء هذه المخالفة بالفعل.");
   if(input.action==="approve" && noteText.includes(cancelledMarker)) throw new Error("تم إلغاء هذه المخالفة بالفعل ولا يمكن اعتمادها مرة أخرى.");
   // Reversing an approved attendance deduction is allowed only before payroll approval; assertPayrollEditable above enforces the lock.
-  let nextNote=noteText.replace(/\s*·\s*(?:تم اعتماد|تم إلغاء )?(?:التأخير|الانصراف المبكر|الغياب)/g,"").trim();
+  let nextNote=noteText.split(/\s*·\s*/).filter(part=>part.trim()!==approvedMarker && part.trim()!==cancelledMarker).join(" · ").trim();
   if(input.action==="cancel"){
     if(input.kind==="late") row.lateMinutes=0;
     if(input.kind==="absence") row.status="مستثنى";
@@ -1426,12 +1426,14 @@ export async function reviewAttendanceException(actorId:number,input:{staffAccou
   return (await db.select().from(attendanceRecords).where(eq(attendanceRecords.id,row.id)).limit(1))[0];
 }
 
-export async function listAttendancePenaltyRequests(staffAccountId:number) {
+export async function listAttendancePenaltyRequests(staffAccountId:number, month?:string) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId); if(!m || !["owner","manager"].includes(m.role)) return [];
-  const staff=await db.select({id:staffAccounts.id,name:staffAccounts.name,employmentStartedOn:staffAccounts.employmentStartedOn,employmentEndedOn:staffAccounts.employmentEndedOn}).from(staffAccounts).innerJoin(companyMembers,eq(companyMembers.staffAccountId,staffAccounts.id)).where(and(eq(companyMembers.companyId,m.companyId),eq(companyMembers.active,true)));
+  const staff=await db.select({id:staffAccounts.id,name:staffAccounts.name,employmentStartedOn:staffAccounts.employmentStartedOn,employmentEndedOn:staffAccounts.employmentEndedOn}).from(staffAccounts).innerJoin(companyMembers,eq(companyMembers.staffAccountId,staffAccounts.id)).where(eq(companyMembers.companyId,m.companyId));
   const names=new Map(staff.map(x=>[x.id,x.name]));
-  const rows=await db.select().from(attendanceRecords).orderBy(desc(attendanceRecords.date));
+  const ids=staff.map(member=>member.id);
+  if(!ids.length) return [];
+  const rows=await db.select().from(attendanceRecords).where(and(inArray(attendanceRecords.staffAccountId,ids),month ? sql`LEFT(${attendanceRecords.date}, 7) = ${month}` : undefined)).orderBy(desc(attendanceRecords.date));
   return rows.filter(r=>names.has(r.staffAccountId) && isEmploymentDate(staff.find(s=>s.id===r.staffAccountId) || {},r.date)).flatMap(r=>{
     const note=String(r.note||"");
     const latePending=Number(r.lateMinutes||0)>=PAYROLL_RULES.lateQuarterDayMinutes && !note.includes("تم اعتماد التأخير") && !note.includes("تم إلغاء التأخير");

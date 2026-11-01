@@ -21,6 +21,30 @@ export default function RequestsScreen() {
   const [modalOpen, setModalOpen] = useState(false);
   const [type, setType] = useState<RequestType>("إجازة");
   const initialDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date());
+  const canManageDeductions = role === "owner" || role === "manager";
+  const [activeTab, setActiveTab] = useState<"requests" | "deductions">("requests");
+  const [deductionMonth, setDeductionMonth] = useState(initialDate.slice(0, 7));
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(Number(initialDate.slice(0, 4)));
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const approvedAttendance = trpc.requests.listPenaltyRequests.useQuery({ month: deductionMonth }, { enabled: canManageDeductions && activeTab === "deductions", retry: false });
+  const approvedDeductions = [
+    ...(approvedAttendance.data ?? []).filter(item => item.status === "معتمد").map(item => ({ ...item, source: "attendance" as const, adjustmentId: undefined as number | undefined })),
+    ...requests.filter(item => item.source === "penalty" && item.from.slice(0, 7) === deductionMonth).map(item => ({ id: item.id, staffAccountId: item.staffAccountId!, staffName: item.staffName, fromDate: item.from, title: item.reason, minutes: 0, exceptionKind: undefined, source: "penalty" as const, adjustmentId: item.adjustmentId })),
+  ].sort((a, b) => b.fromDate.localeCompare(a.fromDate));
+  const monthLabel = (month: string) => new Intl.DateTimeFormat("ar-EG", { month: "long", year: "numeric" }).format(new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1));
+  async function cancelApprovedDeduction(item: (typeof approvedDeductions)[number]) {
+    if (cancellingId) return;
+    setCancellingId(String(item.id));
+    try {
+      if (item.source === "penalty") await cancelPenalty.mutateAsync({ id: Number(item.adjustmentId) });
+      else await reviewAttendanceException.mutateAsync({ staffAccountId: item.staffAccountId, date: item.fromDate, kind: item.exceptionKind as "late" | "early" | "absence", action: "cancel" });
+      await Promise.all([approvedAttendance.refetch(), refresh()]);
+      showAlert("تم إلغاء الخصم", "تم إلغاء الخصم من حساب الموظف قبل اعتماد المسير.");
+    } catch (error) {
+      showAlert("تعذر إلغاء الخصم", error instanceof Error ? error.message : "حدث خطأ أثناء إلغاء الخصم.");
+    } finally { setCancellingId(null); }
+  }
   const [from, setFrom] = useState(initialDate);
   const [to, setTo] = useState(initialDate);
   const [hours, setHours] = useState("1");
@@ -54,6 +78,20 @@ export default function RequestsScreen() {
 
   return <ScreenContainer><ScrollView contentContainerStyle={[styles.content, compact && styles.contentCompact]} showsVerticalScrollIndicator={false}>
     <View style={[styles.header, compact && styles.headerCompact]}><View><Text style={styles.eyebrow}>طلباتك وموافقاتك</Text><Text style={styles.title}>الطلبات</Text><Text style={styles.subtitle}>إجازات وأذونات</Text></View><Pressable onPress={() => setModalOpen(true)} style={[styles.addButton, compact && styles.addButtonCompact]}><Text style={styles.addButtonText}>+ طلب جديد</Text></Pressable></View>
+    {canManageDeductions && <View style={styles.subTabs}>{([{ key: "requests", label: "الطلبات" }, { key: "deductions", label: "الخصومات المعتمدة" }] as const).map(tab => <Pressable key={tab.key} onPress={() => setActiveTab(tab.key)} style={[styles.subTab, activeTab === tab.key && styles.subTabActive]}><Text style={[styles.subTabText, activeTab === tab.key && styles.subTabTextActive]}>{tab.label}</Text></Pressable>)}</View>}
+    {canManageDeductions && activeTab === "deductions" ? <>
+      <Pressable style={styles.monthSelector} onPress={() => { setPickerYear(Number(deductionMonth.slice(0, 4))); setMonthPickerOpen(true); }}><Text style={styles.sectionTitle}>{monthLabel(deductionMonth)} ▾</Text><Text style={styles.sectionHint}>اختيار شهر الخصومات</Text></Pressable>
+      <Text style={styles.sectionHint}>يمكن إلغاء الخصم قبل اعتماد مسير الموظف فقط.</Text>
+      {approvedAttendance.isPending ? <Text style={styles.empty}>جاري تحميل الخصومات...</Text> : approvedAttendance.isError ? <View><Text style={styles.empty}>تعذر تحميل الخصومات.</Text><Pressable onPress={() => approvedAttendance.refetch()} style={styles.detailsButton}><Text style={styles.detailsButtonText}>إعادة المحاولة</Text></Pressable></View> : <>
+        <Text style={styles.sectionTitle}>الخصومات المعتمدة ({approvedDeductions.length})</Text>
+        {approvedDeductions.map(item => <View key={`${item.source}-${item.id}`} style={styles.requestCard}>
+          <View style={styles.requestTop}><Text style={styles.staffName}>{item.staffName ?? "موظف"}</Text><Text style={styles.statusText}>معتمد</Text></View>
+          <Text style={styles.requestType}>{item.title}</Text><Text style={styles.requestDates}>{item.source === "penalty" ? monthLabel(deductionMonth) : item.fromDate}{item.minutes ? ` · ${item.minutes} دقيقة` : ""}</Text>
+          <Pressable disabled={cancellingId !== null} onPress={() => cancelApprovedDeduction(item)} style={[styles.cancelAction, cancellingId !== null && { opacity: 0.5 }]}><Text style={styles.cancelActionText}>{cancellingId === String(item.id) ? "جاري الإلغاء..." : "إلغاء الخصم المعتمد"}</Text></Pressable>
+        </View>)}
+        {approvedDeductions.length === 0 && <Text style={styles.empty}>لا توجد خصومات معتمدة في الشهر المحدد.</Text>}
+      </>}
+    </> : <>
     <View style={styles.smartInsight}>
       <View style={styles.smartInsightIcon}><Text style={styles.smartInsightIconText}>✦</Text></View>
       <View style={styles.smartInsightCopy}>
@@ -102,13 +140,21 @@ export default function RequestsScreen() {
       </View>;
     })}
     {filteredRequests.length === 0 && <Text style={styles.empty}>{requests.length === 0 ? "لم ترسل أي طلبات بعد." : `لا توجد طلبات بحالة ${activeFilter}.`}</Text>}
+    </>}
   </ScrollView>
+  <Modal visible={monthPickerOpen} transparent animationType="slide" onRequestClose={() => setMonthPickerOpen(false)}><View style={styles.modalBackdrop}><View style={styles.modal}><View style={styles.detailHead}><Text style={styles.detailTitle}>اختيار الشهر</Text><Pressable onPress={() => setMonthPickerOpen(false)}><Text style={styles.closeText}>إغلاق</Text></Pressable></View><View style={styles.yearRow}><Pressable onPress={() => setPickerYear(year => year - 1)} style={styles.filterChip}><Text>السنة السابقة</Text></Pressable><Text style={styles.sectionTitle}>{pickerYear}</Text><Pressable onPress={() => setPickerYear(year => year + 1)} style={styles.filterChip}><Text>السنة التالية</Text></Pressable></View><View style={styles.monthGrid}>{Array.from({ length: 12 }, (_, index) => `${pickerYear}-${String(index + 1).padStart(2, "0")}`).map(month => <Pressable key={month} onPress={() => { setDeductionMonth(month); setMonthPickerOpen(false); }} style={[styles.monthChip, deductionMonth === month && styles.filterChipActive]}><Text style={[styles.filterText, deductionMonth === month && styles.filterTextActive]}>{new Intl.DateTimeFormat("ar-EG", { month: "long" }).format(new Date(pickerYear, Number(month.slice(5)) - 1, 1))}</Text></Pressable>)}</View></View></View></Modal>
   <Modal visible={Boolean(selectedRequest)} transparent animationType="slide" onRequestClose={() => setSelectedRequest(null)}><View style={styles.modalBackdrop}><View style={styles.detailModal}><View style={styles.detailHead}><Text style={styles.detailTitle}>تفاصيل الطلب</Text><Pressable onPress={() => setSelectedRequest(null)}><Text style={styles.closeText}>إغلاق</Text></Pressable></View>{selectedRequest && <><Text style={styles.detailType}>{selectedRequest.type}</Text><Text style={styles.detailDates}>{selectedRequest.type === "أوفر تايم" ? `${selectedRequest.from} · ${selectedRequest.hours ?? 0} ساعة` : `${selectedRequest.from} إلى ${selectedRequest.to}`}</Text><View style={styles.detailStatus}><Text style={styles.detailStatusText}>{selectedRequest.status}</Text></View><Text style={styles.detailLabel}>سبب الطلب</Text><Text style={styles.detailReason}>{selectedRequest.reason}</Text><View style={styles.timeline}><Text style={styles.timelineTitle}>حالة المعالجة</Text><Text style={styles.timelineText}>{selectedRequest.status === "قيد المراجعة" ? "الطلب في انتظار مراجعة المدير." : selectedRequest.status === "مقبول" ? "تمت مراجعة الطلب واعتماده." : "تمت مراجعة الطلب ورفضه."}</Text></View></>}</View></View></Modal>
   <Modal visible={modalOpen} transparent animationType="slide" onRequestClose={() => setModalOpen(false)}><View style={styles.modalBackdrop}><View style={styles.modal}><View style={styles.modalHeader}><Pressable onPress={() => setModalOpen(false)}><Text style={styles.close}>إلغاء</Text></Pressable><Text style={styles.modalTitle}>طلب جديد</Text></View><Text style={styles.fieldLabel}>نوع الطلب</Text><View style={styles.typeRow}>{(["إجازة", "إجازة مرضية", "إجازة طارئة", "إذن"] as RequestType[]).map((item) => <Pressable key={item} onPress={() => setType(item)} style={[styles.typeChip, type === item && styles.typeChipActive]}><Text style={[styles.typeChipText, type === item && styles.typeChipTextActive]}>{item}</Text></Pressable>)}</View><Text style={styles.fieldLabel}>التاريخ</Text><TextInput value={from} onChangeText={(value) => { setFrom(value); if (type === "إذن") setTo(value); }} placeholder="YYYY-MM-DD" style={styles.input} />{type !== "إذن" ? <><Text style={styles.fieldLabel}>إلى</Text><TextInput value={to} onChangeText={setTo} placeholder="YYYY-MM-DD" style={styles.input} /></> : <><Text style={styles.fieldLabel}>مدة الإذن</Text><View style={styles.typeRow}>{["0.5", "1", "1.5", "2", "3"].map((item) => <Pressable key={item} onPress={() => setHours(item)} style={[styles.typeChip, hours === item && styles.typeChipActive]}><Text style={[styles.typeChipText, hours === item && styles.typeChipTextActive]}>{item === "0.5" ? "نصف ساعة" : `${item} ساعة`}</Text></Pressable>)}</View></>}<Text style={styles.fieldLabel}>السبب</Text><TextInput value={reason} onChangeText={setReason} placeholder="اكتب سبب الطلب" multiline style={[styles.input, styles.textArea]} /><Pressable onPress={saveRequest} style={styles.submitButton}><Text style={styles.submitText}>إرسال للمراجعة</Text></Pressable></View></View></Modal>
   </ScreenContainer>;
 }
 
 const styles = StyleSheet.create<any>({
+  subTabs: { flexDirection: "row-reverse", backgroundColor: "#F2F5F8", borderRadius: 14, padding: 5, gap: 5 },
+  subTab: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 10 },
+  subTabActive: { backgroundColor: "#163A63" }, subTabText: { color: "#163A63", fontWeight: "800", fontSize: 13 }, subTabTextActive: { color: "#FFFFFF" },
+  monthSelector: { padding: 16, borderRadius: 16, borderWidth: 1, borderColor: "#D9E2EC", backgroundColor: "#FFFFFF", gap: 5 },
+  yearRow: { flexDirection: "row-reverse", justifyContent: "space-between", alignItems: "center", marginVertical: 20 },
+  monthGrid: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 8 }, monthChip: { width: "30%", paddingVertical: 14, alignItems: "center", borderRadius: 10, backgroundColor: "#F2F5F8" },
   actionRow: { flexDirection: "row-reverse", gap: 10, marginTop: 12 },
   acceptButton: { flex: 1, minHeight: 48, backgroundColor: "#163A63", borderRadius: 13, paddingVertical: 12, paddingHorizontal: 14, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#163A63", elevation: 2 },
   acceptText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },

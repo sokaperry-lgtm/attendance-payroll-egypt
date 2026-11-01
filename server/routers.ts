@@ -539,7 +539,7 @@ export const appRouter = router({
       return row;
     }),
     waiveAttendance: managerProcedure.input(z.object({ staffAccountId:z.number().int(), date:z.string().length(10), kind:z.enum(["late","early"]) })).mutation(async ({ctx,input})=>{ await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage"); return enterprise.waiveAttendanceException(ctx.staffUser.id,input); }),
-listPenaltyRequests: managerProcedure.query(async ({ctx})=>{ await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.listAttendancePenaltyRequests(ctx.staffUser.id); }),
+listPenaltyRequests: managerProcedure.input(z.object({ month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) }).optional()).query(async ({ctx,input})=>{ await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.listAttendancePenaltyRequests(ctx.staffUser.id,input?.month); }),
         reviewAttendanceException: managerProcedure.input(z.object({ staffAccountId:z.number().int(), date:z.string().length(10), kind:z.enum(["late","early","absence"]), action:z.enum(["approve","cancel"]) })).mutation(async ({ctx,input})=>{ await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage"); return enterprise.reviewAttendanceException(ctx.staffUser.id,input); }),
     cancelPenalty: payrollAdminProcedure.input(z.object({ id:z.number().int() })).mutation(async ({ctx,input})=>{ await enterprise.assertPermission(ctx.staffUser.id, "payroll.manage"); return enterprise.cancelSalaryAdjustment(ctx.staffUser.id,input.id); }),
   }),
