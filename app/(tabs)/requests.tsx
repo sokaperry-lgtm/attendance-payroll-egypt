@@ -28,8 +28,6 @@ export default function RequestsScreen() {
   const [selectedRequest, setSelectedRequest] = useState<(typeof requests)[number] | null>(null);
   const [activeFilter, setActiveFilter] = useState<"الكل" | "قيد المراجعة" | "مقبول" | "مرفوض">("الكل");
   const filteredRequests = requests.filter((request:any) => activeFilter === "الكل" || request.status === activeFilter);
-  const penaltyRequests = trpc.requests.listPenaltyRequests.useQuery(undefined, { enabled: role !== "employee", retry: false });
-  const pendingPenaltyRequests = penaltyRequests.data ?? [];
   const isLeaveType = type === "إجازة" || type === "إجازة مرضية" || type === "إجازة طارئة";
   const pendingCount = requests.filter((r:any) => r.status === "قيد المراجعة").length;
   const approvedCount = requests.filter((r:any) => r.status === "مقبول").length;
@@ -56,57 +54,6 @@ export default function RequestsScreen() {
 
   return <ScreenContainer><ScrollView contentContainerStyle={[styles.content, compact && styles.contentCompact]} showsVerticalScrollIndicator={false}>
     <View style={[styles.header, compact && styles.headerCompact]}><View><Text style={styles.eyebrow}>طلباتك وموافقاتك</Text><Text style={styles.title}>الطلبات</Text><Text style={styles.subtitle}>إجازات وأذونات</Text></View><Pressable onPress={() => setModalOpen(true)} style={[styles.addButton, compact && styles.addButtonCompact]}><Text style={styles.addButtonText}>+ طلب جديد</Text></Pressable></View>
-    {role !== "employee" ? <View style={styles.absenceReviewPanel}>
-      <View style={styles.absenceReviewHeader}>
-        <View style={styles.absenceReviewBadge}><Text style={styles.absenceReviewBadgeText}>{pendingPenaltyRequests.length}</Text></View>
-        <View style={styles.absenceReviewCopy}>
-          <Text style={styles.absenceReviewTitle}>خصومات الحضور تحتاج اعتمادك</Text>
-          <Text style={styles.absenceReviewText}>كل خصم ناتج عن الحضور يدخل للمراجعة أولًا — أنت تقرر هل يعتمد الخصم أم يُلغى.</Text>
-        </View>
-        <IconSymbol name="person.crop.circle.badge.exclamationmark" size={25} color="#163A63" />
-      </View>
-      {pendingPenaltyRequests.length === 0 ? (
-        <Text style={styles.absenceReviewEmpty}>لا توجد خصومات حضور معلقة حاليًا.</Text>
-      ) : pendingPenaltyRequests.slice(0, 6).map((item: any) => (
-        <View key={String(item.id)} style={styles.absenceReviewCard}>
-          <View style={styles.absenceReviewInfo}>
-            <Text style={styles.absenceReviewName}>{item.staffName ?? "موظف"}</Text>
-            <Text style={styles.absenceReviewDate}>{item.fromDate} · {item.title}{item.minutes ? ` · ${item.minutes} دقيقة` : ""}</Text>
-            <Text style={styles.absenceReviewHint}>{item.status === "معتمد" ? "الخصم معتمد، ويمكن إلغاؤه قبل اعتماد مسير الموظف." : "قرار المدير مطلوب قبل احتساب أي خصم من الراتب."}</Text>
-          </View>
-          <View style={styles.absenceReviewActions}>
-            {item.status !== "معتمد" ? <Pressable
-              disabled={reviewAttendanceException.isPending}
-              onPress={async () => {
-                try {
-                  await reviewAttendanceException.mutateAsync({ staffAccountId: Number(item.staffAccountId), date: String(item.fromDate), kind: item.exceptionKind, action: "approve" });
-                  await penaltyRequests.refetch();
-                  await refresh();
-                  showAlert("تم اعتماد الخصم", "سيتم احتساب الخصم في المرتب.");
-                } catch (error) {
-                  showAlert("تعذر اعتماد الخصم", error instanceof Error ? error.message : "حدث خطأ أثناء اعتماد الخصم.");
-                }
-              }}
-              style={styles.absenceApproveButton}
-            ><Text style={styles.absenceApproveText}>{reviewAttendanceException.isPending ? "..." : "✓  اعتماد الخصم"}</Text></Pressable> : null}
-            <Pressable
-              disabled={reviewAttendanceException.isPending}
-              onPress={async () => {
-                try {
-                  await reviewAttendanceException.mutateAsync({ staffAccountId: Number(item.staffAccountId), date: String(item.fromDate), kind: item.exceptionKind, action: "cancel" });
-                  await penaltyRequests.refetch();
-                  await refresh();
-                  showAlert("تم إلغاء الخصم", "تم إلغاء الخصم ولن يُحتسب ما دام المسير غير معتمد.");
-                } catch (error) {
-                  showAlert("تعذر إلغاء الخصم", error instanceof Error ? error.message : "حدث خطأ أثناء إلغاء الخصم.");
-                }
-              }}
-              style={styles.absenceCancelButton}
-            ><Text style={styles.absenceCancelText}>{reviewAttendanceException.isPending ? "..." : (item.status === "معتمد" ? "✕  إلغاء الخصم المعتمد" : "✕  إلغاء الخصم")}</Text></Pressable>
-          </View>
-        </View>
-      ))}
-    </View> : null}
     <View style={styles.smartInsight}>
       <View style={styles.smartInsightIcon}><Text style={styles.smartInsightIconText}>✦</Text></View>
       <View style={styles.smartInsightCopy}>
@@ -162,20 +109,6 @@ export default function RequestsScreen() {
 }
 
 const styles = StyleSheet.create<any>({
-  absenceReviewPanel: { backgroundColor: "#FFFFFF", borderRadius: 22, padding: 16, borderWidth: 1, borderColor: "#D9E6F2", gap: 11, marginBottom: 2 },
-  absenceReviewHeader: { flexDirection: "row-reverse", alignItems: "center", gap: 11 },
-  absenceReviewBadge: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#163A63", alignItems: "center", justifyContent: "center" },
-  absenceReviewBadgeText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
-  absenceReviewCopy: { flex: 1 },
-  absenceReviewTitle: { color: "#172033", fontSize: 14, fontWeight: "900", textAlign: "right" },
-  absenceReviewText: { color: "#667085", fontSize: 10, lineHeight: 16, marginTop: 2, textAlign: "right" },
-  absenceReviewEmpty: { color: "#98A6B8", fontSize: 11, textAlign: "right", paddingVertical: 5 },
-  absenceReviewCard: { backgroundColor: "#F7F9FC", borderRadius: 16, padding: 12, flexDirection: "row-reverse", alignItems: "center", gap: 10 },
-  absenceReviewInfo: { flex: 1 },
-  absenceReviewName: { color: "#172033", fontSize: 12, fontWeight: "900", textAlign: "right" },
-  absenceReviewDate: { color: "#31577F", fontSize: 10, fontWeight: "800", marginTop: 3, textAlign: "right" },
-  absenceReviewHint: { color: "#98A6B8", fontSize: 9, marginTop: 3, textAlign: "right" },
-  absenceReviewActions: { gap: 10, marginTop: 10, minWidth: 122 },
   actionRow: { flexDirection: "row-reverse", gap: 10, marginTop: 12 },
   acceptButton: { flex: 1, minHeight: 48, backgroundColor: "#163A63", borderRadius: 13, paddingVertical: 12, paddingHorizontal: 14, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#163A63", elevation: 2 },
   acceptText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
@@ -183,10 +116,6 @@ const styles = StyleSheet.create<any>({
   rejectText: { color: "#B42318", fontSize: 13, fontWeight: "900" },
   cancelAction: { flex: 1, minHeight: 48, backgroundColor: "#FFF5F5", borderRadius: 13, paddingVertical: 12, paddingHorizontal: 14, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#D64545" },
   cancelActionText: { color: "#B42318", fontSize: 13, fontWeight: "900" },
-  absenceApproveButton: { minHeight: 46, backgroundColor: "#163A63", borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#163A63", elevation: 2 },
-  absenceApproveText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
-  absenceCancelButton: { minHeight: 46, backgroundColor: "#FFF5F5", borderWidth: 2, borderColor: "#D64545", borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14, alignItems: "center", justifyContent: "center" },
-  absenceCancelText: { color: "#B42318", fontSize: 13, fontWeight: "900" },
 
   detailModal:{backgroundColor:"#FFFFFF",borderTopLeftRadius:26,borderTopRightRadius:26,padding:20,gap:10},detailHead:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},detailTitle:{color:"#172033",fontSize:20,fontWeight:"900"},closeText:{color:"#163A63",fontSize:11},detailType:{color:"#163A63",fontSize:18,fontWeight:"800",textAlign:"right"},detailDates:{color:"#667085",fontSize:12,textAlign:"right"},detailStatus:{alignSelf:"flex-end",backgroundColor:"#EEF4FB",borderRadius:99,paddingHorizontal:12,paddingVertical:6},detailStatusText:{color:"#31577F",fontSize:10,fontWeight:"800"},detailLabel:{color:"#667085",fontSize:10,fontWeight:"700",textAlign:"right",marginTop:10},detailReason:{color:"#172033",fontSize:13,lineHeight:20,textAlign:"right"},timeline:{backgroundColor:"#172033",borderRadius:14,padding:13,marginTop:8},timelineTitle:{color:"#FFFFFF",fontSize:12,fontWeight:"800",textAlign:"right"},timelineText:{color:"#D9E6F2",fontSize:11,lineHeight:18,textAlign:"right",marginTop:4},
   smartInsight:{backgroundColor:"#F7F9FC",borderRadius:18,padding:15,borderWidth:1,borderColor:"#D9E2EC",flexDirection:"row-reverse",alignItems:"center",gap:11},
