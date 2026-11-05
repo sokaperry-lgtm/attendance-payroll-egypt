@@ -79,10 +79,10 @@ it("builds a new employee dashboard when the browser formats en-CA dates with sl
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-11-05T10:00:00Z"));
   const original = Object.getOwnPropertyDescriptor(Intl.DateTimeFormat.prototype, "format")!;
-  const format = vi.spyOn(Intl.DateTimeFormat.prototype, "format", "get").mockImplementation(function (this: Intl.DateTimeFormat) {
+  Object.defineProperty(Intl.DateTimeFormat.prototype, "format", { configurable: true, get: function (this: Intl.DateTimeFormat) {
     if (this.resolvedOptions().locale === "en-CA") return () => "11/05/2026";
     return original.get!.call(this);
-  });
+  }});
   try {
     const today = todayKey();
     expect(today).toBe("2026-11-05");
@@ -93,7 +93,7 @@ it("builds a new employee dashboard when the browser formats en-CA dates with sl
     expect(result.slice(0, 6).every(day => day.value === null)).toBe(true);
     expect(buildLastSevenDaysAttendance([], today)).toHaveLength(7);
   } finally {
-    format.mockRestore();
+    Object.defineProperty(Intl.DateTimeFormat.prototype, "format", original);
     vi.useRealTimers();
   }
 });
