@@ -9,6 +9,7 @@ import { useAppData } from "@/lib/app-data";
 import { buildLastSevenDaysAttendance } from "@/lib/dashboard-utils";
 import { calculateLateMinutes } from "@/lib/shift-utils";
 import { trpc } from "@/lib/trpc";
+import { todayKey } from "@/lib/payroll";
 import { useRouter } from "expo-router";
 
 function distanceBetween(lat1:number,lon1:number,lat2:number,lon2:number){
@@ -41,8 +42,8 @@ export default function HomeScreen(){
     return () => clearInterval(timer);
   }, []);
   const notificationsQuery=trpc.notifications.list.useQuery();
-  const currentMonth = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit" }).format(new Date());
-  const todayCairo = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const todayCairo = todayKey();
+  const currentMonth = todayCairo.slice(0, 7);
   const teamQuery = trpc.attendance.team.useQuery(undefined, { enabled: isManagement || role === "supervisor" });
   const payrollQuery = trpc.payroll.list.useQuery({ month: currentMonth }, { enabled: isManagement });
   const selfServicePayroll = trpc.selfService.me.useQuery({ month: currentMonth }, { enabled: !isManagement });

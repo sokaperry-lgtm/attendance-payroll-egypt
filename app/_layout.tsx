@@ -1,11 +1,11 @@
 import "@/global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, type ErrorBoundaryProps } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
-import { Platform } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import {
@@ -26,6 +26,17 @@ const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
 export const unstable_settings = {
   anchor: "(tabs)",
 };
+
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 24, backgroundColor: "#FFFFFF", gap: 16 }}>
+    <Text style={{ color: "#163A63", fontSize: 20, fontWeight: "700", textAlign: "center" }}>تعذر عرض الصفحة</Text>
+    <Text style={{ color: "#667085", textAlign: "center" }}>حاول فتح الصفحة مرة أخرى. لو المشكلة مستمرة، ابعت للإدارة صورة بالرسالة التالية.</Text>
+    <Text selectable style={{ color: "#667085", textAlign: "center" }}>{error.message}</Text>
+    <Pressable onPress={retry} accessibilityRole="button" style={{ backgroundColor: "#163A63", padding: 16, borderRadius: 12 }}>
+      <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>إعادة المحاولة</Text>
+    </Pressable>
+  </View>;
+}
 
 export default function RootLayout() {
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;

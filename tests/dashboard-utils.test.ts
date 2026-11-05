@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { todayKey } from "../lib/payroll";
 import {
   buildLastSevenDaysAttendance,
   buildDepartmentStats,
@@ -71,4 +72,28 @@ it("shows seven actual calendar days, with missing data blank and real absence a
   expect(result[0]).toMatchObject({date:"2026-10-25",value:null});
   expect(result[5].value).toBe(50);
   expect(result[6].value).toBe(0);
+});
+
+
+it("builds a new employee dashboard when the browser formats en-CA dates with slashes", () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-11-05T10:00:00Z"));
+  const original = Object.getOwnPropertyDescriptor(Intl.DateTimeFormat.prototype, "format")!;
+  const format = vi.spyOn(Intl.DateTimeFormat.prototype, "format", "get").mockImplementation(function (this: Intl.DateTimeFormat) {
+    if (this.resolvedOptions().locale === "en-CA") return () => "11/05/2026";
+    return original.get!.call(this);
+  });
+  try {
+    const today = todayKey();
+    expect(today).toBe("2026-11-05");
+    expect(today.slice(0, 7)).toBe("2026-11");
+    const result = buildLastSevenDaysAttendance([{ date: today, status: "حاضر", lateMinutes: 0 }], today);
+    expect(result).toHaveLength(7);
+    expect(result[6]).toMatchObject({ date: today, value: 100 });
+    expect(result.slice(0, 6).every(day => day.value === null)).toBe(true);
+    expect(buildLastSevenDaysAttendance([], today)).toHaveLength(7);
+  } finally {
+    format.mockRestore();
+    vi.useRealTimers();
+  }
 });

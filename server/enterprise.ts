@@ -1103,7 +1103,7 @@ export async function waiveAttendanceException(actorId:number,input:{staffAccoun
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId);
   if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
-  await assertOperationalTarget(actorId,input.staffAccountId,input.action === "cancel");
+  await assertOperationalTarget(actorId,input.staffAccountId,true);
   await assertPayrollEditable(actorId,input.date.slice(0,7),input.staffAccountId);
   const row=(await db.select().from(attendanceRecords).where(and(eq(attendanceRecords.staffAccountId,input.staffAccountId),eq(attendanceRecords.date,input.date))).limit(1))[0];
   if(!row) throw new Error("سجل الحضور غير موجود.");
