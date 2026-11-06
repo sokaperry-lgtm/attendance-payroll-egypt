@@ -263,6 +263,7 @@ export async function listShiftTemplates() {
   const seed = [];
   if (!existing.some((item) => item.kind === "shift" && item.name === "الشيفت الصباحي")) seed.push({ name: "الشيفت الصباحي", kind: "shift", startTime: "08:00", endTime: "17:00", crossesMidnight: false, active: true });
   if (!existing.some((item) => item.kind === "shift" && item.name === "الشيفت المسائي")) seed.push({ name: "الشيفت المسائي", kind: "shift", startTime: "16:00", endTime: "01:00", crossesMidnight: true, active: true });
+  if (!existing.some((item) => item.kind === "shift" && item.name === "شيفت بتوين")) seed.push({ name: "شيفت بتوين", kind: "shift", startTime: "12:00", endTime: "21:00", crossesMidnight: false, active: true });
   if (!existing.some((item) => item.kind === "weekly_off")) seed.push({ name: "إجازة أسبوعية", kind: "weekly_off", startTime: "00:00", endTime: "00:00", crossesMidnight: false, active: true });
   if (seed.length) await db.insert(shiftTemplates).values(seed);
   return db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
