@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
   approveAbsenceText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
   cancelAbsence: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E9DED0", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 11 },
   cancelAbsenceText: { color: "#B8794A", fontSize: 10, fontWeight: "800" },
-  smartInsight:{backgroundColor:"#FFFCF4",borderRadius:18,padding:15,borderWidth:1,borderColor:"#D9E2EC",flexDirection:"row-reverse",alignItems:"center",gap:11},
+  smartInsight:{backgroundColor:"#FFFCF4",borderRadius:18,padding:15,borderWidth:1,borderColor:"#E9DED0",flexDirection:"row-reverse",alignItems:"center",gap:11},
   smartInsightIcon:{width:40,height:40,borderRadius:13,backgroundColor:"#75282E",alignItems:"center",justifyContent:"center"},
   smartInsightIconText:{color:"#FFFFFF",fontSize:18,fontWeight:"900"},
   smartInsightCopy:{flex:1},
