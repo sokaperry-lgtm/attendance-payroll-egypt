@@ -50,6 +50,19 @@ export default function RootLayout() {
     initManusRuntime();
   }, []);
 
+  // Keep the entire Arabic web app in RTL, regardless of browser locale or CSS changes.
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    const html = document.documentElement;
+    html.setAttribute("dir", "rtl");
+    html.setAttribute("lang", "ar");
+    html.style.direction = "rtl";
+    if (document.body) {
+      document.body.setAttribute("dir", "rtl");
+      document.body.style.direction = "rtl";
+    }
+  }, []);
+
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
     setInsets(metrics.insets);
     setFrame(metrics.frame);
