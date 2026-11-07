@@ -45,7 +45,9 @@ function RoleAwareTabs() {
     <View style={{ flex: 1 }}>
       <Tabs
         screenOptions={{
-          tabBarPosition: isDesktopWeb ? "right" : "bottom",
+          // React Navigation's side position is mirrored by the document RTL direction on web.
+          // "left" here places the desktop navigation rail on the physical right edge.
+          tabBarPosition: isDesktopWeb ? "left" : "bottom",
           tabBarVariant: isDesktopWeb ? "material" : "uikit",
           tabBarLabelPosition: isDesktopWeb ? "beside-icon" : "below-icon",
           tabBarActiveTintColor: "#163A63",
@@ -80,8 +82,8 @@ function RoleAwareTabs() {
             ? {
                 width: 276,
                 backgroundColor: "#FFFFFF",
-                borderLeftColor: "#E4E7EC",
-                borderLeftWidth: 1,
+                borderRightColor: "#E4E7EC",
+                borderRightWidth: 1,
                 paddingVertical: 28,
                 paddingHorizontal: 18,
                 borderTopWidth: 0,
@@ -123,7 +125,7 @@ function RoleAwareTabs() {
           style={({ pressed }) => ({
             position: "absolute",
             top: 12,
-            left: 14,
+            right: 14,
             zIndex: 100,
             minWidth: 92,
             height: 42,
