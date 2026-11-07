@@ -57,3 +57,22 @@ body {
   background-repeat: repeat;
   background-size: 420px 420px;
 }
+
+
+/*
+ * Arabic typography baseline for all screens and nested tabs.
+ * React Native Text defaults to automatic/centered alignment in several
+ * layouts; inheriting right alignment from the app root gives Arabic copy
+ * a consistent reading edge. Explicit component alignments (centered stats,
+ * icons, numeric indicators) remain respected by their own styles.
+ */
+html[dir="rtl"] body,
+html[dir="rtl"] #root {
+  direction: rtl;
+  text-align: right;
+}
+
+/* Ensure native-web text wrappers inherit the Arabic reading alignment. */
+html[dir="rtl"] #root [dir="rtl"] {
+  text-align: right;
+}
