@@ -38,3 +38,22 @@ body {
 #root {
   background-color: transparent;
 }
+
+
+/*
+ * Extend the arabesque identity beyond the landing canvas to every tab.
+ * This fixed, decorative-only layer sits above screen backgrounds, but its
+ * strokes are extremely faint and pointer-events are disabled. It cannot
+ * block controls, alter layout, or meaningfully reduce text contrast.
+ */
+#root::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.28;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420' viewBox='0 0 420 420'%3E%3Cg fill='none' stroke='%2375282E' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' opacity='.16'%3E%3Cpath d='M210 18 255 63 210 108 165 63Z M210 108 255 153 210 198 165 153Z M210 222 255 267 210 312 165 267Z M210 312 255 357 210 402 165 357Z'/%3E%3Cpath d='M18 210 63 165 108 210 63 255Z M108 210 153 165 198 210 153 255Z M222 210 267 165 312 210 267 255Z M312 210 357 165 402 210 357 255Z'/%3E%3Cpath d='M45 45 Q105 5 165 45 Q210 75 210 135 Q210 75 255 45 Q315 5 375 45 Q415 105 375 165 Q345 210 285 210 Q345 210 375 255 Q415 315 375 375 Q315 415 255 375 Q210 345 210 285 Q210 345 165 375 Q105 415 45 375 Q5 315 45 255 Q75 210 135 210 Q75 210 45 165 Q5 105 45 45Z'/%3E%3Cpath d='M105 105 Q150 75 180 105 L210 135 240 105 Q270 75 315 105 Q345 150 315 180 L285 210 315 240 Q345 270 315 315 Q270 345 240 315 L210 285 180 315 Q150 345 105 315 Q75 270 105 240 L135 210 105 180 Q75 150 105 105Z'/%3E%3C/g%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 420px 420px;
+}
