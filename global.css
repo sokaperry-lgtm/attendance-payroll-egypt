@@ -1,3 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * React Native Web renders each screen as its own DOM subtree. Setting dir on
+ * html/body alone does not reliably update every native View/Text subtree.
+ * Inherit RTL through the complete app tree so row-based layouts, labels,
+ * controls and nested tab screens all follow the Arabic reading direction.
+ */
+html[dir="rtl"],
+html[dir="rtl"] body,
+html[dir="rtl"] body * {
+  direction: rtl;
+}
