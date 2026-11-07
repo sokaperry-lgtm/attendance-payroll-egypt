@@ -40,12 +40,21 @@ function tone(s: ShiftTemplate | null | undefined, paletteIndex?: number) {
   if (!s) return { bg: "#F6F8FA", accent: "#A1ACBA", text: "#806F68" };
   if (s.kind === "weekly_off") return { bg: "#FFF0E1", accent: "#E05A33", text: "#A33A20" };
   if (s.crossesMidnight) return { bg: "#F5E7E2", accent: "#5C1F25", text: "#5C1F25" };
+
+  // Keep day and evening shifts visually distinct regardless of template order.
+  const shiftName = String(s.name ?? "").toLowerCase();
+  const startHour = Number(String(s.startTime ?? "").split(":")[0]);
+  if (shiftName.includes("صباح") || shiftName.includes("morning") || (Number.isFinite(startHour) && startHour >= 5 && startHour < 12)) {
+    return { bg: "#FFF0D8", accent: "#C47A32", text: "#87501F" };
+  }
+  if (shiftName.includes("مساء") || shiftName.includes("مسائي") || shiftName.includes("evening") || (Number.isFinite(startHour) && startHour >= 16)) {
+    return { bg: "#F5E7E2", accent: "#75282E", text: "#5C1F25" };
+  }
+
   const palettes = [
+    { bg: "#FFF0D8", accent: "#C47A32", text: "#87501F" },
     { bg: "#F5E7E2", accent: "#75282E", text: "#5C1F25" },
-    { bg: "#E3F8EF", accent: "#149A67", text: "#08704A" },
-    { bg: "#FFF0F0", accent: "#D94A5B", text: "#9F2638" },
     { bg: "#FFF3D6", accent: "#D58A00", text: "#965E00" },
-    { bg: "#FFF0E1", accent: "#B8794A", text: "#80512F" },
   ];
   const index = paletteIndex ?? 0;
   return palettes[index % palettes.length];
@@ -289,7 +298,8 @@ export default function ScheduleScreen() {
         <View style={styles.rosterCard}>
           <View style={styles.rosterHeader}><View style={styles.attendanceLegend}><Text style={styles.legendTitle}>الحضور</Text>{[["#149A67","حاضر"],["#D58A00","متأخر"],["#D94A5B","غياب"],["#B8794A","إجازة"]].map(([color,label]) => <View key={label} style={styles.legendItem}><View style={[styles.legendDot,{backgroundColor:color}]} /><Text>{label}</Text></View>)}</View>
             <View style={styles.legend}>
-              <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#B8794A" }]} /><Text>وردية</Text></View>
+              <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#C47A32" }]} /><Text>صباحي</Text></View>
+              <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#75282E" }]} /><Text>مسائي</Text></View>
               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#B7791F" }]} /><Text>إجازة</Text></View>
               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#A1ACBA" }]} /><Text>فارغ</Text></View>
             </View>
