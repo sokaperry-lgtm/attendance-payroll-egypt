@@ -50,8 +50,8 @@ function RoleAwareTabs() {
           tabBarPosition: isDesktopWeb ? "left" : "bottom",
           tabBarVariant: isDesktopWeb ? "material" : "uikit",
           tabBarLabelPosition: isDesktopWeb ? "beside-icon" : "below-icon",
-          tabBarActiveTintColor: "#163A63",
-          tabBarInactiveTintColor: "#667085",
+          tabBarActiveTintColor: "#75282E",
+          tabBarInactiveTintColor: "#806F68",
           headerShown: false,
           tabBarButton: HapticTab,
           tabBarLabelStyle: {
@@ -65,7 +65,7 @@ function RoleAwareTabs() {
                 borderRadius: 14,
                 marginVertical: 5,
                 paddingHorizontal: 12,
-                backgroundColor: "#FFFFFF",
+                backgroundColor: "#FFF8E7",
               }
             : {
                 minHeight: 52,
@@ -73,7 +73,7 @@ function RoleAwareTabs() {
                 marginHorizontal: 2,
                 marginVertical: 4,
                 paddingVertical: 2,
-                backgroundColor: "#FFFFFF",
+                backgroundColor: "#FFF8E7",
               },
           tabBarIconStyle: {
             marginBottom: isDesktopWeb ? 0 : 1,
@@ -81,8 +81,8 @@ function RoleAwareTabs() {
           tabBarStyle: isDesktopWeb
             ? {
                 width: 276,
-                backgroundColor: "#FFFFFF",
-                borderRightColor: "#E4E7EC",
+                backgroundColor: "#FFF8E7",
+                borderRightColor: "#E9DED0",
                 borderRightWidth: 1,
                 paddingVertical: 28,
                 paddingHorizontal: 18,
@@ -93,9 +93,9 @@ function RoleAwareTabs() {
                 paddingTop: 5,
                 paddingBottom: bottomPadding,
                 height: tabBarHeight,
-                backgroundColor: "#FFFFFF",
+                backgroundColor: "#FFF8E7",
                 borderTopWidth: 0,
-                shadowColor: "#172033",
+                shadowColor: "#332A26",
                 shadowOpacity: 0.08,
                 shadowRadius: 14,
                 shadowOffset: { width: 0, height: -4 },
@@ -105,7 +105,7 @@ function RoleAwareTabs() {
       >
         <Tabs.Screen name="index" options={{ title: "الرئيسية", href: mobile && !mobilePrimary.has("index") ? null : "/", tabBarIcon: ({ color }) => <IconSymbol size={23} name="house.fill" color={color} /> }} />
         <Tabs.Screen name="self-service" options={{ title: "ملفي", href: mobile ? null : (role === "employee" ? "/self-service" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="person.fill" color={color} /> }} />
-        <Tabs.Screen name="notifications" options={{ title: "الإشعارات", tabBarBadge: notificationCount > 0 ? (notificationCount > 99 ? "99+" : notificationCount) : undefined, tabBarBadgeStyle: { backgroundColor: "#163A63", color: "#FFFFFF", fontSize: 9, fontWeight: "800" }, href: mobile && !mobilePrimary.has("notifications") ? null : "/notifications", tabBarIcon: ({ color }) => <IconSymbol size={23} name="notifications" color={color} /> }} />
+        <Tabs.Screen name="notifications" options={{ title: "الإشعارات", tabBarBadge: notificationCount > 0 ? (notificationCount > 99 ? "99+" : notificationCount) : undefined, tabBarBadgeStyle: { backgroundColor: "#75282E", color: "#FFF8E7", fontSize: 9, fontWeight: "800" }, href: mobile && !mobilePrimary.has("notifications") ? null : "/notifications", tabBarIcon: ({ color }) => <IconSymbol size={23} name="notifications" color={color} /> }} />
         <Tabs.Screen name="hr-tools" options={{ title: "HR Tools", href: mobile ? null : (employeeManagement ? "/hr-tools" : null), tabBarIcon: ({ color }) => <IconSymbol size={23} name="banknote" color={color} /> }} />
         <Tabs.Screen name="attendance" options={{ title: "الحضور", href: mobile && !mobilePrimary.has("attendance") ? null : "/attendance", tabBarIcon: ({ color }) => <IconSymbol size={23} name="calendar" color={color} /> }} />
         <Tabs.Screen name="requests" options={{ title: "الطلبات", href: mobile && !mobilePrimary.has("requests") ? null : "/requests", tabBarIcon: ({ color }) => <IconSymbol size={23} name="doc.text.fill" color={color} /> }} />
@@ -131,14 +131,14 @@ function RoleAwareTabs() {
             height: 42,
             paddingHorizontal: 12,
             borderRadius: 14,
-            backgroundColor: "#FFFFFF",
+            backgroundColor: "#FFF8E7",
             borderWidth: 1,
-            borderColor: "#DCE5EE",
+            borderColor: "#E9DED0",
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "center",
             gap: 7,
-            shadowColor: "#172033",
+            shadowColor: "#332A26",
             shadowOpacity: 0.09,
             shadowRadius: 10,
             shadowOffset: { width: 0, height: 4 },
@@ -147,9 +147,9 @@ function RoleAwareTabs() {
             transform: [{ scale: pressed ? 0.98 : 1 }],
           })}
         >
-          <IconSymbol name="house.fill" size={17} color="#163A63" />
+          <IconSymbol name="house.fill" size={17} color="#75282E" />
           <View>
-            <Text style={{ color: "#163A63", fontSize: 10, fontWeight: "900" }}>الرئيسية</Text>
+            <Text style={{ color: "#75282E", fontSize: 10, fontWeight: "900" }}>الرئيسية</Text>
           </View>
         </Pressable>
       )}

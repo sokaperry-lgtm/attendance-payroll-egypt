@@ -29,10 +29,10 @@ export const unstable_settings = {
 
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 24, backgroundColor: "#FFFFFF", gap: 16 }}>
-    <Text style={{ color: "#163A63", fontSize: 20, fontWeight: "700", textAlign: "center" }}>تعذر عرض الصفحة</Text>
-    <Text style={{ color: "#667085", textAlign: "center" }}>حاول فتح الصفحة مرة أخرى. لو المشكلة مستمرة، ابعت للإدارة صورة بالرسالة التالية.</Text>
-    <Text selectable style={{ color: "#667085", textAlign: "center" }}>{error.message}</Text>
-    <Pressable onPress={retry} accessibilityRole="button" style={{ backgroundColor: "#163A63", padding: 16, borderRadius: 12 }}>
+    <Text style={{ color: "#75282E", fontSize: 20, fontWeight: "700", textAlign: "center" }}>تعذر عرض الصفحة</Text>
+    <Text style={{ color: "#806F68", textAlign: "center" }}>حاول فتح الصفحة مرة أخرى. لو المشكلة مستمرة، ابعت للإدارة صورة بالرسالة التالية.</Text>
+    <Text selectable style={{ color: "#806F68", textAlign: "center" }}>{error.message}</Text>
+    <Pressable onPress={retry} accessibilityRole="button" style={{ backgroundColor: "#75282E", padding: 16, borderRadius: 12 }}>
       <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>إعادة المحاولة</Text>
     </Pressable>
   </View>;

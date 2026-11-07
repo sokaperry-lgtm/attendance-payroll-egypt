@@ -96,7 +96,7 @@ export default function AttendanceScreen() {
               <View style={styles.managementKpi}><Text style={styles.managementKpiValue}>{allRows.filter((x:any)=>x.status==="غياب").length}</Text><Text style={styles.managementKpiLabel}>غائب</Text></View>
               <View style={styles.managementKpi}><Text style={styles.managementKpiValue}>{allRows.filter((x:any)=>x.checkIn&&!x.checkOut).length}</Text><Text style={styles.managementKpiLabel}>لم ينصرف</Text></View>
             </View>
-            <TextInput value={managementSearch} onChangeText={setManagementSearch} placeholder="ابحث باسم الموظف..." placeholderTextColor="#98A6B8" style={styles.managementSearch} textAlign="right" />
+            <TextInput value={managementSearch} onChangeText={setManagementSearch} placeholder="ابحث باسم الموظف..." placeholderTextColor="#A8968A" style={styles.managementSearch} textAlign="right" />
             <View style={styles.managementFilters}>{([["all","الكل"],["present","حاضر"],["late","متأخر"],["absent","غائب"]] as const).map(([k,l])=><Pressable key={k} onPress={()=>setManagementFilter(k)} style={[styles.managementFilter,managementFilter===k&&styles.managementFilterActive]}><Text style={[styles.managementFilterText,managementFilter===k&&styles.managementFilterTextActive]}>{l}</Text></Pressable>)}</View>
           </>}
           renderItem={({item}:any)=><View style={styles.managementRow}>
@@ -172,7 +172,7 @@ export default function AttendanceScreen() {
       <Text style={styles.reviewTitle}>مراجعة الغياب</Text>
       <Text style={styles.reviewText}>الغياب التلقائي لا يُخصم من الراتب إلا بعد اعتماد المدير.</Text>
     </View>
-    <IconSymbol name="person.crop.circle.badge.exclamationmark" size={24} color="#163A63" />
+    <IconSymbol name="person.crop.circle.badge.exclamationmark" size={24} color="#75282E" />
   </View>
   {pendingAbsences.length === 0 ? (
     <Text style={styles.reviewEmpty}>لا توجد حالات غياب بانتظار القرار.</Text>
@@ -221,7 +221,7 @@ export default function AttendanceScreen() {
 
             <View style={styles.insight}>
               <View style={styles.insightIcon}>
-                <IconSymbol name={late > 0 ? "clock" : "checkmark"} size={18} color="#163A63" />
+                <IconSymbol name={late > 0 ? "clock" : "checkmark"} size={18} color="#75282E" />
               </View>
               <View style={styles.insightCopy}>
                 <Text style={styles.insightTitle}>{late > 0 ? "مراجعة التأخير" : "حالة ممتازة"}</Text>
@@ -303,7 +303,7 @@ export default function AttendanceScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <IconSymbol name="calendar" size={28} color="#98A6B8" />
+            <IconSymbol name="calendar" size={28} color="#A8968A" />
             <Text style={styles.emptyTitle}>لا يوجد سجل حضور بعد</Text>
             <Text style={styles.emptyText}>ستظهر هنا تفاصيل أيام الحضور والانصراف.</Text>
           </View>
@@ -316,47 +316,47 @@ export default function AttendanceScreen() {
 const styles = StyleSheet.create({
   managementDateCard: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#E8EDF3", flexDirection: "row-reverse", alignItems: "center", gap: 10 },
   dateNavButton: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#F2F5F8", alignItems: "center", justifyContent: "center" },
-  dateNavText: { color: "#163A63", fontSize: 25, fontWeight: "700" },
+  dateNavText: { color: "#75282E", fontSize: 25, fontWeight: "700" },
   managementDateCenter: { flex: 1, alignItems: "center" },
-  managementDateLabel: { color: "#98A6B8", fontSize: 9, fontWeight: "700" },
-  managementDateValue: { color: "#172033", fontSize: 13, fontWeight: "900", marginTop: 3, textAlign: "center" },
-  todayButton: { alignSelf: "flex-start", backgroundColor: "#163A63", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 13, marginTop: -5 },
+  managementDateLabel: { color: "#A8968A", fontSize: 9, fontWeight: "700" },
+  managementDateValue: { color: "#332A26", fontSize: 13, fontWeight: "900", marginTop: 3, textAlign: "center" },
+  todayButton: { alignSelf: "flex-start", backgroundColor: "#75282E", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 13, marginTop: -5 },
   todayButtonText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
   managementKpis: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 9 },
   managementKpi: { flex: 1, minWidth: "22%", backgroundColor: "#FFFFFF", borderRadius: 16, padding: 13, borderWidth: 1, borderColor: "#E8EDF3", alignItems: "center" },
-  managementKpiValue: { color: "#163A63", fontSize: 21, fontWeight: "900" },
-  managementKpiLabel: { color: "#667085", fontSize: 10, fontWeight: "800", marginTop: 2 },
-  managementSearch: { backgroundColor: "#FFFFFF", borderRadius: 14, borderWidth: 1, borderColor: "#E8EDF3", paddingHorizontal: 14, paddingVertical: 11, color: "#172033", fontSize: 11 },
+  managementKpiValue: { color: "#75282E", fontSize: 21, fontWeight: "900" },
+  managementKpiLabel: { color: "#806F68", fontSize: 10, fontWeight: "800", marginTop: 2 },
+  managementSearch: { backgroundColor: "#FFFFFF", borderRadius: 14, borderWidth: 1, borderColor: "#E8EDF3", paddingHorizontal: 14, paddingVertical: 11, color: "#332A26", fontSize: 11 },
   managementFilters: { flexDirection: "row-reverse", gap: 7, flexWrap: "wrap" },
   managementFilter: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E8EDF3", borderRadius: 11, paddingVertical: 8, paddingHorizontal: 13 },
-  managementFilterActive: { backgroundColor: "#163A63", borderColor: "#163A63" },
-  managementFilterText: { color: "#667085", fontSize: 10, fontWeight: "800" },
+  managementFilterActive: { backgroundColor: "#75282E", borderColor: "#75282E" },
+  managementFilterText: { color: "#806F68", fontSize: 10, fontWeight: "800" },
   managementFilterTextActive: { color: "#FFFFFF" },
   managementTableHeader: { flexDirection: "row-reverse", backgroundColor: "#F2F5F8", borderRadius: 12, padding: 10, alignItems: "center" },
-  managementHeaderText: { flex: 1, color: "#667085", fontSize: 9, fontWeight: "900", textAlign: "center" },
+  managementHeaderText: { flex: 1, color: "#806F68", fontSize: 9, fontWeight: "900", textAlign: "center" },
   managementRow: { backgroundColor: "#FFFFFF", borderRadius: 16, padding: 12, borderWidth: 1, borderColor: "#E8EDF3", flexDirection: "row-reverse", alignItems: "center", gap: 7 },
   managementEmployee: { flex: 1.25, flexDirection: "row-reverse", alignItems: "center", gap: 7 },
-  managementAvatar: { width: 34, height: 34, borderRadius: 11, backgroundColor: "#E8F1F8", alignItems: "center", justifyContent: "center" },
-  managementAvatarText: { color: "#163A63", fontSize: 13, fontWeight: "900" },
-  managementName: { color: "#172033", fontSize: 11, fontWeight: "900", textAlign: "right" },
-  managementTitle: { color: "#98A6B8", fontSize: 8, marginTop: 2, textAlign: "right" },
+  managementAvatar: { width: 34, height: 34, borderRadius: 11, backgroundColor: "#F5E7E2", alignItems: "center", justifyContent: "center" },
+  managementAvatarText: { color: "#75282E", fontSize: 13, fontWeight: "900" },
+  managementName: { color: "#332A26", fontSize: 11, fontWeight: "900", textAlign: "right" },
+  managementTitle: { color: "#A8968A", fontSize: 8, marginTop: 2, textAlign: "right" },
   managementStatus: { flex: 1, alignItems: "center" },
-  managementTime: { flex: 0.8, color: "#172033", fontSize: 10, fontWeight: "800", textAlign: "center" },
+  managementTime: { flex: 0.8, color: "#332A26", fontSize: 10, fontWeight: "800", textAlign: "center" },
   managementOut: { flex: 0.8, alignItems: "center" },
   managementLate: { color: "#8A5A00", fontSize: 7, fontWeight: "800", marginTop: 2 },
   inlineAbsenceReview: { marginTop: 10, padding: 10, borderRadius: 12, backgroundColor: "#FFF8ED", borderWidth: 1, borderColor: "#F4D7A1", gap: 8 },
   inlineAbsenceHint: { color: "#8A5A00", fontSize: 9, fontWeight: "800", textAlign: "right" },
   inlineAbsenceActions: { flexDirection: "row-reverse", gap: 7 },
-  inlineApprove: { flex: 1, backgroundColor: "#163A63", borderRadius: 9, paddingVertical: 8, alignItems: "center" },
+  inlineApprove: { flex: 1, backgroundColor: "#75282E", borderRadius: 9, paddingVertical: 8, alignItems: "center" },
   inlineApproveText: { color: "#FFFFFF", fontSize: 9, fontWeight: "900" },
-  inlineCancel: { flex: 1, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D9E6F2", borderRadius: 9, paddingVertical: 8, alignItems: "center" },
-  inlineCancelText: { color: "#31577F", fontSize: 9, fontWeight: "900" },
+  inlineCancel: { flex: 1, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E9DED0", borderRadius: 9, paddingVertical: 8, alignItems: "center" },
+  inlineCancelText: { color: "#B8794A", fontSize: 9, fontWeight: "900" },
   content: { padding: 20, paddingBottom: 40, gap: 14 },
   contentCompact: { padding: 14, paddingBottom: 34, gap: 11 },
   heroCompact: { padding: 16, borderRadius: 20 },
   kpiGridCompact: { gap: 8 },
   hero: {
-    backgroundColor: "#163A63",
+    backgroundColor: "#75282E",
     borderRadius: 24,
     padding: 20,
     overflow: "hidden",
@@ -368,15 +368,15 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   heroCopy: { flex: 1 },
-  heroEyebrow: { color: "#D9E6F2", fontSize: 11, textAlign: "right" },
+  heroEyebrow: { color: "#E9DED0", fontSize: 11, textAlign: "right" },
   heroValue: { color: "#FFFFFF", fontSize: 30, fontWeight: "900", textAlign: "right", marginTop: 2 },
-  heroHint: { color: "#BFD0E1", fontSize: 10, textAlign: "right", marginTop: 2 },
+  heroHint: { color: "#F1DCD0", fontSize: 10, textAlign: "right", marginTop: 2 },
   rateCircle: {
     width: 70, height: 70, borderRadius: 35, borderWidth: 5,
     borderColor: "#9CC5E8", alignItems: "center", justifyContent: "center",
   },
   rateNumber: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" },
-  rateLabel: { color: "#D9E6F2", fontSize: 8, marginTop: 1 },
+  rateLabel: { color: "#E9DED0", fontSize: 8, marginTop: 1 },
   progressTrack: { height: 7, backgroundColor: "rgba(255,255,255,0.14)", borderRadius: 4, marginTop: 18, overflow: "hidden" },
   progressFill: { height: 7, backgroundColor: "#9CC5E8", borderRadius: 4 },
   kpiGrid: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 10 },
@@ -384,35 +384,35 @@ const styles = StyleSheet.create({
     width: "48%", backgroundColor: "#FFFFFF", borderRadius: 18,
     padding: 15, borderWidth: 1, borderColor: "#E8EDF3",
   },
-  kpiValue: { color: "#172033", fontSize: 23, fontWeight: "900", textAlign: "right" },
-  kpiLabel: { color: "#667085", fontSize: 11, fontWeight: "700", textAlign: "right", marginTop: 3 },
-  reviewPanel: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 15, borderWidth: 1, borderColor: "#D9E6F2", gap: 10 },
+  kpiValue: { color: "#332A26", fontSize: 23, fontWeight: "900", textAlign: "right" },
+  kpiLabel: { color: "#806F68", fontSize: 11, fontWeight: "700", textAlign: "right", marginTop: 3 },
+  reviewPanel: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 15, borderWidth: 1, borderColor: "#E9DED0", gap: 10 },
   reviewHeader: { flexDirection: "row-reverse", alignItems: "center", gap: 10 },
-  reviewBadge: { minWidth: 32, height: 32, borderRadius: 10, backgroundColor: "#163A63", alignItems: "center", justifyContent: "center" },
+  reviewBadge: { minWidth: 32, height: 32, borderRadius: 10, backgroundColor: "#75282E", alignItems: "center", justifyContent: "center" },
   reviewBadgeText: { color: "#FFFFFF", fontSize: 12, fontWeight: "900" },
   reviewCopy: { flex: 1 },
-  reviewTitle: { color: "#172033", fontSize: 13, fontWeight: "900", textAlign: "right" },
-  reviewText: { color: "#667085", fontSize: 10, lineHeight: 16, marginTop: 2, textAlign: "right" },
-  reviewEmpty: { color: "#98A6B8", fontSize: 10, textAlign: "right", paddingVertical: 5 },
-  absenceCard: { backgroundColor: "#F7F9FC", borderRadius: 14, padding: 11, flexDirection: "row-reverse", alignItems: "center", gap: 9 },
+  reviewTitle: { color: "#332A26", fontSize: 13, fontWeight: "900", textAlign: "right" },
+  reviewText: { color: "#806F68", fontSize: 10, lineHeight: 16, marginTop: 2, textAlign: "right" },
+  reviewEmpty: { color: "#A8968A", fontSize: 10, textAlign: "right", paddingVertical: 5 },
+  absenceCard: { backgroundColor: "#FFFCF4", borderRadius: 14, padding: 11, flexDirection: "row-reverse", alignItems: "center", gap: 9 },
   absenceInfo: { flex: 1 },
-  absenceName: { color: "#172033", fontSize: 12, fontWeight: "800", textAlign: "right" },
-  absenceDate: { color: "#667085", fontSize: 10, marginTop: 3, textAlign: "right" },
+  absenceName: { color: "#332A26", fontSize: 12, fontWeight: "800", textAlign: "right" },
+  absenceDate: { color: "#806F68", fontSize: 10, marginTop: 3, textAlign: "right" },
   absenceActions: { flexDirection: "row-reverse", gap: 6 },
-  approveAbsence: { backgroundColor: "#163A63", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 11 },
+  approveAbsence: { backgroundColor: "#75282E", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 11 },
   approveAbsenceText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
-  cancelAbsence: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D9E6F2", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 11 },
-  cancelAbsenceText: { color: "#31577F", fontSize: 10, fontWeight: "800" },
-  smartInsight:{backgroundColor:"#F7F9FC",borderRadius:18,padding:15,borderWidth:1,borderColor:"#D9E2EC",flexDirection:"row-reverse",alignItems:"center",gap:11},
-  smartInsightIcon:{width:40,height:40,borderRadius:13,backgroundColor:"#163A63",alignItems:"center",justifyContent:"center"},
+  cancelAbsence: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E9DED0", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 11 },
+  cancelAbsenceText: { color: "#B8794A", fontSize: 10, fontWeight: "800" },
+  smartInsight:{backgroundColor:"#FFFCF4",borderRadius:18,padding:15,borderWidth:1,borderColor:"#D9E2EC",flexDirection:"row-reverse",alignItems:"center",gap:11},
+  smartInsightIcon:{width:40,height:40,borderRadius:13,backgroundColor:"#75282E",alignItems:"center",justifyContent:"center"},
   smartInsightIconText:{color:"#FFFFFF",fontSize:18,fontWeight:"900"},
   smartInsightCopy:{flex:1},
-  smartInsightEyebrow:{color:"#667085",fontSize:9,fontWeight:"900",letterSpacing:1,textAlign:"right"},
-  smartInsightTitle:{color:"#163A63",fontSize:14,fontWeight:"900",textAlign:"right",marginTop:2},
-  smartInsightText:{color:"#667085",fontSize:10,fontWeight:"600",textAlign:"right",lineHeight:17,marginTop:2},
+  smartInsightEyebrow:{color:"#806F68",fontSize:9,fontWeight:"900",letterSpacing:1,textAlign:"right"},
+  smartInsightTitle:{color:"#75282E",fontSize:14,fontWeight:"900",textAlign:"right",marginTop:2},
+  smartInsightText:{color:"#806F68",fontSize:10,fontWeight:"600",textAlign:"right",lineHeight:17,marginTop:2},
   insight: {
     backgroundColor: "#F2F5F8", borderRadius: 18, padding: 14,
-    borderWidth: 1, borderColor: "#D9E6F2",
+    borderWidth: 1, borderColor: "#E9DED0",
     flexDirection: "row-reverse", alignItems: "center", gap: 10,
   },
   insightIcon: {
@@ -420,31 +420,31 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   insightCopy: { flex: 1 },
-  insightTitle: { color: "#163A63", fontSize: 12, fontWeight: "800", textAlign: "right" },
-  insightText: { color: "#667085", fontSize: 11, lineHeight: 17, marginTop: 3, textAlign: "right" },
+  insightTitle: { color: "#75282E", fontSize: 12, fontWeight: "800", textAlign: "right" },
+  insightText: { color: "#806F68", fontSize: 11, lineHeight: 17, marginTop: 3, textAlign: "right" },
   row: {
     backgroundColor: "#FFFFFF", borderRadius: 18, padding: 13,
     flexDirection: "row-reverse", alignItems: "center", gap: 11,
     borderWidth: 1, borderColor: "#E8EDF3",
   },
   dateBox: {
-    width: 46, height: 50, backgroundColor: "#F7F9FC", borderRadius: 13,
+    width: 46, height: 50, backgroundColor: "#FFFCF4", borderRadius: 13,
     alignItems: "center", justifyContent: "center",
   },
-  dateDay: { color: "#172033", fontWeight: "900", fontSize: 18 },
-  dateMonth: { color: "#98A6B8", fontSize: 9, marginTop: 1 },
+  dateDay: { color: "#332A26", fontWeight: "900", fontSize: 18 },
+  dateMonth: { color: "#A8968A", fontSize: 9, marginTop: 1 },
   rowMain: { flex: 1 },
   rowHeader: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  rowDate: { color: "#172033", fontSize: 13, fontWeight: "800", textAlign: "right", flex: 1 },
-  rowTime: { color: "#667085", fontSize: 11, marginTop: 7, textAlign: "right" },
-  lateText: { color: "#31577F", fontSize: 10, fontWeight: "700", marginTop: 4, textAlign: "right" },
+  rowDate: { color: "#332A26", fontSize: 13, fontWeight: "800", textAlign: "right", flex: 1 },
+  rowTime: { color: "#806F68", fontSize: 11, marginTop: 7, textAlign: "right" },
+  lateText: { color: "#B8794A", fontSize: 10, fontWeight: "700", marginTop: 4, textAlign: "right" },
   empty: { alignItems: "center", paddingVertical: 40, gap: 7 },
-  emptyTitle: { color: "#172033", fontSize: 15, fontWeight: "800" },
-  emptyText: { color: "#98A6B8", fontSize: 11 },
+  emptyTitle: { color: "#332A26", fontSize: 15, fontWeight: "800" },
+  emptyText: { color: "#A8968A", fontSize: 11 },
   syncRow: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#E8EDF3", flexDirection: "row-reverse", alignItems: "center", gap: 12 },
   syncCopy: { flex: 1 },
-  syncTitle: { color: "#172033", fontSize: 12, fontWeight: "800", textAlign: "right" },
-  syncText: { color: "#667085", fontSize: 10, lineHeight: 16, marginTop: 3, textAlign: "right" },
-  syncButton: { backgroundColor: "#163A63", borderRadius: 12, paddingVertical: 10, paddingHorizontal: 13 },
+  syncTitle: { color: "#332A26", fontSize: 12, fontWeight: "800", textAlign: "right" },
+  syncText: { color: "#806F68", fontSize: 10, lineHeight: 16, marginTop: 3, textAlign: "right" },
+  syncButton: { backgroundColor: "#75282E", borderRadius: 12, paddingVertical: 10, paddingHorizontal: 13 },
   syncButtonText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
 });
