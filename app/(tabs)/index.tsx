@@ -134,8 +134,8 @@ export default function HomeScreen(){
         </View>
       </View>
 
-      <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{isManagement?"لوحة الإدارة":role==="supervisor"?"لوحة الفريق":"يومك اليوم"}</Text><Text style={styles.sectionSub}>{isManagement?"ملخص سريع لأداء الفريق":role==="supervisor"?"متابعة سريعة لفريقك":"أهم معلومات يوم العمل في لمحة"}</Text></View><View style={styles.sectionBadge}><View style={styles.sectionBadgeDot}/><Text style={styles.sectionBadgeText}>محدث الآن</Text></View></View>
-      <View style={[styles.kpis, isMobile && styles.kpisMobile]}>
+      <View style={[styles.sectionHeader,isManagement&&styles.hidden]}><View><Text style={styles.sectionTitle}>{isManagement?"لوحة الإدارة":role==="supervisor"?"لوحة الفريق":"يومك اليوم"}</Text><Text style={styles.sectionSub}>{isManagement?"ملخص سريع لأداء الفريق":role==="supervisor"?"متابعة سريعة لفريقك":"أهم معلومات يوم العمل في لمحة"}</Text></View><View style={styles.sectionBadge}><View style={styles.sectionBadgeDot}/><Text style={styles.sectionBadgeText}>محدث الآن</Text></View></View>
+      <View style={[styles.kpis, isMobile && styles.kpisMobile,isManagement&&styles.hidden]}>
         {isManagement ? <>
           <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="person.2.fill" value={String(teamPresent)} label="حضور الفريق" note="اليوم"/></View>
           <View style={isMobile ? styles.kpiMobile : undefined}><Kpi icon="clock" value={String(teamLate)} label="دقائق التأخير" note="اليوم"/></View>
@@ -154,7 +154,7 @@ export default function HomeScreen(){
         </>}
       </View>
 
-      {isManagement ? <View style={styles.executiveGrid}>
+      {isManagement ? <View style={[styles.executiveGrid,styles.hidden]}>
         <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>نبض الفريق</Text><Text style={styles.cardMeta}>اليوم</Text></View><View style={styles.pulseRow}><View style={styles.pulseRing}><Text style={styles.pulseValue}>{teamToday.length ? Math.round((teamPresent / teamToday.length) * 100) : 0}%</Text></View><View style={styles.pulseCopy}><Text style={styles.pulseTitle}>{teamPresent > 0 ? "الحضور مستقر" : "بانتظار بيانات الحضور"}</Text><Text style={styles.pulseSub}>مؤشر مبني على سجلات الحضور الحالية</Text></View></View><View style={styles.miniMetric}><Text style={styles.miniValue}>{teamToday.length}</Text><Text style={styles.miniLabel}>سجل اليوم</Text></View></View>
         <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>ملخص الرواتب</Text><Text style={styles.cardMeta}>هذا الشهر</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>EGP</Text><Text style={styles.payrollValue}>{payrollTotal.toLocaleString("ar-EG")}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>صافي المستحق</Text><Text style={styles.payrollStatus}>{payrollQuery.data?.length ? "محدث" : "لا توجد بيانات"}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{teamLate} دقيقة</Text></View></View>
       </View> : role==="supervisor" ? <View style={styles.executiveGrid}>
@@ -165,68 +165,73 @@ export default function HomeScreen(){
         <View style={styles.executiveCard}><View style={styles.cardHeader}><Text style={styles.cardTitle}>ملخصك المالي</Text><Text style={styles.cardMeta}>هذا الشهر</Text></View><View style={styles.payrollTotal}><Text style={styles.payrollCurrency}>EGP</Text><Text style={styles.payrollValue}>{employeeNet.toLocaleString("ar-EG")}</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>صافي الراتب</Text><Text style={styles.payrollStatus}>محدث</Text></View><View style={styles.payrollRow}><Text style={styles.payrollLabel}>التأخير</Text><Text style={styles.payrollText}>{payrollInputs.lateMinutes??0} دقيقة</Text></View></View>
       </View>}
 
-      <View style={[styles.insightStrip, isMobile && styles.insightStripMobile]}>
+      <View style={[styles.insightStrip, isMobile && styles.insightStripMobile,isManagement&&styles.hidden]}>
         <Insight icon="person.2.fill" value={String(teamPresent)} label={isManagement || role === "supervisor" ? "حاضر اليوم" : "أيام حضورك"} meta={isManagement || role === "supervisor" ? `${teamToday.length} سجل اليوم` : `${presentDays} سجل`} />
         <Insight icon="clock" value={String(teamLate)} label="التأخير" meta="دقائق مسجلة اليوم" />
         <Insight icon="checkmark" value={String(teamCheckedOut)} label="أنهوا الوردية" meta="تسجيل انصراف" />
         {isManagement ? <Insight icon="banknote" value={payrollTotal.toLocaleString("ar-EG")} label="صافي الرواتب" meta="هذا الشهر" /> : <Insight icon="notifications" value={String(unread)} label="التنبيهات" meta="تحتاج انتباهك" />}
       </View>
 
-      {isManagement && <View style={styles.managementPanel}>
-        <View style={styles.managementHeader}>
-          <View>
-            <Text style={styles.managementEyebrow}>MANAGEMENT COMMAND CENTER</Text>
-            <Text style={styles.managementTitle}>مركز قيادة الإدارة</Text>
-            <Text style={styles.managementSub}>صورة تشغيلية مباشرة للفريق والحضور والطلبات والرواتب.</Text>
+      {isManagement && <View style={styles.commandCenter}>
+        <View style={styles.commandWelcome}>
+          <View style={styles.commandWelcomeCopy}>
+            <Text style={styles.commandEyebrow}>DALLA KARAK · MANAGEMENT</Text>
+            <Text style={styles.commandWelcomeTitle}>مركز قيادة دلة كرك</Text>
+            <Text style={styles.commandWelcomeSub}>كل تفاصيل التشغيل المهمة في شاشة واحدة، لمتابعة يومك واتخاذ القرار بسرعة.</Text>
           </View>
-          <View style={styles.managementLive}><View style={styles.managementLiveDot}/><Text style={styles.managementLiveText}>مباشر</Text></View>
+          <View style={styles.commandDate}><Text style={styles.commandDateLabel}>تاريخ اليوم</Text><Text style={styles.commandDateValue}>{dateLabel}</Text><View style={styles.commandLive}><View style={styles.commandLiveDot}/><Text style={styles.commandLiveText}>تحديث مباشر</Text></View></View>
         </View>
 
-        <View style={[styles.managementGrid, isMobile && styles.managementGridMobile]}>
-          <View style={styles.managementMainCard}>
-            <View style={styles.cardHeader}><Text style={styles.cardTitle}>حالة الفريق اليوم</Text><Text style={styles.cardMeta}>{managementDashboard.data?.date ?? todayCairo}</Text></View>
-            <View style={styles.managementStats}>
-              <DashStat value={String(managementDashboard.data?.team.present ?? teamPresent)} label="حاضر" />
-              <DashStat value={String(managementDashboard.data?.team.absent ?? teamAbsent)} label="غائب" />
-              <DashStat value={String(managementDashboard.data?.team.openShifts ?? Math.max(0, teamPresent-teamCheckedOut))} label="وردية مفتوحة" />
-              <DashStat value={String(managementDashboard.data?.team.lateMinutes ?? teamLate)} label="دقائق تأخير" />
+        <View style={[styles.commandKpis,isMobile&&styles.commandKpisMobile]}>
+          <View style={[styles.commandKpi,styles.commandKpiPrimary]}><Text style={styles.commandKpiLabel}>حضور اليوم</Text><Text style={styles.commandKpiValue}>{teamPresent}</Text><Text style={styles.commandKpiNote}>من {managementDashboard.data?.team.total ?? teamToday.length} سجل متاح</Text></View>
+          <View style={styles.commandKpi}><Text style={styles.commandKpiLabel}>حالات الغياب</Text><Text style={styles.commandKpiValue}>{managementDashboard.data?.team.absent ?? teamAbsent}</Text><Text style={styles.commandKpiNote}>مسجلة اليوم</Text></View>
+          <View style={styles.commandKpi}><Text style={styles.commandKpiLabel}>دقائق التأخير</Text><Text style={styles.commandKpiValue}>{managementDashboard.data?.team.lateMinutes ?? teamLate}</Text><Text style={styles.commandKpiNote}>إجمالي الفريق اليوم</Text></View>
+          <View style={styles.commandKpi}><Text style={styles.commandKpiLabel}>ورديات مفتوحة</Text><Text style={styles.commandKpiValue}>{managementDashboard.data?.team.openShifts ?? Math.max(0,teamPresent-teamCheckedOut)}</Text><Text style={styles.commandKpiNote}>بانتظار تسجيل الانصراف</Text></View>
+        </View>
+
+        <View style={[styles.commandMainGrid,isMobile&&styles.commandMainGridMobile]}>
+          <View style={[styles.commandPanel,styles.commandAttendancePanel]}>
+            <View style={styles.commandPanelHead}><View><Text style={styles.commandPanelTitle}>مؤشر حضور الفريق</Text><Text style={styles.commandPanelSub}>نسبة الحضور المسجلة اليوم</Text></View><View style={styles.commandPanelIcon}><IconSymbol name="person.2.fill" size={19} color="#75282E"/></View></View>
+            <View style={styles.commandAttendanceBody}>
+              <View style={styles.commandRing}><Text style={styles.commandRingValue}>{managementDashboard.data?.team.attendanceRate ?? (teamToday.length?Math.round(teamPresent/teamToday.length*100):0)}%</Text><Text style={styles.commandRingLabel}>نسبة الحضور</Text></View>
+              <View style={styles.commandLegend}>
+                <View style={styles.commandLegendRow}><View style={[styles.commandLegendDot,{backgroundColor:"#B8794A"}]}/><Text style={styles.commandLegendLabel}>حاضر</Text><Text style={styles.commandLegendValue}>{managementDashboard.data?.team.present ?? teamPresent}</Text></View>
+                <View style={styles.commandLegendRow}><View style={[styles.commandLegendDot,{backgroundColor:"#A84B50"}]}/><Text style={styles.commandLegendLabel}>غائب</Text><Text style={styles.commandLegendValue}>{managementDashboard.data?.team.absent ?? teamAbsent}</Text></View>
+                <View style={styles.commandLegendRow}><View style={[styles.commandLegendDot,{backgroundColor:"#C9B9A7"}]}/><Text style={styles.commandLegendLabel}>لم يسجل اليوم</Text><Text style={styles.commandLegendValue}>{Math.max(0,Number(managementDashboard.data?.team.total ?? teamToday.length)-teamPresent-teamAbsent)}</Text></View>
+              </View>
             </View>
-            <View style={styles.attendanceProgress}>
-              <View style={styles.attendanceProgressHead}><Text style={styles.managementPercent}>{managementDashboard.data?.team.attendanceRate ?? (teamToday.length ? Math.round((teamPresent / teamToday.length) * 100) : 0)}%</Text><Text style={styles.managementSmallLabel}>نسبة حضور الفريق</Text></View>
-              <View style={styles.progressTrack}><View style={[styles.progressFill,{width: `${Math.min(100,Math.max(0,managementDashboard.data?.team.attendanceRate ?? (teamToday.length ? Math.round((teamPresent / teamToday.length) * 100) : 0)))}%`} as any]}/></View>
-            </View>
+            <View style={styles.commandProgressTrack}><View style={[styles.commandProgressFill,{width:`${Math.min(100,Math.max(0,managementDashboard.data?.team.attendanceRate ?? (teamToday.length?Math.round(teamPresent/teamToday.length*100):0)))}%`} as any]}/></View>
+            <Pressable style={styles.commandTextAction} onPress={()=>router.push("/attendance" as never)}><Text style={styles.commandTextActionLabel}>عرض سجل الحضور بالكامل</Text><Text style={styles.commandTextActionArrow}>←</Text></Pressable>
           </View>
 
-          <View style={styles.managementMainCard}>
-            <View style={styles.cardHeader}><Text style={styles.cardTitle}>طلبات تحتاج قرار</Text><Text style={styles.cardMeta}>الآن</Text></View>
-            <View style={styles.commandMetric}><Text style={styles.commandMetricValue}>{managementDashboard.data?.requests.pending ?? 0}</Text><Text style={styles.commandMetricLabel}>طلب قيد المراجعة</Text></View>
-            <Pressable style={styles.managementAction} onPress={()=>router.push("/requests" as never)}><Text style={styles.managementActionText}>فتح مركز الطلبات</Text><Text style={styles.managementArrow}>‹</Text></Pressable>
+          <View style={styles.commandPanel}>
+            <View style={styles.commandPanelHead}><View><Text style={styles.commandPanelTitle}>طلبات تنتظر قرارك</Text><Text style={styles.commandPanelSub}>طلبات الموظفين التي تحتاج مراجعة</Text></View><View style={styles.commandPanelIcon}><IconSymbol name="doc.text.fill" size={19} color="#75282E"/></View></View>
+            <View style={styles.commandRequestCount}><Text style={styles.commandRequestValue}>{managementDashboard.data?.requests.pending ?? 0}</Text><Text style={styles.commandRequestLabel}>طلب معلق</Text></View>
+            <Text style={styles.commandMuted}>راجع الطلبات واتخذ الإجراء المناسب من مكان واحد.</Text>
+            <Pressable style={styles.commandPrimaryAction} onPress={()=>router.push("/requests" as never)}><Text style={styles.commandPrimaryActionText}>فتح الطلبات</Text><Text style={styles.commandPrimaryActionArrow}>←</Text></Pressable>
           </View>
 
-          <View style={styles.managementMainCard}>
-            <View style={styles.cardHeader}><Text style={styles.cardTitle}>الرواتب</Text><Text style={styles.cardMeta}>هذا الشهر</Text></View>
-            <View style={styles.commandMetric}><Text style={styles.commandMetricValue}>{Number(managementDashboard.data?.payroll.total ?? payrollTotal).toLocaleString("ar-EG")}</Text><Text style={styles.commandMetricLabel}>إجمالي صافي الرواتب</Text></View>
-            <View style={styles.managementRows}>
-              <Text style={styles.managementRowLabel}>السجلات</Text><Text style={styles.managementRowValue}>{managementDashboard.data?.payroll.rows ?? payrollQuery.data?.length ?? 0}</Text>
-              <Text style={styles.managementRowLabel}>المعتمد</Text><Text style={styles.managementRowValue}>{managementDashboard.data?.payroll.approved ?? 0}</Text>
-            </View>
+          <View style={styles.commandPanel}>
+            <View style={styles.commandPanelHead}><View><Text style={styles.commandPanelTitle}>ملخص الرواتب</Text><Text style={styles.commandPanelSub}>إجمالي صافي رواتب الشهر الحالي</Text></View><View style={styles.commandPanelIcon}><IconSymbol name="banknote" size={19} color="#75282E"/></View></View>
+            <Text style={styles.commandPayrollValue}>{Number(managementDashboard.data?.payroll.total ?? payrollTotal).toLocaleString("ar-EG")} <Text style={styles.commandPayrollCurrency}>ج.م</Text></Text>
+            <View style={styles.commandPayrollMeta}><Text style={styles.commandMuted}>عدد السجلات</Text><Text style={styles.commandPayrollMetaValue}>{managementDashboard.data?.payroll.rows ?? payrollQuery.data?.length ?? 0}</Text></View>
+            <View style={styles.commandPayrollMeta}><Text style={styles.commandMuted}>السجلات المعتمدة</Text><Text style={styles.commandPayrollMetaValue}>{managementDashboard.data?.payroll.approved ?? 0}</Text></View>
+            <Pressable style={styles.commandTextAction} onPress={()=>router.push("/payroll" as never)}><Text style={styles.commandTextActionLabel}>الانتقال إلى الرواتب</Text><Text style={styles.commandTextActionArrow}>←</Text></Pressable>
           </View>
         </View>
 
-        <View style={[styles.managementLowerGrid,isMobile && styles.managementGridMobile]}>
-          <View style={styles.managementMainCard}>
-            <View style={styles.cardHeader}><Text style={styles.cardTitle}>أكثر الموظفين تأخيرًا</Text><Text style={styles.cardMeta}>اليوم</Text></View>
-            {(managementDashboard.data?.lateEmployees?.length ?? 0) > 0 ? managementDashboard.data!.lateEmployees.map((item:any)=><View key={String(item.id)} style={styles.lateRow}><View style={styles.lateBadge}><Text style={styles.lateBadgeText}>{item.minutes} د</Text></View><View style={styles.lateCopy}><Text style={styles.lateName}>{item.name}</Text><Text style={styles.lateMeta}>{item.status} · يحتاج متابعة</Text></View></View>) : <View style={styles.emptyCommand}><Text style={styles.emptyCommandTitle}>لا يوجد تأخير مسجل</Text><Text style={styles.emptyCommandText}>لا توجد حالات تأخير تحتاج متابعة حاليًا.</Text></View>}
+        <View style={[styles.commandLowerGrid,isMobile&&styles.commandMainGridMobile]}>
+          <View style={[styles.commandPanel,styles.commandWidePanel]}>
+            <View style={styles.commandPanelHead}><View><Text style={styles.commandPanelTitle}>حالات تحتاج متابعة</Text><Text style={styles.commandPanelSub}>الموظفون الأعلى في دقائق التأخير اليوم</Text></View><View style={styles.commandPanelIcon}><IconSymbol name="clock" size={19} color="#75282E"/></View></View>
+            {(managementDashboard.data?.lateEmployees?.length ?? 0)>0 ? managementDashboard.data!.lateEmployees.slice(0,5).map((item:any)=><View key={String(item.id)} style={styles.commandLateRow}><View style={styles.commandLateMinutes}><Text style={styles.commandLateMinutesText}>{item.minutes} د</Text></View><View style={styles.commandLateCopy}><Text style={styles.commandLateName}>{item.name}</Text><Text style={styles.commandLateStatus}>{item.status} · يحتاج متابعة</Text></View><IconSymbol name="chevron.left" size={15} color="#B7A89A"/></View>) : <View style={styles.commandEmpty}><IconSymbol name="checkmark.circle" size={25} color="#B8794A"/><Text style={styles.commandEmptyTitle}>لا توجد حالات تأخير مسجلة</Text><Text style={styles.commandMuted}>الفريق بدون حالات تأخير تحتاج متابعة في السجلات الحالية.</Text></View>}
           </View>
-
-          <View style={styles.managementMainCard}>
-            <View style={styles.cardHeader}><Text style={styles.cardTitle}>توزيع الفريق</Text><Text style={styles.cardMeta}>حسب القسم</Text></View>
-            {(managementDashboard.data?.departments?.length ?? 0) > 0 ? managementDashboard.data!.departments.slice(0,5).map((item:any)=><View key={item.name} style={styles.departmentRow}><Text style={styles.departmentCount}>{item.count}</Text><View style={styles.departmentCopy}><Text style={styles.departmentName}>{item.name}</Text><View style={styles.departmentTrack}><View style={[styles.departmentFill,{width:`${Math.min(100,(item.count/Math.max(1,managementDashboard.data!.team.total))*100)}%`} as any]}/></View></View></View>) : <View style={styles.emptyCommand}><Text style={styles.emptyCommandTitle}>لا توجد أقسام مسجلة</Text><Text style={styles.emptyCommandText}>أضف الأقسام من بيانات الموظفين لعرض التوزيع.</Text></View>}
+          <View style={styles.commandPanel}>
+            <View style={styles.commandPanelHead}><View><Text style={styles.commandPanelTitle}>توزيع الفريق</Text><Text style={styles.commandPanelSub}>عدد الموظفين حسب القسم</Text></View><View style={styles.commandPanelIcon}><IconSymbol name="chart.bar.fill" size={19} color="#75282E"/></View></View>
+            {(managementDashboard.data?.departments?.length ?? 0)>0 ? managementDashboard.data!.departments.slice(0,5).map((item:any)=><View key={item.name} style={styles.commandDepartmentRow}><View style={styles.commandDepartmentTop}><Text style={styles.commandDepartmentName}>{item.name}</Text><Text style={styles.commandDepartmentCount}>{item.count}</Text></View><View style={styles.commandDepartmentTrack}><View style={[styles.commandDepartmentFill,{width:`${Math.min(100,item.count/Math.max(1,managementDashboard.data!.team.total)*100)}%`} as any]}/></View></View>) : <View style={styles.commandEmpty}><Text style={styles.commandEmptyTitle}>لا توجد أقسام مسجلة</Text><Text style={styles.commandMuted}>أضف الأقسام من بيانات الموظفين لعرض التوزيع.</Text></View>}
           </View>
         </View>
       </View>}
-
-      <View style={styles.smartCard}>
+      <View style={[styles.smartCard,isManagement&&styles.hidden]}>
         <View style={styles.smartHeader}>
           <View><Text style={styles.smartEyebrow}>SMART INSIGHTS</Text><Text style={styles.smartTitle}>مؤشرات ذكية من بيانات اليوم</Text></View>
           <View style={styles.smartBadge}><IconSymbol name="sparkles" size={14} color="#75282E" /><Text style={styles.smartBadgeText}>تحليل تلقائي</Text></View>
@@ -246,7 +251,7 @@ export default function HomeScreen(){
         </View>
       </View>
 
-      <View style={[styles.grid, isMobile && styles.gridMobile]}>
+      <View style={[styles.grid, isMobile && styles.gridMobile,isManagement&&styles.hidden]}>
         <View style={[styles.card,styles.attendancePanel,isMobile&&styles.panelMobile]}>
           <View style={styles.cardHeader}><Text style={styles.cardTitle}>أداء الحضور</Text><Text style={styles.cardMeta}>آخر 7 أيام</Text></View>
           <View style={styles.chart}>{weeklyAttendance.map((day,i)=><View key={day.date} style={styles.barItem}><Text style={styles.barValue}>{day.value === null ? "—" : `${day.value}%`}</Text><View style={styles.barTrack}><View style={[styles.barFill,{height:((day.value ?? 0)+"%") as `${number}%`,opacity:i===6?.55:1}]}/></View><Text style={styles.barDay}>{day.label}</Text></View>)}</View>
@@ -258,7 +263,7 @@ export default function HomeScreen(){
         </View>
       </View>
 
-      <View style={styles.workspaceGrid}>{workspaceItems.map(([label,value,icon])=>{const content=<><View style={styles.workspaceIcon}><IconSymbol name={icon as any} size={17} color="#75282E"/></View><View style={styles.workspaceCopy}><Text style={styles.workspaceLabel}>{label}</Text><Text style={styles.workspaceValue}>{value}</Text></View><Text style={styles.workspaceChevron}>‹</Text></>;return label==="الراتب" ? <Pressable key={label} onPress={()=>router.push("/payroll" as never)} accessibilityRole="button" accessibilityLabel="عرض تفاصيل الراتب" style={({pressed})=>[styles.workspaceCard,pressed&&styles.pressed]}>{content}</Pressable> : <View key={label} style={styles.workspaceCard}>{content}</View>;})}</View><View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>وصول سريع</Text><Text style={styles.sectionSub}>اختصارات للمهام اليومية</Text></View></View>
+      <View style={[styles.workspaceGrid,isManagement&&styles.hidden]}>{workspaceItems.map(([label,value,icon])=>{const content=<><View style={styles.workspaceIcon}><IconSymbol name={icon as any} size={17} color="#75282E"/></View><View style={styles.workspaceCopy}><Text style={styles.workspaceLabel}>{label}</Text><Text style={styles.workspaceValue}>{value}</Text></View><Text style={styles.workspaceChevron}>‹</Text></>;return label==="الراتب" ? <Pressable key={label} onPress={()=>router.push("/payroll" as never)} accessibilityRole="button" accessibilityLabel="عرض تفاصيل الراتب" style={({pressed})=>[styles.workspaceCard,pressed&&styles.pressed]}>{content}</Pressable> : <View key={label} style={styles.workspaceCard}>{content}</View>;})}</View><View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>وصول سريع</Text><Text style={styles.sectionSub}>اختصارات للمهام اليومية</Text></View></View>
       <View style={[styles.quickGrid, isMobile && styles.quickGridMobile]}>{quick.map(([label,icon,path])=><Pressable key={label} onPress={()=>router.push(path as never)} style={({pressed})=>[styles.quick,isMobile&&styles.quickMobile,pressed&&styles.pressed]}><View style={styles.quickIcon}><IconSymbol name={icon as any} size={18} color="#75282E"/></View><View style={styles.quickCopy}><Text style={styles.quickTitle}>{label}</Text><Text style={styles.quickSub}>فتح القسم</Text></View><Text style={styles.chevron}>‹</Text></Pressable>)}</View>
     </ScrollView>
   </ScreenContainer>;
@@ -327,7 +332,76 @@ const styles=StyleSheet.create({
   departmentName:{fontSize:10,fontWeight:"800",color:"#475467",textAlign:"right"},
   departmentTrack:{height:6,borderRadius:4,backgroundColor:"#EEF2F6",overflow:"hidden",marginTop:5},
   departmentFill:{height:"100%",borderRadius:4,backgroundColor:"#75282E"},
-  smartCard:{backgroundColor:"#FFFDF8",borderRadius:20,borderWidth:1,borderColor:"#E9DED0",padding:18},smartHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",gap:12},smartEyebrow:{fontSize:9,fontWeight:"900",letterSpacing:1.2,color:"#98A2B3",textAlign:"right"},smartTitle:{fontSize:16,fontWeight:"900",color:"#332A26",marginTop:3,textAlign:"right"},smartBadge:{flexDirection:"row",alignItems:"center",gap:5,paddingHorizontal:9,paddingVertical:6,borderRadius:999,backgroundColor:"#EEF3F8"},smartBadgeText:{fontSize:9,fontWeight:"800",color:"#75282E"},smartGrid:{flexDirection:"row-reverse",gap:10,marginTop:14,flexWrap:"wrap"},smartGridMobile:{flexDirection:"column"},smartItem:{flex:1,minWidth:220,flexDirection:"row-reverse",alignItems:"flex-start",gap:10,backgroundColor:"#FFFFFF",borderRadius:14,borderWidth:1,borderColor:"#E8ECF1",padding:13},smartIcon:{width:30,height:30,borderRadius:10,backgroundColor:"#EEF3F8",alignItems:"center",justifyContent:"center"},smartCopy:{flex:1},smartItemTitle:{fontSize:11,fontWeight:"900",color:"#332A26",textAlign:"right"},smartItemText:{fontSize:9,color:"#806F68",lineHeight:15,marginTop:3,textAlign:"right"},  page:{padding:30,paddingBottom:70,gap:22,maxWidth:1280,width:"100%",alignSelf:"center"},pageMobile:{padding:14,paddingBottom:34,gap:14},
+  smartCard:{backgroundColor:"#FFFDF8",borderRadius:20,borderWidth:1,borderColor:"#E9DED0",padding:18},smartHeader:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",gap:12},smartEyebrow:{fontSize:9,fontWeight:"900",letterSpacing:1.2,color:"#98A2B3",textAlign:"right"},smartTitle:{fontSize:16,fontWeight:"900",color:"#332A26",marginTop:3,textAlign:"right"},smartBadge:{flexDirection:"row",alignItems:"center",gap:5,paddingHorizontal:9,paddingVertical:6,borderRadius:999,backgroundColor:"#EEF3F8"},smartBadgeText:{fontSize:9,fontWeight:"800",color:"#75282E"},smartGrid:{flexDirection:"row-reverse",gap:10,marginTop:14,flexWrap:"wrap"},smartGridMobile:{flexDirection:"column"},smartItem:{flex:1,minWidth:220,flexDirection:"row-reverse",alignItems:"flex-start",gap:10,backgroundColor:"#FFFFFF",borderRadius:14,borderWidth:1,borderColor:"#E8ECF1",padding:13},smartIcon:{width:30,height:30,borderRadius:10,backgroundColor:"#EEF3F8",alignItems:"center",justifyContent:"center"},smartCopy:{flex:1},smartItemTitle:{fontSize:11,fontWeight:"900",color:"#332A26",textAlign:"right"},smartItemText:{fontSize:9,color:"#806F68",lineHeight:15,marginTop:3,textAlign:"right"},  hidden:{display:"none"},
+  commandCenter:{backgroundColor:"#F7F0E7",borderRadius:26,padding:20,gap:15,borderWidth:1,borderColor:"#E7D8C7"},
+  commandWelcome:{backgroundColor:"#332A26",borderRadius:21,padding:22,flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",gap:15},
+  commandWelcomeCopy:{flex:1},
+  commandEyebrow:{fontSize:9,fontWeight:"900",letterSpacing:1.4,color:"#D6A16C",textAlign:"right"},
+  commandWelcomeTitle:{fontSize:25,fontWeight:"900",color:"#FFF8E7",textAlign:"right",marginTop:7},
+  commandWelcomeSub:{fontSize:11,lineHeight:19,color:"#E8D8C8",textAlign:"right",marginTop:5,maxWidth:560},
+  commandDate:{minWidth:150,backgroundColor:"#493B34",borderRadius:15,padding:13,alignItems:"flex-end"},
+  commandDateLabel:{fontSize:9,color:"#D6BDA7"},
+  commandDateValue:{fontSize:12,fontWeight:"900",color:"#FFF8E7",marginTop:5,textAlign:"right"},
+  commandLive:{flexDirection:"row-reverse",alignItems:"center",gap:6,marginTop:9},
+  commandLiveDot:{width:6,height:6,borderRadius:3,backgroundColor:"#B8794A"},
+  commandLiveText:{fontSize:9,color:"#F0D5BE",fontWeight:"800"},
+  commandKpis:{flexDirection:"row-reverse",gap:10},
+  commandKpisMobile:{flexWrap:"wrap"},
+  commandKpi:{flex:1,minWidth:125,backgroundColor:"#FFFDF9",borderWidth:1,borderColor:"#E8DCCD",borderRadius:17,padding:15,alignItems:"flex-end"},
+  commandKpiPrimary:{backgroundColor:"#75282E",borderColor:"#75282E"},
+  commandKpiLabel:{fontSize:10,fontWeight:"800",color:"#8C7868",textAlign:"right"},
+  commandKpiValue:{fontSize:29,fontWeight:"900",color:"#332A26",marginTop:8,textAlign:"right"},
+  commandKpiNote:{fontSize:9,color:"#A18E7C",marginTop:3,textAlign:"right"},
+  commandMainGrid:{flexDirection:"row-reverse",gap:12,flexWrap:"wrap"},
+  commandMainGridMobile:{flexDirection:"column"},
+  commandPanel:{flex:1,minWidth:220,backgroundColor:"#FFFDF9",borderRadius:18,borderWidth:1,borderColor:"#E8DCCD",padding:16},
+  commandAttendancePanel:{flex:1.25,minWidth:280},
+  commandPanelHead:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",gap:10},
+  commandPanelTitle:{fontSize:13,fontWeight:"900",color:"#332A26",textAlign:"right"},
+  commandPanelSub:{fontSize:9,color:"#9C8978",marginTop:4,textAlign:"right"},
+  commandPanelIcon:{width:37,height:37,borderRadius:12,backgroundColor:"#F5E7E2",alignItems:"center",justifyContent:"center"},
+  commandAttendanceBody:{flexDirection:"row-reverse",alignItems:"center",justifyContent:"space-around",gap:12,marginTop:18},
+  commandRing:{width:112,height:112,borderRadius:56,borderWidth:9,borderColor:"#B8794A",backgroundColor:"#FFF8EF",alignItems:"center",justifyContent:"center"},
+  commandRingValue:{fontSize:25,fontWeight:"900",color:"#75282E"},
+  commandRingLabel:{fontSize:8,color:"#9C8978",marginTop:2},
+  commandLegend:{flex:1,gap:12},
+  commandLegendRow:{flexDirection:"row-reverse",alignItems:"center",gap:7},
+  commandLegendDot:{width:8,height:8,borderRadius:4},
+  commandLegendLabel:{flex:1,fontSize:9,color:"#806F68",textAlign:"right"},
+  commandLegendValue:{fontSize:11,fontWeight:"900",color:"#332A26"},
+  commandProgressTrack:{height:7,backgroundColor:"#EFE4D8",borderRadius:6,overflow:"hidden",marginTop:17},
+  commandProgressFill:{height:"100%",backgroundColor:"#75282E",borderRadius:6},
+  commandTextAction:{flexDirection:"row-reverse",alignItems:"center",justifyContent:"space-between",marginTop:15,paddingTop:12,borderTopWidth:1,borderTopColor:"#EFE5DA"},
+  commandTextActionLabel:{fontSize:9,fontWeight:"900",color:"#75282E"},
+  commandTextActionArrow:{fontSize:14,color:"#B8794A"},
+  commandRequestCount:{flexDirection:"row-reverse",alignItems:"baseline",gap:8,marginTop:20},
+  commandRequestValue:{fontSize:42,fontWeight:"900",color:"#75282E"},
+  commandRequestLabel:{fontSize:10,fontWeight:"800",color:"#806F68"},
+  commandMuted:{fontSize:9,color:"#9C8978",lineHeight:16,textAlign:"right",marginTop:6},
+  commandPrimaryAction:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center",backgroundColor:"#75282E",borderRadius:11,paddingHorizontal:13,paddingVertical:11,marginTop:17},
+  commandPrimaryActionText:{fontSize:10,fontWeight:"900",color:"#FFF8E7"},
+  commandPrimaryActionArrow:{fontSize:15,color:"#E8C7AB"},
+  commandPayrollValue:{fontSize:26,fontWeight:"900",color:"#332A26",textAlign:"right",marginTop:22},
+  commandPayrollCurrency:{fontSize:10,color:"#9C8978"},
+  commandPayrollMeta:{flexDirection:"row-reverse",justifyContent:"space-between",borderTopWidth:1,borderTopColor:"#EFE5DA",paddingTop:9,marginTop:10},
+  commandPayrollMetaValue:{fontSize:10,fontWeight:"900",color:"#75282E"},
+  commandLowerGrid:{flexDirection:"row-reverse",gap:12,flexWrap:"wrap"},
+  commandWidePanel:{flex:1.25,minWidth:280},
+  commandLateRow:{flexDirection:"row-reverse",alignItems:"center",gap:10,borderTopWidth:1,borderTopColor:"#EFE5DA",paddingVertical:11},
+  commandLateMinutes:{backgroundColor:"#F5E7E2",borderRadius:9,paddingHorizontal:9,paddingVertical:7},
+  commandLateMinutesText:{fontSize:9,fontWeight:"900",color:"#75282E"},
+  commandLateCopy:{flex:1},
+  commandLateName:{fontSize:10,fontWeight:"900",color:"#332A26",textAlign:"right"},
+  commandLateStatus:{fontSize:8,color:"#9C8978",textAlign:"right",marginTop:3},
+  commandEmpty:{alignItems:"center",justifyContent:"center",paddingVertical:20,gap:5},
+  commandEmptyTitle:{fontSize:10,fontWeight:"900",color:"#5D493D"},
+  commandDepartmentRow:{marginTop:14},
+  commandDepartmentTop:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},
+  commandDepartmentName:{fontSize:9,fontWeight:"800",color:"#806F68"},
+  commandDepartmentCount:{fontSize:10,fontWeight:"900",color:"#75282E"},
+  commandDepartmentTrack:{height:6,backgroundColor:"#EFE4D8",borderRadius:5,overflow:"hidden",marginTop:7},
+  commandDepartmentFill:{height:"100%",backgroundColor:"#B8794A",borderRadius:5},
+  page:{padding:30,paddingBottom:70,gap:22,maxWidth:1280,width:"100%",alignSelf:"center"},pageMobile:{padding:14,paddingBottom:34,gap:14},
   header:{flexDirection:"row-reverse",justifyContent:"space-between",alignItems:"center"},  headerMobile:{flexDirection:"column",alignItems:"stretch",gap:12},
   headerRightMobile:{justifyContent:"space-between",width:"100%",gap:10},
   heroMobile:{flexDirection:"column",padding:16,borderRadius:20,gap:14},
