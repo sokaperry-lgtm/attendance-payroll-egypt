@@ -82,11 +82,11 @@ export default function LoginScreen() {
           <Text style={styles.kicker}>{isSetup ? "إعداد النظام" : "بوابة الشركة"}</Text>
           <Text style={styles.title}>{isSetup ? "إعداد حساب المدير" : "مرحبًا بعودتك"}</Text>
           <Text style={styles.subtitle}>{isSetup ? "أنشئ حسابك الإداري الأول، وبعدها أضف فريقك." : "سجّل دخولك للوصول إلى لوحة العمل الخاصة بشركتك."}</Text>
-          {isSetup && <><Text style={styles.label}>اسم المدير</Text><TextInput value={name} onChangeText={setName} placeholder="اسمك" placeholderTextColor="#8592A6" style={styles.input} textAlign="right" /></>}
+          {isSetup && <><Text style={styles.label}>اسم المدير</Text><TextInput value={name} onChangeText={setName} placeholder="اسمك" placeholderTextColor="#A08B7B" style={styles.input} textAlign="right" /></>}
           <Text style={styles.label}>رقم الهاتف</Text>
-          <TextInput value={phone} onChangeText={setPhone} placeholder="01xxxxxxxxx" placeholderTextColor="#8592A6" keyboardType="phone-pad" style={styles.input} textAlign="right" />
+          <TextInput value={phone} onChangeText={setPhone} placeholder="01xxxxxxxxx" placeholderTextColor="#A08B7B" keyboardType="phone-pad" style={styles.input} textAlign="right" />
           <Text style={styles.label}>كلمة المرور</Text>
-          <TextInput value={password} onChangeText={setPassword} placeholder={isSetup ? "6 أحرف على الأقل" : "كلمة المرور"} placeholderTextColor="#8592A6" secureTextEntry style={styles.input} textAlign="right" />\n          <Pressable onPress={handleSubmit} disabled={busy} style={({ pressed }) => [styles.button, busy && styles.buttonDisabled, pressed && !busy && styles.buttonPressed]}>
+          <TextInput value={password} onChangeText={setPassword} placeholder={isSetup ? "6 أحرف على الأقل" : "كلمة المرور"} placeholderTextColor="#A08B7B" secureTextEntry style={styles.input} textAlign="right" />\n          <Pressable onPress={handleSubmit} disabled={busy} style={({ pressed }) => [styles.button, busy && styles.buttonDisabled, pressed && !busy && styles.buttonPressed]}>
             <Text style={styles.buttonText}>{busy ? "جاري التنفيذ..." : isSetup ? "إنشاء حساب المدير" : "دخول إلى النظام"}</Text>
           </Pressable>\n          <Text style={styles.securityNote}>بيانات الدخول مشفرة ومخصصة لحسابات الشركة.</Text>
         </View>
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   featureValue: { color: "#B8794A", fontSize: 10, fontWeight: "900" },
   featureLabel: { color: "#FFF8E7", fontSize: 13, fontWeight: "800", marginTop: 17, textAlign: "right" },
   featureHint: { color: "#806F68", fontSize: 9, lineHeight: 14, marginTop: 4, textAlign: "right" },
-  card: { width: "100%", maxWidth: 430, backgroundColor: "#FFFCF4", borderRadius: 26, padding: 24, marginTop: 28, borderWidth: 1, borderColor: "#E9DED0", shadowColor: "#EEF2F8", shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 5, overflow: "hidden" },
+  card: { width: "100%", maxWidth: 430, backgroundColor: "#FFFCF4", borderRadius: 26, padding: 24, marginTop: 28, borderWidth: 1, borderColor: "#E9DED0", shadowColor: "#B8794A", shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 5, overflow: "hidden" },
   cardWide: { marginTop: 0, width: 420 },
   cardHeader: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 18 },
   statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#22C55E" },
