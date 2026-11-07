@@ -48,6 +48,12 @@ export default function HomeScreen(){
   const payrollQuery = trpc.payroll.list.useQuery({ month: currentMonth }, { enabled: isManagement });
   const selfServicePayroll = trpc.selfService.me.useQuery({ month: currentMonth }, { enabled: !isManagement });
   const managementDashboard = trpc.management.dashboard.useQuery({ month: currentMonth }, { enabled: isManagement, refetchInterval: 60000 });
+  const liveAttendanceQuery = trpc.attendance.dailyOverview.useQuery({ date: todayCairo }, { enabled: isManagement, refetchInterval: 30000, retry: false });
+  const liveAttendanceRows = (liveAttendanceQuery.data?.employees ?? []) as any[];
+  const liveCheckedIn = liveAttendanceRows.filter((item:any) => Boolean(item.checkIn));
+  const liveOpenShifts = liveAttendanceRows.filter((item:any) => Boolean(item.checkIn) && !item.checkOut);
+  const liveCheckedOut = liveAttendanceRows.filter((item:any) => Boolean(item.checkOut));
+  const liveNotCheckedIn = liveAttendanceRows.filter((item:any) => !item.checkIn && item.status !== "غياب" && item.status !== "إجازة" && item.status !== "مأمورية");
   const [working,setWorking]=useState(false);
   const [gpsMessage,setGpsMessage]=useState("الموقع جاهز للتحقق");
   const [attendanceConfirmed,setAttendanceConfirmed]=useState(false);
@@ -220,6 +226,36 @@ export default function HomeScreen(){
           </View>
         </View>
 
+        <View style={[styles.commandPanel, { marginTop: 12 }]}>
+          <View style={styles.commandPanelHead}>
+            <View><Text style={styles.commandPanelTitle}>حركة الموظفين الآن</Text><Text style={styles.commandPanelSub}>تحديث تلقائي كل 30 ثانية · اليوم</Text></View>
+            <View style={styles.commandPanelIcon}><IconSymbol name="clock" size={19} color="#75282E"/></View>
+          </View>
+          <View style={styles.liveAttendanceSummary}>
+            <View style={styles.liveAttendanceMetric}><Text style={styles.liveAttendanceNumber}>{liveCheckedIn.length}</Text><Text style={styles.liveAttendanceLabel}>سجلوا حضور</Text></View>
+            <View style={styles.liveAttendanceMetric}><Text style={styles.liveAttendanceNumber}>{liveOpenShifts.length}</Text><Text style={styles.liveAttendanceLabel}>داخل الوردية</Text></View>
+            <View style={styles.liveAttendanceMetric}><Text style={styles.liveAttendanceNumber}>{liveCheckedOut.length}</Text><Text style={styles.liveAttendanceLabel}>سجلوا انصراف</Text></View>
+            <View style={styles.liveAttendanceMetric}><Text style={styles.liveAttendanceNumber}>{liveNotCheckedIn.length}</Text><Text style={styles.liveAttendanceLabel}>لم يسجلوا</Text></View>
+          </View>
+          {liveAttendanceQuery.isLoading ? <View style={styles.commandEmpty}><Text style={styles.commandMuted}>جاري تحميل حركة الموظفين...</Text></View> :
+            liveAttendanceRows.length ? liveAttendanceRows.slice(0, 8).map((item:any) => {
+              const hasIn = Boolean(item.checkIn);
+              const hasOut = Boolean(item.checkOut);
+              const stateLabel = hasOut ? "أنهى الوردية" : hasIn ? "داخل الوردية" : item.status === "غياب" ? "غياب" : item.status === "إجازة" ? "إجازة" : item.status === "مأمورية" ? "مأمورية" : "لم يسجل";
+              const stateColor = hasOut ? "#8C7865" : hasIn ? "#9A6737" : item.status === "غياب" ? "#A84B50" : "#9C8978";
+              return <View key={String(item.staffAccountId)} style={styles.liveAttendanceRow}>
+                <View style={[styles.liveAttendanceDot,{backgroundColor:stateColor}]}/>
+                <View style={styles.liveAttendanceCopy}>
+                  <Text style={styles.liveAttendanceName}>{item.name || "موظف"}</Text>
+                  <Text style={styles.liveAttendanceMeta}>{item.checkIn ? "حضور "+item.checkIn : "لم يسجل حضور"}{item.checkOut ? " · انصراف "+item.checkOut : ""}</Text>
+                </View>
+                <Text style={[styles.liveAttendanceState,{color:stateColor}]}>{stateLabel}</Text>
+              </View>;
+            }) : <View style={styles.commandEmpty}><Text style={styles.commandEmptyTitle}>لا توجد سجلات حركة اليوم</Text><Text style={styles.commandMuted}>ستظهر بيانات الموظفين هنا بمجرد تسجيل الحضور.</Text></View>}
+          {liveAttendanceRows.length > 8 && <Text style={styles.commandMuted}>يعرض أول 8 موظفين · افتح سجل الحضور لعرض الجميع</Text>}
+          <Pressable style={styles.commandTextAction} onPress={()=>router.push("/attendance" as never)}><Text style={styles.commandTextActionLabel}>فتح سجل الحضور والانصراف</Text><Text style={styles.commandTextActionArrow}>←</Text></Pressable>
+        </View>
+
         <View style={[styles.commandLowerGrid,isMobile&&styles.commandMainGridMobile]}>
           <View style={[styles.commandPanel,styles.commandWidePanel]}>
             <View style={styles.commandPanelHead}><View><Text style={styles.commandPanelTitle}>حالات تحتاج متابعة</Text><Text style={styles.commandPanelSub}>الموظفون الأعلى في دقائق التأخير اليوم</Text></View><View style={styles.commandPanelIcon}><IconSymbol name="clock" size={19} color="#75282E"/></View></View>
@@ -386,6 +422,7 @@ const styles=StyleSheet.create({
   commandPayrollMeta:{flexDirection:"row-reverse",justifyContent:"space-between",borderTopWidth:1,borderTopColor:"#EFE5DA",paddingTop:9,marginTop:10},
   commandPayrollMetaValue:{fontSize:10,fontWeight:"900",color:"#75282E"},
   commandLowerGrid:{flexDirection:"row-reverse",gap:12,flexWrap:"wrap"},
+  liveAttendanceSummary:{flexDirection:"row-reverse",gap:7,marginTop:14,flexWrap:"wrap"},liveAttendanceMetric:{flex:1,minWidth:65,backgroundColor:"#F8F1E9",borderRadius:11,padding:10,alignItems:"flex-end"},liveAttendanceNumber:{fontSize:18,fontWeight:"900",color:"#75282E"},liveAttendanceLabel:{fontSize:8,color:"#8C7868",marginTop:3},liveAttendanceRow:{flexDirection:"row-reverse",alignItems:"center",gap:9,borderTopWidth:1,borderTopColor:"#EFE5DA",paddingVertical:10},liveAttendanceDot:{width:8,height:8,borderRadius:4},liveAttendanceCopy:{flex:1},liveAttendanceName:{fontSize:10,fontWeight:"900",color:"#332A26",textAlign:"right"},liveAttendanceMeta:{fontSize:8,color:"#9C8978",textAlign:"right",marginTop:3},liveAttendanceState:{fontSize:9,fontWeight:"800"} ,
   commandWidePanel:{flex:1.25,minWidth:280},
   commandLateRow:{flexDirection:"row-reverse",alignItems:"center",gap:10,borderTopWidth:1,borderTopColor:"#EFE5DA",paddingVertical:11},
   commandLateMinutes:{backgroundColor:"#F5E7E2",borderRadius:9,paddingHorizontal:9,paddingVertical:7},
