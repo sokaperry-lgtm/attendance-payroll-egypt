@@ -58,13 +58,13 @@ export default function LoginScreen() {
           <View style={styles.brandRow}>
             <View style={styles.brandMark}>
               <Svg width={44} height={44} viewBox="0 0 64 64">
-                <Defs><LinearGradient id="fingerprintBlue" x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#7DD3FC" /><Stop offset="0.48" stopColor="#38BDF8" /><Stop offset="1" stopColor="#0284C7" /></LinearGradient></Defs>
-                <Path d="M32 8C19.3 8 9 18.3 9 31c0 6.2 2.5 11.8 6.5 15.9" fill="none" stroke="url(#fingerprintBlue)" strokeWidth="5" strokeLinecap="round"/>
-                <Path d="M32 15c-8.8 0-16 7.2-16 16 0 7.1 2.3 12.4 6.2 16.8" fill="none" stroke="url(#fingerprintBlue)" strokeWidth="5" strokeLinecap="round"/>
-                <Path d="M32 22c-4.9 0-9 4.1-9 9 0 7.7 3.1 13.2 7.1 18.3" fill="none" stroke="url(#fingerprintBlue)" strokeWidth="5" strokeLinecap="round"/>
-                <Path d="M32 8c12.7 0 23 10.3 23 23 0 10.2-4.4 18.6-11.1 24.2" fill="none" stroke="url(#fingerprintBlue)" strokeWidth="5" strokeLinecap="round"/>
-                <Path d="M32 15c8.8 0 16 7.2 16 16 0 10.1-4.7 17.1-10.3 23.2" fill="none" stroke="url(#fingerprintBlue)" strokeWidth="5" strokeLinecap="round"/>
-                <Path d="M32 22c4.9 0 9 4.1 9 9 0 7.4-2.8 13.1-6.8 18.8" fill="none" stroke="url(#fingerprintBlue)" strokeWidth="5" strokeLinecap="round"/>
+                <Defs><LinearGradient id="fingerprintCopper" x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#E0B18A" /><Stop offset="0.48" stopColor="#B8794A" /><Stop offset="1" stopColor="#75282E" /></LinearGradient></Defs>
+                <Path d="M32 8C19.3 8 9 18.3 9 31c0 6.2 2.5 11.8 6.5 15.9" fill="none" stroke="url(#fingerprintCopper)" strokeWidth="5" strokeLinecap="round"/>
+                <Path d="M32 15c-8.8 0-16 7.2-16 16 0 7.1 2.3 12.4 6.2 16.8" fill="none" stroke="url(#fingerprintCopper)" strokeWidth="5" strokeLinecap="round"/>
+                <Path d="M32 22c-4.9 0-9 4.1-9 9 0 7.7 3.1 13.2 7.1 18.3" fill="none" stroke="url(#fingerprintCopper)" strokeWidth="5" strokeLinecap="round"/>
+                <Path d="M32 8c12.7 0 23 10.3 23 23 0 10.2-4.4 18.6-11.1 24.2" fill="none" stroke="url(#fingerprintCopper)" strokeWidth="5" strokeLinecap="round"/>
+                <Path d="M32 15c8.8 0 16 7.2 16 16 0 10.1-4.7 17.1-10.3 23.2" fill="none" stroke="url(#fingerprintCopper)" strokeWidth="5" strokeLinecap="round"/>
+                <Path d="M32 22c4.9 0 9 4.1 9 9 0 7.4-2.8 13.1-6.8 18.8" fill="none" stroke="url(#fingerprintCopper)" strokeWidth="5" strokeLinecap="round"/>
               </Svg>
             </View>
             <View style={styles.brandCopy}><Text style={styles.brand}>حاضر</Text><Text style={styles.tagline}>HR · Attendance · Payroll</Text></View>
@@ -99,37 +99,37 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: "center", justifyContent: "center", padding: 22, overflow: "hidden" },
   containerWide: { flexDirection: "row-reverse", gap: 70, paddingHorizontal: 7, maxWidth: 1180, alignSelf: "center", width: "100%" },
-  ambientOne: { position: "absolute", width: 320, height: 320, borderRadius: 160, backgroundColor: "#1B2A45", opacity: 0.65, top: -150, right: -120 },
-  ambientTwo: { position: "absolute", width: 260, height: 260, borderRadius: 130, backgroundColor: "#1D2540", opacity: 0.55, bottom: -130, left: -100 },
+  ambientOne: { position: "absolute", width: 320, height: 320, borderRadius: 160, backgroundColor: "#75282E", opacity: 0.65, top: -150, right: -120 },
+  ambientTwo: { position: "absolute", width: 260, height: 260, borderRadius: 130, backgroundColor: "#B8794A", opacity: 0.55, bottom: -130, left: -100 },
   brandPanel: { justifyContent: "center" },
   brandPanelWide: { flex: 1, maxWidth: 540 },
   brandPanelMobile: { alignItems: "center", width: "100%" },
   brandRow: { flexDirection: "row-reverse", alignItems: "center", gap: 14 },
-  brandMark: { width: 68, height: 68, borderRadius: 20, backgroundColor: "#1E4E78", alignItems: "center", justifyContent: "center", shadowColor: "#38BDF8", shadowOpacity: 0.3, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 7 },
+  brandMark: { width: 68, height: 68, borderRadius: 20, backgroundColor: "#75282E", alignItems: "center", justifyContent: "center", shadowColor: "#B8794A", shadowOpacity: 0.3, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 7 },
   brandCopy: { alignItems: "flex-end" },
-  brand: { color: "#EEF2F8", fontSize: 34, fontWeight: "900" },
-  tagline: { color: "#97A3B6", fontSize: 11, marginTop: 3, letterSpacing: 0.5 },
-  brandStatement: { color: "#EEF2F8", fontSize: 29, fontWeight: "900", marginTop: 30, textAlign: "right" },
-  brandDescription: { color: "#97A3B6", fontSize: 14, lineHeight: 23, marginTop: 9, maxWidth: 500, textAlign: "right" },
+  brand: { color: "#332A26", fontSize: 34, fontWeight: "900" },
+  tagline: { color: "#806F68", fontSize: 11, marginTop: 3, letterSpacing: 0.5 },
+  brandStatement: { color: "#332A26", fontSize: 29, fontWeight: "900", marginTop: 30, textAlign: "right" },
+  brandDescription: { color: "#806F68", fontSize: 14, lineHeight: 23, marginTop: 9, maxWidth: 500, textAlign: "right" },
   featureGrid: { flexDirection: "row-reverse", gap: 10, marginTop: 28 },
-  featureCard: { flex: 1, minHeight: 116, backgroundColor: "#0B1220", borderRadius: 18, padding: 14 },
-  featureValue: { color: "#60A5FA", fontSize: 10, fontWeight: "900" },
-  featureLabel: { color: "#F5F7FA", fontSize: 13, fontWeight: "800", marginTop: 17, textAlign: "right" },
-  featureHint: { color: "#8592A6", fontSize: 9, lineHeight: 14, marginTop: 4, textAlign: "right" },
-  card: { width: "100%", maxWidth: 430, backgroundColor: "#131A24", borderRadius: 26, padding: 24, marginTop: 28, borderWidth: 1, borderColor: "#232C3A", shadowColor: "#EEF2F8", shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 5, overflow: "hidden" },
+  featureCard: { flex: 1, minHeight: 116, backgroundColor: "#F5E7E2", borderRadius: 18, padding: 14 },
+  featureValue: { color: "#B8794A", fontSize: 10, fontWeight: "900" },
+  featureLabel: { color: "#FFF8E7", fontSize: 13, fontWeight: "800", marginTop: 17, textAlign: "right" },
+  featureHint: { color: "#806F68", fontSize: 9, lineHeight: 14, marginTop: 4, textAlign: "right" },
+  card: { width: "100%", maxWidth: 430, backgroundColor: "#FFFCF4", borderRadius: 26, padding: 24, marginTop: 28, borderWidth: 1, borderColor: "#E9DED0", shadowColor: "#EEF2F8", shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 5, overflow: "hidden" },
   cardWide: { marginTop: 0, width: 420 },
   cardHeader: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 18 },
   statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#22C55E" },
-  cardStatus: { color: "#8592A6", fontSize: 8, fontWeight: "900", letterSpacing: 1 },
-  kicker: { color: "#5B9BFF", fontSize: 11, fontWeight: "800", textAlign: "right", marginBottom: 5 },
-  title: { color: "#EEF2F8", fontSize: 23, fontWeight: "800", textAlign: "right" },
-  subtitle: { color: "#97A3B6", fontSize: 12, lineHeight: 19, textAlign: "right", marginTop: 7, marginBottom: 12 },
-  label: { color: "#AAB4C4", fontSize: 12, fontWeight: "700", textAlign: "right", marginTop: 11, marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: "#8B96A8", backgroundColor: "#10161F", borderRadius: 14, paddingHorizontal: 13, paddingVertical: 13, color: "#EEF2F8", fontSize: 14 },
-  button: { backgroundColor: "#3B82F6", borderRadius: 14, alignItems: "center", paddingVertical: 14, marginTop: 20, shadowColor: "#5B9BFF", shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  cardStatus: { color: "#806F68", fontSize: 8, fontWeight: "900", letterSpacing: 1 },
+  kicker: { color: "#75282E", fontSize: 11, fontWeight: "800", textAlign: "right", marginBottom: 5 },
+  title: { color: "#332A26", fontSize: 23, fontWeight: "800", textAlign: "right" },
+  subtitle: { color: "#806F68", fontSize: 12, lineHeight: 19, textAlign: "right", marginTop: 7, marginBottom: 12 },
+  label: { color: "#806F68", fontSize: 12, fontWeight: "700", textAlign: "right", marginTop: 11, marginBottom: 6 },
+  input: { borderWidth: 1, borderColor: "#D9C9B8", backgroundColor: "#FFF8E7", borderRadius: 14, paddingHorizontal: 13, paddingVertical: 13, color: "#332A26", fontSize: 14 },
+  button: { backgroundColor: "#75282E", borderRadius: 14, alignItems: "center", paddingVertical: 14, marginTop: 20, shadowColor: "#B8794A", shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
   buttonDisabled: { opacity: 0.55 },
   buttonPressed: { opacity: 0.86, transform: [{ scale: 0.99 }] },
-  buttonText: { color: "#F5F7FA", fontWeight: "800", fontSize: 14 },
-  securityNote: { color: "#8592A6", fontSize: 10, textAlign: "center", marginTop: 14 },
-  footer: { color: "#8592A6", fontSize: 10, marginTop: 18, textAlign: "center" },
+  buttonText: { color: "#FFF8E7", fontWeight: "800", fontSize: 14 },
+  securityNote: { color: "#806F68", fontSize: 10, textAlign: "center", marginTop: 14 },
+  footer: { color: "#806F68", fontSize: 10, marginTop: 18, textAlign: "center" },
 });
