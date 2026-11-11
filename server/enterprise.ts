@@ -893,6 +893,11 @@ export async function recalculateHistoricalPenaltyDeductions(staffAccountId:numb
     netDifference:changes.reduce((sum,row)=>sum+row.oldNet-row.newNet,0)};
 }
 
+function payrollDateKey(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value ?? "").slice(0, 10);
+}
+
 export async function generatePayroll(staffAccountId: number, month: string) {
   const db = await getDb(); if (!db) throw new Error("Database not available");
   if (!/^\d{4}-\d{2}$/.test(month)) throw new Error("صيغة الشهر غير صحيحة. استخدم YYYY-MM.");
@@ -919,21 +924,26 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     )).limit(1))[0];
     if(existing && ["approved","مقبول","معتمد"].includes(String(existing.status))) { result.push(existing); skippedApproved++; continue; }
     const records=attendance
-      .filter(x=>x.staffAccountId===s.id && x.date.startsWith(month) && x.date <= cutoff && isEmploymentDate(s,x.date))
+      .filter(x=>String(x.staffAccountId)===String(s.id) && payrollDateKey(x.date).startsWith(month) && payrollDateKey(x.date) <= cutoff && isEmploymentDate(s,payrollDateKey(x.date)))
+      .map(x=>({...x,date:payrollDateKey(x.date)}))
       .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
 
     const monthlyBaseSalary = Math.max(0, Math.round(Number(s.baseSalary) || 0));
     const todayCairo = cutoff;
-    const restDates = schedules.filter(row => row.staffAccountId === s.id &&
-      shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
-      .map(row => row.scheduleDate);
+    const staffSchedules = schedules.filter(row => String(row.staffAccountId) === String(s.id));
+    const shiftById = new Map(shifts.map(shift => [String(shift.id), shift]));
+    const restDates = staffSchedules
+      .filter(row => shiftById.get(String(row.shiftTemplateId))?.kind === "weekly_off")
+      .map(row => payrollDateKey(row.scheduleDate));
     const unpaidLeaveShiftIds = new Set(shifts
       .filter(shift => shift.kind === "unpaid_leave" || ["إجازة بدون مرتب", "بدون أجر"].includes(String(shift.name || "").trim()))
-      .map(shift => shift.id));
-    const unpaidLeaveDates = schedules
-      .filter(row => row.staffAccountId === s.id && unpaidLeaveShiftIds.has(row.shiftTemplateId))
-      .map(row => String(row.scheduleDate).slice(0, 10));
-    const accrualRecords = records.filter(record => !unpaidLeaveDates.includes(String(record.date).slice(0, 10)));
+      .map(shift => String(shift.id)));
+    const unpaidLeaveDates = [...new Set(staffSchedules
+      .filter(row => unpaidLeaveShiftIds.has(String(row.shiftTemplateId)))
+      .map(row => payrollDateKey(row.scheduleDate))
+      .filter(date => date.startsWith(month)))];
+    const unpaidLeaveDateSet = new Set(unpaidLeaveDates);
+    const accrualRecords = records.filter(record => !unpaidLeaveDateSet.has(payrollDateKey(record.date)));
     const leaveRequests = await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,s.id));
     const accrual = calculateAttendanceAccrual(monthlyBaseSalary, month, accrualRecords, restDates, todayCairo, approvedLeaveDates(leaveRequests), s.employmentStartedOn, unpaidLeaveDates);
     const earnedBaseSalary = accrual.earnedBaseSalary - accrual.restOvertimeValue;
@@ -1497,15 +1507,21 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   const schedules = await db.select().from(weeklySchedules).where(eq(weeklySchedules.staffAccountId,staffAccountId));
   // Historical schedules retain their meaning even if a template is now inactive.
   const shifts = await db.select().from(shiftTemplates);
-  const restDates = schedules.filter(row => shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
-    .map(row => row.scheduleDate);
+  const shiftById = new Map(shifts.map(shift => [String(shift.id), shift]));
+  const restDates = schedules
+    .filter(row => shiftById.get(String(row.shiftTemplateId))?.kind === "weekly_off")
+    .map(row => payrollDateKey(row.scheduleDate));
   const unpaidLeaveShiftIds = new Set(shifts
     .filter(shift => shift.kind === "unpaid_leave" || ["إجازة بدون مرتب", "بدون أجر"].includes(String(shift.name || "").trim()))
-    .map(shift => shift.id));
-  const unpaidLeaveDates = schedules
-    .filter(row => unpaidLeaveShiftIds.has(row.shiftTemplateId))
-    .map(row => String(row.scheduleDate).slice(0, 10));
-  const accrualAttendance = attendance.filter(row => !unpaidLeaveDates.includes(String(row.date).slice(0, 10)));
+    .map(shift => String(shift.id)));
+  const unpaidLeaveDates = [...new Set(schedules
+    .filter(row => unpaidLeaveShiftIds.has(String(row.shiftTemplateId)))
+    .map(row => payrollDateKey(row.scheduleDate))
+    .filter(date => date.startsWith(month)))];
+  const unpaidLeaveDateSet = new Set(unpaidLeaveDates);
+  const accrualAttendance = attendance
+    .filter(row => !unpaidLeaveDateSet.has(payrollDateKey(row.date)))
+    .map(row => ({...row,date:payrollDateKey(row.date)}));
   const accrual = calculateAttendanceAccrual(
     Number(staff.baseSalary), month, accrualAttendance, restDates, cairoToday,
     approvedLeaveDates(requests), staff.employmentStartedOn, unpaidLeaveDates,
