@@ -33,12 +33,14 @@ function findSchedule(entries: ScheduleEntry[], staffId: string, day: string) {
 }
 function shiftLabel(s: ShiftTemplate | null | undefined) {
   if (!s) return "غير محدد";
-  if (s.kind === "weekly_off") return "إجازة";
+  if (s.kind === "weekly_off") return "إجازة أسبوعية";
+  if (s.kind === "unpaid_leave") return "بدون أجر";
   return `${s.startTime} — ${s.endTime}`;
 }
 function tone(s: ShiftTemplate | null | undefined, paletteIndex?: number) {
   if (!s) return { bg: "#F6F1E9", accent: "#A8968A", text: "#66564C" };
   if (s.kind === "weekly_off") return { bg: "#EFE8DF", accent: "#8C7865", text: "#665447" };
+  if (s.kind === "unpaid_leave") return { bg: "#F1EAF5", accent: "#78528E", text: "#593B6B" };
   if (s.crossesMidnight) return { bg: "#F5E7E2", accent: "#5C1F25", text: "#5C1F25" };
 
   // Assign a stable color by shift type, not by the order of templates.
@@ -103,7 +105,7 @@ export default function ScheduleScreen() {
   const weekDayStats = useMemo(() => week.map((day) => ({
     ...day,
     scheduled: visible.filter((entry) => entry.scheduleDate === day.key).length,
-    off: visible.filter((entry) => entry.scheduleDate === day.key && entry.shift?.kind === "weekly_off").length,
+    off: visible.filter((entry) => entry.scheduleDate === day.key && (entry.shift?.kind === "weekly_off" || entry.shift?.kind === "unpaid_leave")).length,
   })), [week, visible]);
   const member = staffMembers.find(m => m.id === selectedEmployee);
   const selectedEntry = findSchedule(visible, selectedEmployee, selectedDay);
@@ -113,18 +115,18 @@ export default function ScheduleScreen() {
     const people = adminRole ? staffMembers : [employee];
     const cells = people.flatMap(person => week.map(day => ({ person, day, entry: findSchedule(visible, person.id, day.key), attendance: attendanceFor(person.id, day.key) })));
     return {
-      scheduled: cells.filter(x => x.entry?.shift && x.entry.shift.kind !== "weekly_off").length,
+      scheduled: cells.filter(x => x.entry?.shift && x.entry.shift.kind !== "weekly_off" && x.entry.shift.kind !== "unpaid_leave").length,
       present: cells.filter(x => x.attendance?.status === "حاضر").length,
       late: cells.filter(x => x.attendance?.status === "متأخر").length,
       absent: cells.filter(x => x.attendance?.status === "غياب").length,
-      leave: cells.filter(x => x.attendance?.status === "إجازة" || x.entry?.shift?.kind === "weekly_off").length,
+      leave: cells.filter(x => x.attendance?.status === "إجازة" || x.entry?.shift?.kind === "weekly_off" || x.entry?.shift?.kind === "unpaid_leave").length,
     };
   }, [role, staffMembers, employee, week, visible, attendanceVisible]);
   const cellMatchesFilter = (personId: string, day: string, entry: ScheduleEntry | undefined) => {
     if (statusFilter === "all") return true;
     const attendance = attendanceFor(personId, day);
     if (statusFilter === "فارغ") return !entry?.shift;
-    if (statusFilter === "إجازة") return attendance?.status === "إجازة" || entry?.shift?.kind === "weekly_off";
+    if (statusFilter === "إجازة") return attendance?.status === "إجازة" || entry?.shift?.kind === "weekly_off" || entry?.shift?.kind === "unpaid_leave";
     return attendance?.status === statusFilter;
   };
 
@@ -143,8 +145,8 @@ export default function ScheduleScreen() {
   const stats = useMemo(() => {
     const source = adminRole ? teamSchedules : schedules;
     const total = source.filter(e => week.some(d => d.key === e.scheduleDate)).length;
-    const work = source.filter(e => week.some(d => d.key === e.scheduleDate) && e.shift?.kind !== "weekly_off").length;
-    const off = source.filter(e => week.some(d => d.key === e.scheduleDate) && e.shift?.kind === "weekly_off").length;
+    const work = source.filter(e => week.some(d => d.key === e.scheduleDate) && e.shift?.kind !== "weekly_off" && e.shift?.kind !== "unpaid_leave").length;
+    const off = source.filter(e => week.some(d => d.key === e.scheduleDate) && (e.shift?.kind === "weekly_off" || e.shift?.kind === "unpaid_leave")).length;
     return { total, work, off, open: Math.max(0, staffMembers.length * 7 - total) };
   }, [role, teamSchedules, schedules, week, staffMembers.length]);
 
@@ -306,6 +308,7 @@ export default function ScheduleScreen() {
               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#75282E" }]} /><Text>مسائي</Text></View>
               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#9A6737" }]} /><Text>بتوين</Text></View>
               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#8C7865" }]} /><Text>إجازة أسبوعية</Text></View>
+              <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#78528E" }]} /><Text>إجازة بدون مرتب</Text></View>
               <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: "#A8968A" }]} /><Text>فارغ</Text></View>
             </View>
             <View><Text style={styles.sectionTitle}>جدول الأسبوع</Text><Text style={styles.sectionHint}>{adminRole ? "اضغط أي خلية لتحديد الموظف واليوم" : "مواعيدك اليومية في عرض واحد"}</Text></View>
@@ -466,10 +469,10 @@ export default function ScheduleScreen() {
                           }}
                         >
                           <Text style={{ color: active ? "#75282E" : colors.text, fontSize: 11, fontWeight: "900", textAlign: "right" }}>
-                            {s.kind === "weekly_off" ? "إجازة أسبوعية" : s.name}
+                            {s.kind === "weekly_off" ? "إجازة أسبوعية" : s.kind === "unpaid_leave" ? "إجازة بدون مرتب" : s.name}
                           </Text>
                           <Text style={{ color: active ? "#75282E" : colors.text, fontSize: 9, marginTop: 4, textAlign: "right" }}>
-                            {s.kind === "weekly_off" ? "راحة أسبوعية" : shiftLabel(s)}
+                            {s.kind === "weekly_off" ? "راحة أسبوعية مدفوعة" : s.kind === "unpaid_leave" ? "يوم غير مدفوع" : shiftLabel(s)}
                           </Text>
                           <Text style={{ color: active ? "#75282E" : colors.accent, fontSize: 9, fontWeight: "900", marginTop: 7, textAlign: "right" }}>
                             {saving ? "جارٍ الحفظ..." : active ? "الشيفت الحالي ✓" : "اختيار الشيفت"}
