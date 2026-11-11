@@ -82,14 +82,14 @@ export default function ScheduleScreen() {
   const [selectedEmployee, setSelectedEmployee] = useState(staffMembers[0]?.id ?? employee.id);
   const [selectedDay, setSelectedDay] = useState(week[0].key);
   const [saving, setSaving] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<"all" | "حاضر" | "متأخر" | "غياب" | "إجازة" | "فارغ">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "حاضر" | "متأخر" | "غياب" | "إجازة" | "إجازة بدون مرتب" | "فارغ">("all");
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailSaving, setDetailSaving] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkShiftId, setBulkShiftId] = useState<number | null>(null);
   const [bulkMode, setBulkMode] = useState<"all" | "fiveDays">("fiveDays");
   const [bulkSaving, setBulkSaving] = useState(false);
-  const [detailForm, setDetailForm] = useState({ checkIn: "", checkOut: "", lateMinutes: "0", status: "حاضر" as "حاضر" | "متأخر" | "غياب" | "إجازة" | "مأمورية", note: "" });
+  const [detailForm, setDetailForm] = useState({ checkIn: "", checkOut: "", lateMinutes: "0", status: "حاضر" as "حاضر" | "متأخر" | "غياب" | "إجازة" | "إجازة بدون مرتب" | "مأمورية", note: "" });
   useEffect(() => {
     if (staffMembers.some(person => person.id === selectedEmployee)) return;
     setSelectedEmployee(staffMembers[0]?.id ?? "");
@@ -118,6 +118,7 @@ export default function ScheduleScreen() {
       late: cells.filter(x => x.attendance?.status === "متأخر").length,
       absent: cells.filter(x => x.attendance?.status === "غياب").length,
       leave: cells.filter(x => x.attendance?.status === "إجازة" || x.entry?.shift?.kind === "weekly_off").length,
+      unpaidLeave: cells.filter(x => x.attendance?.status === "إجازة بدون مرتب").length,
     };
   }, [role, staffMembers, employee, week, visible, attendanceVisible]);
   const cellMatchesFilter = (personId: string, day: string, entry: ScheduleEntry | undefined) => {
@@ -125,6 +126,7 @@ export default function ScheduleScreen() {
     const attendance = attendanceFor(personId, day);
     if (statusFilter === "فارغ") return !entry?.shift;
     if (statusFilter === "إجازة") return attendance?.status === "إجازة" || entry?.shift?.kind === "weekly_off";
+    if (statusFilter === "إجازة بدون مرتب") return attendance?.status === "إجازة بدون مرتب";
     return attendance?.status === statusFilter;
   };
 
@@ -136,6 +138,7 @@ export default function ScheduleScreen() {
     if (status === "متأخر") return { bg: "#FFF4DB", text: "#9A6400", dot: "#D58A00" };
     if (status === "غياب") return { bg: "#FFF0F0", text: "#9F2638", dot: "#D94A5B" };
     if (status === "إجازة") return { bg: "#FFF0E1", text: "#80512F", dot: "#B8794A" };
+    if (status === "إجازة بدون مرتب") return { bg: "#F1EAF8", text: "#65418A", dot: "#8B63B5" };
     if (status === "مأمورية") return { bg: "#EEE8FF", text: "#5135A8", dot: "#7655D6" };
     return { bg: "#F5F7F9", text: "#7B8798", dot: "#A1ACBA" };
   }
@@ -148,7 +151,7 @@ export default function ScheduleScreen() {
     return { total, work, off, open: Math.max(0, staffMembers.length * 7 - total) };
   }, [role, teamSchedules, schedules, week, staffMembers.length]);
 
-  const statusCounts = { all: staffMembers.length * 7, حاضر: workforceStats.present, متأخر: workforceStats.late, غياب: workforceStats.absent, إجازة: workforceStats.leave, فارغ: Math.max(0, stats.open) };
+  const statusCounts = { all: staffMembers.length * 7, حاضر: workforceStats.present, متأخر: workforceStats.late, غياب: workforceStats.absent, إجازة: workforceStats.leave, "إجازة بدون مرتب": workforceStats.unpaidLeave, فارغ: Math.max(0, stats.open) };
 
   function openDayDetail(personId: string, day: string) {
     if (!adminRole) return;
@@ -172,10 +175,10 @@ export default function ScheduleScreen() {
       await updateAttendance.mutateAsync({
         staffAccountId: Number(selectedEmployee),
         date: selectedDay,
-        checkIn: detailForm.checkIn.trim() || null,
-        checkOut: detailForm.checkOut.trim() || null,
         status: detailForm.status,
-        lateMinutes: Math.max(0, Number(detailForm.lateMinutes) || 0),
+        checkIn: detailForm.status === "إجازة بدون مرتب" ? null : (detailForm.checkIn.trim() || null),
+        checkOut: detailForm.status === "إجازة بدون مرتب" ? null : (detailForm.checkOut.trim() || null),
+        lateMinutes: detailForm.status === "إجازة بدون مرتب" ? 0 : Math.max(0, Number(detailForm.lateMinutes) || 0),
         note: detailForm.note.trim() || null,
       });
       showAlert("تم تحديث الحضور", member.name + " — " + selectedDay);
@@ -256,14 +259,14 @@ export default function ScheduleScreen() {
         {adminRole && <View style={styles.workforceSummary}>
           <View style={styles.summaryTitleRow}><View><Text style={styles.sectionTitle}>ملخص التشغيل</Text><Text style={styles.sectionHint}>حالة الفريق خلال الأسبوع المحدد</Text></View><View style={styles.liveBadge}><View style={styles.liveDot} /><Text style={styles.liveText}>LIVE</Text></View></View>
           <View style={styles.summaryGrid}>
-            {[{key:"scheduled",label:"أيام عمل",value:workforceStats.scheduled,bg:"#FFF8E7",color:"#75282E"},{key:"present",label:"حاضر",value:workforceStats.present,bg:"#E7F7EF",color:"#08704A"},{key:"late",label:"متأخر",value:workforceStats.late,bg:"#FFF4DB",color:"#9A6400"},{key:"absent",label:"غياب",value:workforceStats.absent,bg:"#FFF0F0",color:"#9F2638"},{key:"leave",label:"إجازة",value:workforceStats.leave,bg:"#FFF0E1",color:"#80512F"}].map(item => <View key={item.key} style={[styles.summaryCard,{backgroundColor:item.bg}]}><Text style={[styles.summaryValue,{color:item.color}]}>{item.value}</Text><Text style={[styles.summaryLabel,{color:item.color}]}>{item.label}</Text></View>)}
+            {[{key:"scheduled",label:"أيام عمل",value:workforceStats.scheduled,bg:"#FFF8E7",color:"#75282E"},{key:"present",label:"حاضر",value:workforceStats.present,bg:"#E7F7EF",color:"#08704A"},{key:"late",label:"متأخر",value:workforceStats.late,bg:"#FFF4DB",color:"#9A6400"},{key:"absent",label:"غياب",value:workforceStats.absent,bg:"#FFF0F0",color:"#9F2638"},{key:"leave",label:"إجازة",value:workforceStats.leave,bg:"#FFF0E1",color:"#80512F"},{key:"unpaidLeave",label:"بدون مرتب",value:workforceStats.unpaidLeave,bg:"#F1EAF8",color:"#65418A"}].map(item => <View key={item.key} style={[styles.summaryCard,{backgroundColor:item.bg}]}><Text style={[styles.summaryValue,{color:item.color}]}>{item.value}</Text><Text style={[styles.summaryLabel,{color:item.color}]}>{item.label}</Text></View>)}
           </View>
         </View>}
 
         {adminRole && <View style={styles.filterBar}>
           <Text style={styles.filterTitle}>تصفية الجدول</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-            {(["all","حاضر","متأخر","غياب","إجازة","فارغ"] as const).map(filter => <Pressable key={filter} onPress={() => setStatusFilter(filter)} style={[styles.filterChip,statusFilter===filter&&styles.filterChipActive]}><Text style={[styles.filterChipText,statusFilter===filter&&styles.filterChipTextActive]}>{filter === "all" ? "الكل" : filter} · {statusCounts[filter]}</Text></Pressable>)}
+            {(["all","حاضر","متأخر","غياب","إجازة","إجازة بدون مرتب","فارغ"] as const).map(filter => <Pressable key={filter} onPress={() => setStatusFilter(filter)} style={[styles.filterChip,statusFilter===filter&&styles.filterChipActive]}><Text style={[styles.filterChipText,statusFilter===filter&&styles.filterChipTextActive]}>{filter === "all" ? "الكل" : filter} · {statusCounts[filter]}</Text></Pressable>)}
           </ScrollView>
         </View>}
 
@@ -486,7 +489,7 @@ export default function ScheduleScreen() {
                     <View style={styles.detailField}><Text style={styles.detailLabel}>وقت الخروج</Text><TextInput style={styles.detailInput} value={detailForm.checkOut} onChangeText={v=>setDetailForm(f=>({...f,checkOut:v}))} placeholder="18:00" textAlign="right"/></View>
                   </View>
                   <View style={styles.statusOptions}>
-                    {(["حاضر","متأخر","غياب","إجازة","مأمورية"] as const).map(s=><Pressable key={s} onPress={()=>setDetailForm(f=>({...f,status:s}))} style={[styles.statusOption,detailForm.status===s&&styles.statusOptionActive]}><Text style={[styles.statusOptionText,detailForm.status===s&&styles.statusOptionTextActive]}>{s}</Text></Pressable>)}
+                    {(["حاضر","متأخر","غياب","إجازة","إجازة بدون مرتب","مأمورية"] as const).map(s=><Pressable key={s} onPress={()=>setDetailForm(f=>({...f,status:s}))} style={[styles.statusOption,detailForm.status===s&&styles.statusOptionActive]}><Text style={[styles.statusOptionText,detailForm.status===s&&styles.statusOptionTextActive]}>{s}</Text></Pressable>)}
                   </View>
                   <View style={styles.detailField}><Text style={styles.detailLabel}>دقائق التأخير</Text><TextInput style={styles.detailInput} value={detailForm.lateMinutes} onChangeText={v=>setDetailForm(f=>({...f,lateMinutes:v.replace(/[^0-9]/g,"")}))} keyboardType="numeric" textAlign="right"/></View>
                   <View style={styles.detailField}><Text style={styles.detailLabel}>ملاحظة</Text><TextInput style={[styles.detailInput,styles.detailNoteInput]} value={detailForm.note} onChangeText={v=>setDetailForm(f=>({...f,note:v}))} placeholder="اكتب ملاحظة تشغيلية..." multiline textAlign="right"/></View>

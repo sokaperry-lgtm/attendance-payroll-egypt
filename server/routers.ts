@@ -214,7 +214,7 @@ export const appRouter = router({
     sync: supervisorProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).mutation(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage"); return enterprise.syncMonthlyAttendance(ctx.staffUser.id, input.month); }),
     workSummary: supervisorProcedure.input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) })).query(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.getAttendanceWorkSummary(ctx.staffUser.id, input.month); }),
     dailyOverview: managerProcedure.input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })).query(async ({ ctx, input }) => { await enterprise.assertPermission(ctx.staffUser.id, "attendance.view"); return enterprise.getDailyAttendanceOverview(ctx.staffUser.id, input.date); }),
-    managerUpdate: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), checkIn: z.string().max(8).nullable().optional(), checkOut: z.string().max(8).nullable().optional(), status: z.enum(["حاضر", "متأخر", "غياب", "إجازة", "مأمورية"]), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0).nullable().optional(), note: z.string().max(1000).nullable().optional() })).mutation(async ({ ctx, input }) => {
+    managerUpdate: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), checkIn: z.string().max(8).nullable().optional(), checkOut: z.string().max(8).nullable().optional(), status: z.enum(["حاضر", "متأخر", "غياب", "إجازة", "إجازة بدون مرتب", "مأمورية"]), lateMinutes: z.number().int().min(0), distanceMeters: z.number().int().min(0).nullable().optional(), note: z.string().max(1000).nullable().optional() })).mutation(async ({ ctx, input }) => {
       await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage");
       const access = await enterprise.assertOperationalTarget(ctx.staffUser.id, input.staffAccountId);
       if (access.target.role === "owner" && access.actor.role !== "owner") throw new Error("لا يمكن تعديل حضور المالك من هذا الحساب.");
@@ -259,6 +259,9 @@ export const appRouter = router({
         ...input,
         lateMinutes: effectiveLateMinutes,
         status: effectiveStatus,
+        checkIn: input.status === "إجازة بدون مرتب" ? null : input.checkIn,
+        checkOut: input.status === "إجازة بدون مرتب" ? null : input.checkOut,
+        lateMinutes: input.status === "إجازة بدون مرتب" ? 0 : effectiveLateMinutes,
         note: effectiveNote,
       });
       const m = await enterprise.getCompanyForStaff(ctx.staffUser.id);

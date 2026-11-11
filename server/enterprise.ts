@@ -152,7 +152,7 @@ export async function getDailyAttendanceOverview(staffAccountId: number, date: s
       };
     })
     .sort((a,b) => {
-      const order: Record<string, number> = { "متأخر": 0, "حاضر": 1, "غياب": 2, "إجازة": 3, "مأمورية": 4 };
+      const order: Record<string, number> = { "متأخر": 0, "حاضر": 1, "غياب": 2, "إجازة": 3, "إجازة بدون مرتب": 4, "مأمورية": 5 };
       return (order[a.status] ?? 9) - (order[b.status] ?? 9) || a.name.localeCompare(b.name, "ar");
     });
 
