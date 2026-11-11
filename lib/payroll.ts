@@ -43,11 +43,12 @@ export function calculateAttendanceAccrual(
   employmentStartedOn?: string | null,
 ) {
   const eligible = (date: string) => date.startsWith(`${month}-`) && date <= today && (!employmentStartedOn || date >= employmentStartedOn);
+  const statusOf = (record: { status: string }) => String(record.status || "").trim();
   const worked = new Set(attendance.filter(r => eligible(r.date) && Boolean(r.checkIn) &&
-    ["حاضر", "متأخر"].includes(r.status)).map(r => r.date));
+    ["حاضر", "متأخر"].includes(statusOf(r))).map(r => r.date));
   const rest = new Set(restDates.filter(eligible));
   const leave = new Set(paidLeaveDates.filter(eligible));
-  const missions = attendance.filter(r => eligible(r.date) && r.status === "مأمورية").map(r => r.date);
+  const missions = attendance.filter(r => eligible(r.date) && statusOf(r) === "مأمورية").map(r => r.date);
   // Unpaid leave is never an earning day, even if another source (such as a
   // scheduled rest day or a paid-leave request) also marks the same date paid.
   const unpaidLeave = new Set(attendance
@@ -58,7 +59,7 @@ export function calculateAttendanceAccrual(
   const workedRestDays = [...worked].filter(date => rest.has(date)).length;
   // An absent day's wage is already excluded from accrual. Only the additional
   // two days of the three-day penalty may be deducted from this basis.
-  const unpaidAbsence = new Set(attendance.filter(r => eligible(r.date) && r.status === "غياب" &&
+  const unpaidAbsence = new Set(attendance.filter(r => eligible(r.date) && statusOf(r) === "غياب" &&
     !paid.has(r.date)).map(r => r.date));
   // Settle unused monthly rest only after the actual month ends. Extra worked
   // days above 26 prove work in lieu of rest; absence/leave cannot earn it.
@@ -93,7 +94,10 @@ export function calculateAttendancePenalties(
     if (paidRestDates.includes(record.date)) continue;
     const note = record.note || "";
     if (record.status === "غياب") absence += getAbsencePenaltyDays(note.includes("بإذن")) * daily;
-    if (note.includes("تم اعتماد التأخير")) {
+    // A cancelled/waived lateness must never be charged, even if the
+    // historical approval marker remains in the note for audit purposes.
+    const lateWasCancelled = /تم إلغاء احتساب التأخير|تم إلغاء التأخير|إلغاء خصم التأخير|تم إلغاء الخصم/.test(note);
+    if (!lateWasCancelled && note.includes("تم اعتماد التأخير")) {
       const minutes = Math.max(0, Number(record.lateMinutes) || 0);
       late += (minutes >= PAYROLL_RULES.lateFullDayMinutes ? 1 : minutes >= PAYROLL_RULES.lateHalfDayMinutes ? 0.5 : minutes >= PAYROLL_RULES.lateQuarterDayMinutes ? 0.25 : 0) * daily;
     }
