@@ -682,7 +682,7 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
       const shift = scheduled ? shifts.find(x => x.id === scheduled.shiftTemplateId) : undefined;
 
       // An explicit weekly-off schedule always wins.
-      if (shift?.kind === "weekly_off") continue;
+      if (shift && isWeeklyOffShift(shift)) continue;
 
       // Rest is defined only by the employee schedule, never by a fixed weekday.
 
@@ -969,7 +969,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       if (!record.checkOut || !String(record.note || "").includes("تم اعتماد الانصراف المبكر")) return total;
       const schedule = schedules.find(item => item.staffAccountId === s.id && item.scheduleDate === record.date);
       const shift = schedule ? shifts.find(item => item.id === schedule.shiftTemplateId) : undefined;
-      if (shift?.kind === "weekly_off") return total;
+      if (shift && isWeeklyOffShift(shift)) return total;
       const shiftStart = shift?.startTime ?? s.shiftStart;
       const shiftEnd = shift?.endTime ?? s.shiftEnd;
       const crossesMidnight = (shift?.crossesMidnight ?? false) || minutesOf(shiftEnd) < minutesOf(shiftStart);
