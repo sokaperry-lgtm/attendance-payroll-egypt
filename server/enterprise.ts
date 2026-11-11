@@ -954,6 +954,13 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       .map(row => payrollDateKey(row.scheduleDate))
       .filter(date => date.startsWith(month)))];
     const unpaidLeaveDateSet = new Set(unpaidLeaveDates);
+    console.info("[payroll-unpaid-leave-check]", JSON.stringify({
+      staffAccountId: s.id,
+      month,
+      schedules: staffSchedules.filter(row => payrollDateKey(row.scheduleDate).startsWith(month))
+        .map(row => ({ date: payrollDateKey(row.scheduleDate), shiftTemplateId: String(row.shiftTemplateId), kind: shiftById.get(String(row.shiftTemplateId))?.kind ?? null, name: shiftById.get(String(row.shiftTemplateId))?.name ?? null })),
+      unpaidLeaveDates,
+    }));
     const accrualRecords = records.filter(record => !unpaidLeaveDateSet.has(payrollDateKey(record.date)));
     const leaveRequests = await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,s.id));
     const accrual = calculateAttendanceAccrual(monthlyBaseSalary, month, accrualRecords, restDates, todayCairo, approvedLeaveDates(leaveRequests), s.employmentStartedOn, unpaidLeaveDates);
@@ -1530,6 +1537,13 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
     .map(row => payrollDateKey(row.scheduleDate))
     .filter(date => date.startsWith(month)))];
   const unpaidLeaveDateSet = new Set(unpaidLeaveDates);
+  console.info("[payroll-unpaid-leave-check]", JSON.stringify({
+    staffAccountId,
+    month,
+    schedules: schedules.filter(row => String(row.staffAccountId) === String(staffAccountId) && payrollDateKey(row.scheduleDate).startsWith(month))
+      .map(row => ({ date: payrollDateKey(row.scheduleDate), shiftTemplateId: String(row.shiftTemplateId), kind: shiftById.get(String(row.shiftTemplateId))?.kind ?? null, name: shiftById.get(String(row.shiftTemplateId))?.name ?? null })),
+    unpaidLeaveDates,
+  }));
   const accrualAttendance = attendance
     .filter(row => !unpaidLeaveDateSet.has(payrollDateKey(row.date)))
     .map(row => ({...row,date:payrollDateKey(row.date)}));
