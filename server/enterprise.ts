@@ -11,29 +11,6 @@ import {
   attendanceRecords, staffRequests, weeklySchedules, shiftTemplates, salaryAdjustments, salaryAdvances, employeeDocuments
 } from "../drizzle/schema";
 
-function normalizePayrollLabel(value: unknown) {
-  return String(value || "").trim()
-    .replace(/[\u064B-\u065F\u0670\u0640]/g, "")
-    .replace(/[أإآٱ]/g, "ا")
-    .replace(/ى/g, "ي");
-}
-
-// Older weekly-off templates may have been saved with the Arabic name but
-// the default "shift" kind. Treat those named templates as paid weekly rest.
-function isWeeklyOffShift(shift: { kind?: string | null; name?: string | null }) {
-  const kind = normalizePayrollLabel(shift.kind).toLowerCase().replace(/[\\s-]+/g, "_");
-  const name = normalizePayrollLabel(shift.name).toLowerCase();
-  // The schedule UI has used both the internal weekly_off kind and visible
-  // labels such as "Weekly Rest". Recognize both so paid rest days are not
-  // accidentally treated as unpaid calendar days in payroll accrual.
-  return kind === "weekly_off" ||
-    name.includes("اجازة اسبوعية") ||
-    name.includes("راحة اسبوعية") ||
-    name.includes("weekly rest") ||
-    name.includes("weekly off") ||
-    name.includes("rest day");
-}
-
 export type CompanyRole = "owner" | "hr" | "manager" | "supervisor" | "accountant" | "employee";
 export const PERMISSION_KEYS = ["dashboard.view","employees.view","employees.manage","attendance.view","attendance.manage","requests.view","requests.review","payroll.view","payroll.manage","payroll.approve","reports.view","reports.export","branches.manage","company.manage","roles.manage","audit.view","documents.view","documents.manage","advances.manage","notifications.manage"] as const;
 export type PermissionKey = typeof PERMISSION_KEYS[number];
@@ -175,7 +152,7 @@ export async function getDailyAttendanceOverview(staffAccountId: number, date: s
       };
     })
     .sort((a,b) => {
-      const order: Record<string, number> = { "متأخر": 0, "حاضر": 1, "غياب": 2, "إجازة": 3, "إجازة بدون مرتب": 4, "مأمورية": 5 };
+      const order: Record<string, number> = { "متأخر": 0, "حاضر": 1, "غياب": 2, "إجازة": 3, "مأمورية": 4 };
       return (order[a.status] ?? 9) - (order[b.status] ?? 9) || a.name.localeCompare(b.name, "ar");
     });
 
@@ -655,8 +632,7 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
   const ids = new Set(visibleMembers.map(x => x.staffAccountId));
   const staff = (await db.select().from(staffAccounts).where(eq(staffAccounts.active, true))).filter(x => ids.has(x.id));
   const schedules = await db.select().from(weeklySchedules);
-  // Include inactive templates because historical schedules must remain valid.
-  const shifts = await db.select().from(shiftTemplates);
+  const shifts = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
   const requests = await db.select().from(staffRequests);
   const existing = await db.select().from(attendanceRecords);
   // A closed payroll month is immutable: do not auto-create or rewrite attendance
@@ -689,25 +665,13 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
 
       const scheduled = schedules.find(x => x.staffAccountId === employee.id && x.scheduleDate === date);
       const shift = scheduled ? shifts.find(x => x.id === scheduled.shiftTemplateId) : undefined;
-      const record = existing.find(x => x.staffAccountId === employee.id && x.date === date);
-
-      // A date with no assigned shift is not a workday and must never become
-      // an automatic absence. Clean up only absences previously auto-created
-      // by this sync, preserving every manually entered/approved attendance row.
-      if (!scheduled) {
-        if (record?.status === "غياب" && record.note === "غياب تلقائي — لا يوجد تسجيل حضور") {
-          await db.delete(attendanceRecords).where(and(
-            eq(attendanceRecords.staffAccountId, employee.id),
-            eq(attendanceRecords.date, date),
-            eq(attendanceRecords.status, "غياب"),
-            eq(attendanceRecords.note, "غياب تلقائي — لا يوجد تسجيل حضور"),
-          ));
-        }
-        continue;
-      }
 
       // An explicit weekly-off schedule always wins.
-      if (shift && isWeeklyOffShift(shift)) continue;
+      if (shift?.kind === "weekly_off") continue;
+
+      // Rest is defined only by the employee schedule, never by a fixed weekday.
+
+      const record = existing.find(x => x.staffAccountId === employee.id && x.date === date);
       const onLeave = isApprovedLeave(requests, employee.id, date);
 
       if (onLeave) {
@@ -961,7 +925,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const monthlyBaseSalary = Math.max(0, Math.round(Number(s.baseSalary) || 0));
     const todayCairo = cutoff;
     const restDates = schedules.filter(row => row.staffAccountId === s.id &&
-      shifts.some(shift => shift.id === row.shiftTemplateId && isWeeklyOffShift(shift)))
+      shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
       .map(row => row.scheduleDate);
     const leaveRequests = await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,s.id));
     const accrual = calculateAttendanceAccrual(monthlyBaseSalary, month, records, restDates, todayCairo, approvedLeaveDates(leaveRequests), s.employmentStartedOn);
@@ -990,7 +954,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       if (!record.checkOut || !String(record.note || "").includes("تم اعتماد الانصراف المبكر")) return total;
       const schedule = schedules.find(item => item.staffAccountId === s.id && item.scheduleDate === record.date);
       const shift = schedule ? shifts.find(item => item.id === schedule.shiftTemplateId) : undefined;
-      if (shift && isWeeklyOffShift(shift)) return total;
+      if (shift?.kind === "weekly_off") return total;
       const shiftStart = shift?.startTime ?? s.shiftStart;
       const shiftEnd = shift?.endTime ?? s.shiftEnd;
       const crossesMidnight = (shift?.crossesMidnight ?? false) || minutesOf(shiftEnd) < minutesOf(shiftStart);
@@ -1174,9 +1138,6 @@ export async function getPayroll(staffAccountId:number, month:string) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId);
   if(!m || !["owner","manager","hr","accountant"].includes(m.role)) throw new Error("غير مصرح");
-  // Always synchronize before reading live payroll so stale auto-generated
-  // absences from unassigned schedule dates are removed before accrual.
-  await syncMonthlyAttendance(staffAccountId, month);
   // Recover a leaving-month row even when the employee was archived before
   // anyone generated this month's run. Approved records remain locked.
   // Payroll viewers (including accountants) need this roster without requiring
@@ -1529,7 +1490,7 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   const schedules = await db.select().from(weeklySchedules).where(eq(weeklySchedules.staffAccountId,staffAccountId));
   // Historical schedules retain their meaning even if a template is now inactive.
   const shifts = await db.select().from(shiftTemplates);
-  const restDates = schedules.filter(row => shifts.some(shift => shift.id === row.shiftTemplateId && isWeeklyOffShift(shift)))
+  const restDates = schedules.filter(row => shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
     .map(row => row.scheduleDate);
   const accrual = calculateAttendanceAccrual(Number(staff.baseSalary), month, attendance, restDates, cairoToday, approvedLeaveDates(requests), staff.employmentStartedOn);
   const earnedBaseSalaryToDate = accrual.earnedBaseSalary - accrual.restOvertimeValue;
