@@ -927,11 +927,15 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const restDates = schedules.filter(row => row.staffAccountId === s.id &&
       shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
       .map(row => row.scheduleDate);
-    const unpaidLeaveDates = schedules.filter(row => row.staffAccountId === s.id &&
-      shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "unpaid_leave"))
-      .map(row => row.scheduleDate);
+    const unpaidLeaveShiftIds = new Set(shifts
+      .filter(shift => shift.kind === "unpaid_leave" || ["إجازة بدون مرتب", "بدون أجر"].includes(String(shift.name || "").trim()))
+      .map(shift => shift.id));
+    const unpaidLeaveDates = schedules
+      .filter(row => row.staffAccountId === s.id && unpaidLeaveShiftIds.has(row.shiftTemplateId))
+      .map(row => String(row.scheduleDate).slice(0, 10));
+    const accrualRecords = records.filter(record => !unpaidLeaveDates.includes(String(record.date).slice(0, 10)));
     const leaveRequests = await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,s.id));
-    const accrual = calculateAttendanceAccrual(monthlyBaseSalary, month, records, restDates, todayCairo, approvedLeaveDates(leaveRequests), s.employmentStartedOn, unpaidLeaveDates);
+    const accrual = calculateAttendanceAccrual(monthlyBaseSalary, month, accrualRecords, restDates, todayCairo, approvedLeaveDates(leaveRequests), s.employmentStartedOn, unpaidLeaveDates);
     const earnedBaseSalary = accrual.earnedBaseSalary - accrual.restOvertimeValue;
     const dailyValue=monthlyBaseSalary/PAYROLL_RULES.calendarDays;
     const hourlyValue=dailyValue/PAYROLL_RULES.dailyHours;
@@ -1495,10 +1499,15 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   const shifts = await db.select().from(shiftTemplates);
   const restDates = schedules.filter(row => shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
     .map(row => row.scheduleDate);
-  const unpaidLeaveDates = schedules.filter(row => shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "unpaid_leave"))
-    .map(row => row.scheduleDate);
+  const unpaidLeaveShiftIds = new Set(shifts
+    .filter(shift => shift.kind === "unpaid_leave" || ["إجازة بدون مرتب", "بدون أجر"].includes(String(shift.name || "").trim()))
+    .map(shift => shift.id));
+  const unpaidLeaveDates = schedules
+    .filter(row => unpaidLeaveShiftIds.has(row.shiftTemplateId))
+    .map(row => String(row.scheduleDate).slice(0, 10));
+  const accrualAttendance = attendance.filter(row => !unpaidLeaveDates.includes(String(row.date).slice(0, 10)));
   const accrual = calculateAttendanceAccrual(
-    Number(staff.baseSalary), month, attendance, restDates, cairoToday,
+    Number(staff.baseSalary), month, accrualAttendance, restDates, cairoToday,
     approvedLeaveDates(requests), staff.employmentStartedOn, unpaidLeaveDates,
   );
   const earnedBaseSalaryToDate = accrual.earnedBaseSalary - accrual.restOvertimeValue;
