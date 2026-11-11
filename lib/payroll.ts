@@ -43,34 +43,16 @@ export function calculateAttendanceAccrual(
   employmentStartedOn?: string | null,
 ) {
   const eligible = (date: string) => date.startsWith(`${month}-`) && date <= today && (!employmentStartedOn || date >= employmentStartedOn);
-  // Normalize Arabic spelling/diacritics so the unpaid-leave status is
-  // recognized consistently regardless of the form saved by the attendance UI.
-  const normalizeStatus = (value: unknown) => String(value || "")
-    .trim()
-    .replace(/[\u064B-\u065F\u0670\u0640]/g, "")
-    .replace(/[أإآٱ]/g, "ا")
-    .replace(/ى/g, "ي");
-  const statusOf = (record: { status: string }) => normalizeStatus(record.status);
   const worked = new Set(attendance.filter(r => eligible(r.date) && Boolean(r.checkIn) &&
-    ["حاضر", "متأخر"].includes(statusOf(r))).map(r => r.date));
+    ["حاضر", "متأخر"].includes(r.status)).map(r => r.date));
   const rest = new Set(restDates.filter(eligible));
   const leave = new Set(paidLeaveDates.filter(eligible));
-  const missions = attendance.filter(r => eligible(r.date) && statusOf(r) === "مأمورية").map(r => r.date);
-  // Unpaid leave is never an earning day, even if another source (such as a
-  // scheduled rest day or a paid-leave request) also marks the same date paid.
-  const unpaidLeave = new Set(attendance
-    .filter(r => eligible(r.date) && statusOf(r) === "اجازة بدون مرتب")
-    .map(r => r.date));
+  const missions = attendance.filter(r => eligible(r.date) && r.status === "مأمورية").map(r => r.date);
   const paid = new Set([...worked, ...rest, ...leave, ...missions]);
-  for (const date of unpaidLeave) {
-    paid.delete(date);
-    // An unpaid-leave day must not remain counted as a paid weekly rest day.
-    rest.delete(date);
-  }
   const workedRestDays = [...worked].filter(date => rest.has(date)).length;
   // An absent day's wage is already excluded from accrual. Only the additional
   // two days of the three-day penalty may be deducted from this basis.
-  const unpaidAbsence = new Set(attendance.filter(r => eligible(r.date) && statusOf(r) === "غياب" &&
+  const unpaidAbsence = new Set(attendance.filter(r => eligible(r.date) && r.status === "غياب" &&
     !paid.has(r.date)).map(r => r.date));
   // Settle unused monthly rest only after the actual month ends. Extra worked
   // days above 26 prove work in lieu of rest; absence/leave cannot earn it.
@@ -89,7 +71,6 @@ export function calculateAttendanceAccrual(
     workedDays: worked.size,
     paidRestDays: [...rest].filter(date => !worked.has(date)).length,
     unpaidAbsenceDays: unpaidAbsence.size,
-    unpaidLeaveDays: unpaidLeave.size,
   };
 }
 
@@ -105,10 +86,7 @@ export function calculateAttendancePenalties(
     if (paidRestDates.includes(record.date)) continue;
     const note = record.note || "";
     if (record.status === "غياب") absence += getAbsencePenaltyDays(note.includes("بإذن")) * daily;
-    // A cancelled/waived lateness must never be charged, even if the
-    // historical approval marker remains in the note for audit purposes.
-    const lateWasCancelled = /تم إلغاء احتساب التأخير|تم إلغاء التأخير|إلغاء خصم التأخير|تم إلغاء الخصم/.test(note);
-    if (!lateWasCancelled && note.includes("تم اعتماد التأخير")) {
+    if (note.includes("تم اعتماد التأخير")) {
       const minutes = Math.max(0, Number(record.lateMinutes) || 0);
       late += (minutes >= PAYROLL_RULES.lateFullDayMinutes ? 1 : minutes >= PAYROLL_RULES.lateHalfDayMinutes ? 0.5 : minutes >= PAYROLL_RULES.lateQuarterDayMinutes ? 0.25 : 0) * daily;
     }
