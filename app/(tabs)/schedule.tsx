@@ -69,7 +69,7 @@ function tone(s: ShiftTemplate | null | undefined, paletteIndex?: number) {
 export default function ScheduleScreen() {
   const { width } = useWindowDimensions();
   const compact = width < 560;
-  const { role, employee, records, staffMembers: allStaffMembers, shiftTemplates, schedules, teamSchedules: allTeamSchedules, teamAttendance, saveSchedule } = useAppData();
+  const { role, employee, records, staffMembers: allStaffMembers, shiftTemplates, schedules, teamSchedules: allTeamSchedules, teamAttendance, saveSchedule, clearSchedule } = useAppData();
   // Keep archived history in AppData for payroll and employee records. The
   // operational schedule, picker and counters all use the same active roster.
   const staffMembers = useMemo(() => allStaffMembers.filter(person => person.active !== false && !person.employmentEndedOn), [allStaffMembers]);
@@ -207,6 +207,17 @@ export default function ScheduleScreen() {
       showAlert("تعذر تجهيز الجدول", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
     } finally { setBulkSaving(false); }
   }
+  async function removeShift() {
+    if (!adminRole || !member) return;
+    setSaving(true);
+    try {
+      await clearSchedule({ staffAccountId: Number(selectedEmployee), scheduleDate: selectedDay });
+      showAlert("تم إلغاء الشيفت", `${member.name} — ${week.find(d => d.key === selectedDay)?.label ?? ""}`);
+    } catch (error) {
+      showAlert("تعذر إلغاء الشيفت", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
+    } finally { setSaving(false); }
+  }
+
   async function assignShift(shift: ShiftTemplate) {
     if (!adminRole || !member) return;
     setSaving(true);
@@ -448,6 +459,10 @@ export default function ScheduleScreen() {
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSectionTitle}>اختيار شيفت اليوم</Text>
                   <Text style={{ color: "#806F68", fontSize: 9, textAlign: "right" }}>اختار الوردية للموظف في اليوم المحدد، وهيتحدث الجدول تلقائيًا.</Text>
+                  <Pressable disabled={saving || detailSaving || !selectedEntry?.shift} onPress={removeShift} style={{ borderWidth: 1, borderColor: "#B42318", backgroundColor: "#FFF1F0", borderRadius: 12, padding: 12, alignItems: "center", opacity: saving || !selectedEntry?.shift ? 0.5 : 1 }}>
+                    <Text style={{ color: "#B42318", fontSize: 11, fontWeight: "900" }}>{saving ? "جارٍ الإلغاء..." : "إلغاء الشيفت الحالي"}</Text>
+                    <Text style={{ color: "#9F2638", fontSize: 9, marginTop: 4 }}>يمسح تعيين هذا اليوم فقط، ويمكنك اختيار شيفت جديد لاحقًا</Text>
+                  </Pressable>
                   <View style={{ flexDirection: "row-reverse", flexWrap: "wrap", gap: 8 }}>
                     {shiftTemplates.filter(s => s.active).map((s) => {
                       const active = selectedEntry?.shift?.id === s.id;
