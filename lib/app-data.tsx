@@ -50,6 +50,7 @@ export type AppDataContext = {
   teamSchedules: ScheduleEntry[];
   teamAttendance: AttendanceRecord[];
   saveSchedule: (input: { staffAccountId: number; scheduleDate: string; shiftTemplateId: number; note?: string }) => Promise<void>;
+  clearSchedule: (input: { staffAccountId: number; scheduleDate: string }) => Promise<void>;
 };
 
 const AppData = createContext<AppDataContext | null>(null);
@@ -130,7 +131,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     deleteStaffAccount: async (id, employmentEndedOn) => { await deleteStaffMutation.mutateAsync({ id, employmentEndedOn }); await invalidateAll(); },
     updateBranch: async (input) => { await updateCompanyMutation.mutateAsync(input); await invalidateAll(); },
     saveSchedule: async (input) => { await saveScheduleMutation.mutateAsync(input); await invalidateAll(); },
-  }), [role, employee, branch, meQuery.data?.shiftStart, meQuery.data?.shiftEnd, records, requests, staffMembers, payrollInputs, payroll, todayRecord, activeAttendanceRecord, previousRecord, previousSchedule, meQuery.isLoading, attendanceQuery.isLoading, teamAttendanceQuery.isLoading, shiftTemplates, schedules, teamSchedules, teamAttendance, activeShift, checkInMutation, checkOutMutation, requestMutation, reviewMutation, createStaffMutation, updateStaffMutation, deleteStaffMutation, updateCompanyMutation, saveScheduleMutation]);
+  }), [role, employee, branch, meQuery.data?.shiftStart, meQuery.data?.shiftEnd, records, requests, staffMembers, payrollInputs, payroll, todayRecord, activeAttendanceRecord, previousRecord, previousSchedule, meQuery.isLoading, attendanceQuery.isLoading, teamAttendanceQuery.isLoading, shiftTemplates, schedules, teamSchedules, teamAttendance, activeShift, checkInMutation, checkOutMutation, requestMutation, reviewMutation, createStaffMutation, updateStaffMutation, deleteStaffMutation, updateCompanyMutation, saveScheduleMutation, clearScheduleMutation]);
   return <AppData.Provider value={value}>{children}</AppData.Provider>;
 }
 
