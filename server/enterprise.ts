@@ -11,6 +11,21 @@ import {
   attendanceRecords, staffRequests, weeklySchedules, shiftTemplates, salaryAdjustments, salaryAdvances, employeeDocuments
 } from "../drizzle/schema";
 
+function normalizePayrollLabel(value: unknown) {
+  return String(value || "").trim()
+    .replace(/[\\u064B-\\u065F\\u0670\\u0640]/g, "")
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/ى/g, "ي");
+}
+
+// Older weekly-off templates may have been saved with the Arabic name but
+// the default "shift" kind. Treat those named templates as paid weekly rest.
+function isWeeklyOffShift(shift: { kind?: string | null; name?: string | null }) {
+  const kind = normalizePayrollLabel(shift.kind).toLowerCase();
+  const name = normalizePayrollLabel(shift.name);
+  return kind === "weekly_off" || name.includes("اجازة اسبوعية") || name.includes("راحة اسبوعية");
+}
+
 export type CompanyRole = "owner" | "hr" | "manager" | "supervisor" | "accountant" | "employee";
 export const PERMISSION_KEYS = ["dashboard.view","employees.view","employees.manage","attendance.view","attendance.manage","requests.view","requests.review","payroll.view","payroll.manage","payroll.approve","reports.view","reports.export","branches.manage","company.manage","roles.manage","audit.view","documents.view","documents.manage","advances.manage","notifications.manage"] as const;
 export type PermissionKey = typeof PERMISSION_KEYS[number];
@@ -925,7 +940,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const monthlyBaseSalary = Math.max(0, Math.round(Number(s.baseSalary) || 0));
     const todayCairo = cutoff;
     const restDates = schedules.filter(row => row.staffAccountId === s.id &&
-      shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
+      shifts.some(shift => shift.id === row.shiftTemplateId && isWeeklyOffShift(shift)))
       .map(row => row.scheduleDate);
     const leaveRequests = await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,s.id));
     const accrual = calculateAttendanceAccrual(monthlyBaseSalary, month, records, restDates, todayCairo, approvedLeaveDates(leaveRequests), s.employmentStartedOn);
@@ -1490,7 +1505,7 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   const schedules = await db.select().from(weeklySchedules).where(eq(weeklySchedules.staffAccountId,staffAccountId));
   // Historical schedules retain their meaning even if a template is now inactive.
   const shifts = await db.select().from(shiftTemplates);
-  const restDates = schedules.filter(row => shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
+  const restDates = schedules.filter(row => shifts.some(shift => shift.id === row.shiftTemplateId && isWeeklyOffShift(shift)))
     .map(row => row.scheduleDate);
   const accrual = calculateAttendanceAccrual(Number(staff.baseSalary), month, attendance, restDates, cairoToday, approvedLeaveDates(requests), staff.employmentStartedOn);
   const earnedBaseSalaryToDate = accrual.earnedBaseSalary - accrual.restOvertimeValue;

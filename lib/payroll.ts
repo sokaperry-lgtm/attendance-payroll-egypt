@@ -62,7 +62,7 @@ export function calculateAttendanceAccrual(
     .filter(r => eligible(r.date) && statusOf(r) === "اجازة بدون مرتب")
     .map(r => r.date));
   const paid = new Set([...worked, ...rest, ...leave, ...missions]);
-  for (const date of unpaidLeave) paid.delete(date);
+  for (const date of unpaidLeave) {\n    paid.delete(date);\n    // An unpaid-leave day must not remain counted as a paid weekly rest day.\n    rest.delete(date);\n  }
   const workedRestDays = [...worked].filter(date => rest.has(date)).length;
   // An absent day's wage is already excluded from accrual. Only the additional
   // two days of the three-day penalty may be deducted from this basis.
