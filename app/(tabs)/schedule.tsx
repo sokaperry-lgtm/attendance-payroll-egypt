@@ -118,7 +118,7 @@ export default function ScheduleScreen() {
       late: cells.filter(x => x.attendance?.status === "متأخر").length,
       absent: cells.filter(x => x.attendance?.status === "غياب").length,
       leave: cells.filter(x => x.attendance?.status === "إجازة" || x.entry?.shift?.kind === "weekly_off").length,
-      unpaidLeave: cells.filter(x => x.attendance?.status === "إجازة بدون مرتب").length,
+      unpaidLeave: cells.filter(x => String(x.attendance?.status ?? "") === "إجازة بدون مرتب").length,
     };
   }, [role, staffMembers, employee, week, visible, attendanceVisible]);
   const cellMatchesFilter = (personId: string, day: string, entry: ScheduleEntry | undefined) => {
@@ -126,7 +126,7 @@ export default function ScheduleScreen() {
     const attendance = attendanceFor(personId, day);
     if (statusFilter === "فارغ") return !entry?.shift;
     if (statusFilter === "إجازة") return attendance?.status === "إجازة" || entry?.shift?.kind === "weekly_off";
-    if (statusFilter === "إجازة بدون مرتب") return attendance?.status === "إجازة بدون مرتب";
+    if (statusFilter === "إجازة بدون مرتب") return String(attendance?.status ?? "") === "إجازة بدون مرتب";
     return attendance?.status === statusFilter;
   };
 
