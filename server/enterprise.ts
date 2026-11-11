@@ -895,7 +895,18 @@ export async function recalculateHistoricalPenaltyDeductions(staffAccountId:numb
 
 function payrollDateKey(value: unknown): string {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
-  return String(value ?? "").slice(0, 10);
+  return String(value ?? "").trim().slice(0, 10);
+}
+
+function isUnpaidLeaveTemplate(shift: { kind?: unknown; name?: unknown } | undefined): boolean {
+  if (!shift) return false;
+  if (String(shift.kind ?? "").trim().toLowerCase() === "unpaid_leave") return true;
+  const name = String(shift.name ?? "").normalize("NFKD")
+    .replace(/[\\u064B-\\u065F\\u0670\\u0640]/g, "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/\\s+/g, " ").trim();
+  return name === "اجازه بدون مرتب" || name === "بدون اجر";
 }
 
 export async function generatePayroll(staffAccountId: number, month: string) {
@@ -936,7 +947,7 @@ export async function generatePayroll(staffAccountId: number, month: string) {
       .filter(row => shiftById.get(String(row.shiftTemplateId))?.kind === "weekly_off")
       .map(row => payrollDateKey(row.scheduleDate));
     const unpaidLeaveShiftIds = new Set(shifts
-      .filter(shift => shift.kind === "unpaid_leave" || ["إجازة بدون مرتب", "بدون أجر"].includes(String(shift.name || "").trim()))
+      .filter(shift => isUnpaidLeaveTemplate(shift))
       .map(shift => String(shift.id)));
     const unpaidLeaveDates = [...new Set(staffSchedules
       .filter(row => unpaidLeaveShiftIds.has(String(row.shiftTemplateId)))
@@ -1512,7 +1523,7 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
     .filter(row => shiftById.get(String(row.shiftTemplateId))?.kind === "weekly_off")
     .map(row => payrollDateKey(row.scheduleDate));
   const unpaidLeaveShiftIds = new Set(shifts
-    .filter(shift => shift.kind === "unpaid_leave" || ["إجازة بدون مرتب", "بدون أجر"].includes(String(shift.name || "").trim()))
+    .filter(shift => isUnpaidLeaveTemplate(shift))
     .map(shift => String(shift.id)));
   const unpaidLeaveDates = [...new Set(schedules
     .filter(row => unpaidLeaveShiftIds.has(String(row.shiftTemplateId)))
