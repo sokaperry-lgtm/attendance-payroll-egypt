@@ -9,7 +9,7 @@ import { trpc } from "@/lib/trpc";
 const requestPalette: Record<string, { bg: string; text: string }> = { "قيد المراجعة": { bg: "#F5E7E2", text: "#B8794A" }, مقبول: { bg: "#EAF1F8", text: "#75282E" }, مرفوض: { bg: "#F5EFE7", text: "#5C1F25" }, مستثنى: { bg: "#F2F5F8", text: "#806F68" } };
 
 export default function RequestsScreen() {
-  const { role, requests, submitRequest, refresh } = useAppData();
+  const { role, requests, staffMembers, submitRequest, refresh } = useAppData();
   const { width } = useWindowDimensions();
   const compact = width < 600;
   const reviewRequest = trpc.requests.review.useMutation();
