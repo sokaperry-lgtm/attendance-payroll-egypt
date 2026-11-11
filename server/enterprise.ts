@@ -1166,6 +1166,9 @@ export async function getPayroll(staffAccountId:number, month:string) {
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId);
   if(!m || !["owner","manager","hr","accountant"].includes(m.role)) throw new Error("غير مصرح");
+  // Always synchronize before reading live payroll so stale auto-generated
+  // absences from unassigned schedule dates are removed before accrual.
+  await syncMonthlyAttendance(staffAccountId, month);
   // Recover a leaving-month row even when the employee was archived before
   // anyone generated this month's run. Approved records remain locked.
   // Payroll viewers (including accountants) need this roster without requiring
