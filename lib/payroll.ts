@@ -47,7 +47,7 @@ export function calculateAttendanceAccrual(
   // recognized consistently regardless of the form saved by the attendance UI.
   const normalizeStatus = (value: unknown) => String(value || "")
     .trim()
-    .replace(/[\\u064B-\\u065F\\u0670\\u0640]/g, "")
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, "")
     .replace(/[أإآٱ]/g, "ا")
     .replace(/ى/g, "ي");
   const statusOf = (record: { status: string }) => normalizeStatus(record.status);
