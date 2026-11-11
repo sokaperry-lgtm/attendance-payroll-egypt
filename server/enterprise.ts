@@ -1495,7 +1495,12 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   const shifts = await db.select().from(shiftTemplates);
   const restDates = schedules.filter(row => shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
     .map(row => row.scheduleDate);
-  const accrual = calculateAttendanceAccrual(Number(staff.baseSalary), month, attendance, restDates, cairoToday, approvedLeaveDates(requests), staff.employmentStartedOn);
+  const unpaidLeaveDates = schedules.filter(row => shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "unpaid_leave"))
+    .map(row => row.scheduleDate);
+  const accrual = calculateAttendanceAccrual(
+    Number(staff.baseSalary), month, attendance, restDates, cairoToday,
+    approvedLeaveDates(requests), staff.employmentStartedOn, unpaidLeaveDates,
+  );
   const earnedBaseSalaryToDate = accrual.earnedBaseSalary - accrual.restOvertimeValue;
   const workedDaysToDate = accrual.workedDays;
   const paidRestDaysToDate = accrual.paidRestDays;
@@ -1506,7 +1511,7 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
   ))).map(row => row.fromDate));
   const penalties = calculateAttendancePenalties(Number(staff.baseSalary), currentRecords.map(row => ({...row,
     note: permissionDates.has(row.date) ? `${row.note || ""} بإذن` : row.note,
-  })), accrual.unpaidAbsenceDays, [...restDates,...approvedLeaveDates(requests)]);
+  })), accrual.unpaidAbsenceDays, [...restDates,...approvedLeaveDates(requests)], unpaidLeaveDates);
   const overtime = (await db.select().from(staffRequests).where(and(
     eq(staffRequests.staffAccountId,staffAccountId), eq(staffRequests.type,"أوفر تايم"), eq(staffRequests.status,"مقبول")
   ))).filter(row => row.fromDate.startsWith(`${month}-`) && row.fromDate <= cairoToday && isEmploymentDate(staff,row.fromDate))
@@ -1515,7 +1520,7 @@ export async function getEmployeeSelfService(staffAccountId:number, month:string
     if (!record.checkOut || !String(record.note || "").includes("تم اعتماد الانصراف المبكر")) return total;
     const schedule = schedules.find(row => row.scheduleDate === record.date);
     const shift = shifts.find(row => row.id === schedule?.shiftTemplateId);
-    if (shift?.kind === "weekly_off") return total;
+    if (shift?.kind === "weekly_off" || shift?.kind === "unpaid_leave") return total;
     const start = shift?.startTime ?? staff.shiftStart;
     const end = shift?.endTime ?? staff.shiftEnd;
     const overnight = Boolean(shift?.crossesMidnight) || minutesOf(end) < minutesOf(start);
