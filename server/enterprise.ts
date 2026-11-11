@@ -647,7 +647,8 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
   const ids = new Set(visibleMembers.map(x => x.staffAccountId));
   const staff = (await db.select().from(staffAccounts).where(eq(staffAccounts.active, true))).filter(x => ids.has(x.id));
   const schedules = await db.select().from(weeklySchedules);
-  const shifts = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
+  // Include inactive templates because historical schedules must remain valid.
+  const shifts = await db.select().from(shiftTemplates);
   const requests = await db.select().from(staffRequests);
   const existing = await db.select().from(attendanceRecords);
   // A closed payroll month is immutable: do not auto-create or rewrite attendance
@@ -680,13 +681,25 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
 
       const scheduled = schedules.find(x => x.staffAccountId === employee.id && x.scheduleDate === date);
       const shift = scheduled ? shifts.find(x => x.id === scheduled.shiftTemplateId) : undefined;
+      const record = existing.find(x => x.staffAccountId === employee.id && x.date === date);
+
+      // A date with no assigned shift is not a workday and must never become
+      // an automatic absence. Clean up only absences previously auto-created
+      // by this sync, preserving every manually entered/approved attendance row.
+      if (!scheduled) {
+        if (record?.status === "غياب" && record.note === "غياب تلقائي — لا يوجد تسجيل حضور") {
+          await db.delete(attendanceRecords).where(and(
+            eq(attendanceRecords.staffAccountId, employee.id),
+            eq(attendanceRecords.date, date),
+            eq(attendanceRecords.status, "غياب"),
+            eq(attendanceRecords.note, "غياب تلقائي — لا يوجد تسجيل حضور"),
+          ));
+        }
+        continue;
+      }
 
       // An explicit weekly-off schedule always wins.
       if (shift && isWeeklyOffShift(shift)) continue;
-
-      // Rest is defined only by the employee schedule, never by a fixed weekday.
-
-      const record = existing.find(x => x.staffAccountId === employee.id && x.date === date);
       const onLeave = isApprovedLeave(requests, employee.id, date);
 
       if (onLeave) {
