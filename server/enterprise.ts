@@ -666,8 +666,8 @@ export async function syncMonthlyAttendance(staffAccountId: number, month: strin
       const scheduled = schedules.find(x => x.staffAccountId === employee.id && x.scheduleDate === date);
       const shift = scheduled ? shifts.find(x => x.id === scheduled.shiftTemplateId) : undefined;
 
-      // An explicit weekly-off schedule always wins.
-      if (shift?.kind === "weekly_off") continue;
+      // Weekly rest and unpaid leave are schedule exceptions, not absences.
+      if (shift?.kind === "weekly_off" || shift?.kind === "unpaid_leave") continue;
 
       // Rest is defined only by the employee schedule, never by a fixed weekday.
 
@@ -927,8 +927,11 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     const restDates = schedules.filter(row => row.staffAccountId === s.id &&
       shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "weekly_off"))
       .map(row => row.scheduleDate);
+    const unpaidLeaveDates = schedules.filter(row => row.staffAccountId === s.id &&
+      shifts.some(shift => shift.id === row.shiftTemplateId && shift.kind === "unpaid_leave"))
+      .map(row => row.scheduleDate);
     const leaveRequests = await db.select().from(staffRequests).where(eq(staffRequests.staffAccountId,s.id));
-    const accrual = calculateAttendanceAccrual(monthlyBaseSalary, month, records, restDates, todayCairo, approvedLeaveDates(leaveRequests), s.employmentStartedOn);
+    const accrual = calculateAttendanceAccrual(monthlyBaseSalary, month, records, restDates, todayCairo, approvedLeaveDates(leaveRequests), s.employmentStartedOn, unpaidLeaveDates);
     const earnedBaseSalary = accrual.earnedBaseSalary - accrual.restOvertimeValue;
     const dailyValue=monthlyBaseSalary/PAYROLL_RULES.calendarDays;
     const hourlyValue=dailyValue/PAYROLL_RULES.dailyHours;
@@ -947,14 +950,14 @@ export async function generatePayroll(staffAccountId: number, month: string) {
     }
 
     const { absenceDeduction, lateDeduction } = calculateAttendancePenalties(
-      monthlyBaseSalary, records, accrual.unpaidAbsenceDays, [...restDates,...approvedLeaveDates(leaveRequests)],
+      monthlyBaseSalary, records, accrual.unpaidAbsenceDays, [...restDates,...approvedLeaveDates(leaveRequests)], unpaidLeaveDates,
     );
 
     const earlyMinutes=records.reduce((total, record) => {
       if (!record.checkOut || !String(record.note || "").includes("تم اعتماد الانصراف المبكر")) return total;
       const schedule = schedules.find(item => item.staffAccountId === s.id && item.scheduleDate === record.date);
       const shift = schedule ? shifts.find(item => item.id === schedule.shiftTemplateId) : undefined;
-      if (shift?.kind === "weekly_off") return total;
+      if (shift?.kind === "weekly_off" || shift?.kind === "unpaid_leave") return total;
       const shiftStart = shift?.startTime ?? s.shiftStart;
       const shiftEnd = shift?.endTime ?? s.shiftEnd;
       const crossesMidnight = (shift?.crossesMidnight ?? false) || minutesOf(shiftEnd) < minutesOf(shiftStart);
