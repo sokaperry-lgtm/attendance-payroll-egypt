@@ -48,7 +48,13 @@ export function calculateAttendanceAccrual(
   const rest = new Set(restDates.filter(eligible));
   const leave = new Set(paidLeaveDates.filter(eligible));
   const missions = attendance.filter(r => eligible(r.date) && r.status === "مأمورية").map(r => r.date);
+  // Unpaid leave is never an earning day, even if another source (such as a
+  // scheduled rest day or a paid-leave request) also marks the same date paid.
+  const unpaidLeave = new Set(attendance
+    .filter(r => eligible(r.date) && r.status === "إجازة بدون مرتب")
+    .map(r => r.date));
   const paid = new Set([...worked, ...rest, ...leave, ...missions]);
+  for (const date of unpaidLeave) paid.delete(date);
   const workedRestDays = [...worked].filter(date => rest.has(date)).length;
   // An absent day's wage is already excluded from accrual. Only the additional
   // two days of the three-day penalty may be deducted from this basis.
@@ -71,6 +77,7 @@ export function calculateAttendanceAccrual(
     workedDays: worked.size,
     paidRestDays: [...rest].filter(date => !worked.has(date)).length,
     unpaidAbsenceDays: unpaidAbsence.size,
+    unpaidLeaveDays: unpaidLeave.size,
   };
 }
 
