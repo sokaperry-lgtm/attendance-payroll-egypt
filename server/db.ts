@@ -267,6 +267,54 @@ export async function listShiftTemplates() {
   if (!existing.some((item) => item.kind === "weekly_off")) seed.push({ name: "إجازة أسبوعية", kind: "weekly_off", startTime: "00:00", endTime: "00:00", crossesMidnight: false, active: true });
   if (!existing.some((item) => item.kind === "unpaid_leave")) seed.push({ name: "إجازة بدون مرتب", kind: "unpaid_leave", startTime: "00:00", endTime: "00:00", crossesMidnight: false, active: true });
   if (seed.length) await db.insert(shiftTemplates).values(seed);
+
+  // Keep exactly one canonical unpaid-leave template. Prefer the correctly
+  // typed row, preserve its schedule assignments, and remove duplicate rows.
+  const refreshed = await db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
+  const unpaidCandidates = refreshed.filter((item) =>
+    item.kind === "unpaid_leave" || item.name.trim() === "إجازة بدون مرتب"
+  ).sort((a, b) => {
+    if (a.kind === "unpaid_leave" && b.kind !== "unpaid_leave") return -1;
+    if (b.kind === "unpaid_leave" && a.kind !== "unpaid_leave") return 1;
+    return a.id - b.id;
+  });
+
+  if (unpaidCandidates.length > 0) {
+    const canonical = unpaidCandidates[0];
+    if (canonical.kind !== "unpaid_leave" || canonical.name !== "إجازة بدون مرتب") {
+      await db.update(shiftTemplates).set({
+        name: "إجازة بدون مرتب",
+        kind: "unpaid_leave",
+        startTime: "00:00",
+        endTime: "00:00",
+        crossesMidnight: false,
+        active: true,
+      }).where(eq(shiftTemplates.id, canonical.id));
+    }
+
+    for (const duplicate of unpaidCandidates.slice(1)) {
+      const assignedRows = await db.select().from(weeklySchedules)
+        .where(eq(weeklySchedules.shiftTemplateId, duplicate.id));
+      for (const row of assignedRows) {
+        const alreadyAssigned = await db.select({ id: weeklySchedules.id }).from(weeklySchedules)
+          .where(and(
+            eq(weeklySchedules.staffAccountId, row.staffAccountId),
+            eq(weeklySchedules.scheduleDate, row.scheduleDate),
+            eq(weeklySchedules.shiftTemplateId, canonical.id),
+          )).limit(1);
+        if (alreadyAssigned.length > 0) {
+          await db.delete(weeklySchedules).where(eq(weeklySchedules.id, row.id));
+        } else {
+          await db.update(weeklySchedules).set({
+            shiftTemplateId: canonical.id,
+            updatedAt: new Date(),
+          }).where(eq(weeklySchedules.id, row.id));
+        }
+      }
+      await db.delete(shiftTemplates).where(eq(shiftTemplates.id, duplicate.id));
+    }
+  }
+
   return db.select().from(shiftTemplates).where(eq(shiftTemplates.active, true));
 }
 
