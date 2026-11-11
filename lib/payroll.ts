@@ -43,7 +43,14 @@ export function calculateAttendanceAccrual(
   employmentStartedOn?: string | null,
 ) {
   const eligible = (date: string) => date.startsWith(`${month}-`) && date <= today && (!employmentStartedOn || date >= employmentStartedOn);
-  const statusOf = (record: { status: string }) => String(record.status || "").trim();
+  // Normalize Arabic spelling/diacritics so the unpaid-leave status is
+  // recognized consistently regardless of the form saved by the attendance UI.
+  const normalizeStatus = (value: unknown) => String(value || "")
+    .trim()
+    .replace(/[\\u064B-\\u065F\\u0670\\u0640]/g, "")
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/ى/g, "ي");
+  const statusOf = (record: { status: string }) => normalizeStatus(record.status);
   const worked = new Set(attendance.filter(r => eligible(r.date) && Boolean(r.checkIn) &&
     ["حاضر", "متأخر"].includes(statusOf(r))).map(r => r.date));
   const rest = new Set(restDates.filter(eligible));
@@ -52,7 +59,7 @@ export function calculateAttendanceAccrual(
   // Unpaid leave is never an earning day, even if another source (such as a
   // scheduled rest day or a paid-leave request) also marks the same date paid.
   const unpaidLeave = new Set(attendance
-    .filter(r => eligible(r.date) && r.status === "إجازة بدون مرتب")
+    .filter(r => eligible(r.date) && statusOf(r) === "اجازة بدون مرتب")
     .map(r => r.date));
   const paid = new Set([...worked, ...rest, ...leave, ...missions]);
   for (const date of unpaidLeave) paid.delete(date);

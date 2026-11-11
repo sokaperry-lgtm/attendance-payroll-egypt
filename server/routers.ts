@@ -257,7 +257,6 @@ export const appRouter = router({
         : input.note;
       const row = await db.updateAttendanceByManager({
         ...input,
-        lateMinutes: effectiveLateMinutes,
         status: effectiveStatus,
         checkIn: input.status === "إجازة بدون مرتب" ? null : input.checkIn,
         checkOut: input.status === "إجازة بدون مرتب" ? null : input.checkOut,
