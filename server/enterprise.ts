@@ -21,9 +21,17 @@ function normalizePayrollLabel(value: unknown) {
 // Older weekly-off templates may have been saved with the Arabic name but
 // the default "shift" kind. Treat those named templates as paid weekly rest.
 function isWeeklyOffShift(shift: { kind?: string | null; name?: string | null }) {
-  const kind = normalizePayrollLabel(shift.kind).toLowerCase();
-  const name = normalizePayrollLabel(shift.name);
-  return kind === "weekly_off" || name.includes("اجازة اسبوعية") || name.includes("راحة اسبوعية");
+  const kind = normalizePayrollLabel(shift.kind).toLowerCase().replace(/[\\s-]+/g, "_");
+  const name = normalizePayrollLabel(shift.name).toLowerCase();
+  // The schedule UI has used both the internal weekly_off kind and visible
+  // labels such as "Weekly Rest". Recognize both so paid rest days are not
+  // accidentally treated as unpaid calendar days in payroll accrual.
+  return kind === "weekly_off" ||
+    name.includes("اجازة اسبوعية") ||
+    name.includes("راحة اسبوعية") ||
+    name.includes("weekly rest") ||
+    name.includes("weekly off") ||
+    name.includes("rest day");
 }
 
 export type CompanyRole = "owner" | "hr" | "manager" | "supervisor" | "accountant" | "employee";
