@@ -337,6 +337,16 @@ export async function saveSchedule(input: { staffAccountId: number; scheduleDate
   return listSchedules(input.staffAccountId);
 }
 
+export async function clearSchedule(input: { staffAccountId: number; scheduleDate: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(weeklySchedules).where(and(
+    eq(weeklySchedules.staffAccountId, input.staffAccountId),
+    eq(weeklySchedules.scheduleDate, input.scheduleDate)
+  ));
+  return listSchedules(input.staffAccountId);
+}
+
 export async function authenticateStaff(phone: string, password: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
