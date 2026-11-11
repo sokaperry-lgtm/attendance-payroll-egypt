@@ -207,7 +207,7 @@ export const appRouter = router({
       const target = await db.getStaffAccountById(input.staffAccountId);
       if (!target || !target.active || target.employmentEndedOn) throw new Error("لا يمكن جدولة شيفت لموظف مؤرشف أو موقوف.");
       await enterprise.assertPayrollEditable(ctx.staffUser.id, input.scheduleDate.slice(0,7), input.staffAccountId); return db.saveSchedule(input); }),
-    clear: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), scheduleDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/) })).mutation(async ({ ctx, input }) => {
+    clear: supervisorProcedure.input(z.object({ staffAccountId: z.number().int(), scheduleDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })).mutation(async ({ ctx, input }) => {
       await enterprise.assertPermission(ctx.staffUser.id, "attendance.manage");
       await enterprise.assertOperationalTarget(ctx.staffUser.id, input.staffAccountId);
       const target = await db.getStaffAccountById(input.staffAccountId);
