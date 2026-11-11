@@ -69,7 +69,7 @@ function tone(s: ShiftTemplate | null | undefined, paletteIndex?: number) {
 export default function ScheduleScreen() {
   const { width } = useWindowDimensions();
   const compact = width < 560;
-  const { role, employee, records, staffMembers: allStaffMembers, shiftTemplates, schedules, teamSchedules: allTeamSchedules, teamAttendance, saveSchedule, clearSchedule } = useAppData();
+  const { role, employee, records, staffMembers: allStaffMembers, shiftTemplates, schedules, teamSchedules: allTeamSchedules, teamAttendance, saveSchedule, clearSchedule, refresh } = useAppData();
   // Keep archived history in AppData for payroll and employee records. The
   // operational schedule, picker and counters all use the same active roster.
   const staffMembers = useMemo(() => allStaffMembers.filter(person => person.active !== false && !person.employmentEndedOn), [allStaffMembers]);
@@ -79,6 +79,7 @@ export default function ScheduleScreen() {
   }, [allTeamSchedules, staffMembers]);
   const router = useRouter();
   const updateAttendance = trpc.attendance.managerUpdate.useMutation();
+  const clearAttendance = trpc.attendance.clear.useMutation();
   const [weekOffset, setWeekOffset] = useState(0);
   const week = useMemo(() => makeWeek(weekOffset), [weekOffset]);
   const [selectedEmployee, setSelectedEmployee] = useState(staffMembers[0]?.id ?? employee.id);
@@ -165,6 +166,22 @@ export default function ScheduleScreen() {
       note: attendance?.note ?? "",
     });
     setDetailOpen(true);
+  }
+
+  async function cancelAttendanceStatus() {
+    if (!member || !selectedDay || !selectedAttendance) return;
+    setDetailSaving(true);
+    try {
+      await clearAttendance.mutateAsync({ staffAccountId: Number(selectedEmployee), date: selectedDay });
+      await refresh();
+      setDetailForm({ checkIn: "", checkOut: "", lateMinutes: "0", status: "حاضر", note: "" });
+      showAlert("تم إلغاء حالة الحضور", "تم مسح تسجيل هذا اليوم، والجدول والشيفت لم يتغيرا.");
+      setDetailOpen(false);
+    } catch (error) {
+      showAlert("تعذر إلغاء حالة الحضور", error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
+    } finally {
+      setDetailSaving(false);
+    }
   }
 
   async function saveAttendanceDetail() {
@@ -503,6 +520,10 @@ export default function ScheduleScreen() {
                     <View style={styles.detailField}><Text style={styles.detailLabel}>وقت الدخول</Text><TextInput style={styles.detailInput} value={detailForm.checkIn} onChangeText={v=>setDetailForm(f=>({...f,checkIn:v}))} placeholder="09:00" textAlign="right"/></View>
                     <View style={styles.detailField}><Text style={styles.detailLabel}>وقت الخروج</Text><TextInput style={styles.detailInput} value={detailForm.checkOut} onChangeText={v=>setDetailForm(f=>({...f,checkOut:v}))} placeholder="18:00" textAlign="right"/></View>
                   </View>
+                  <Pressable disabled={detailSaving || !selectedAttendance} onPress={cancelAttendanceStatus} style={{ borderWidth: 1, borderColor: "#B42318", backgroundColor: "#FFF1F0", borderRadius: 11, padding: 10, alignItems: "center", marginBottom: 9, opacity: detailSaving || !selectedAttendance ? 0.45 : 1 }}>
+                    <Text style={{ color: "#B42318", fontSize: 10, fontWeight: "900" }}>{detailSaving ? "جارٍ الإلغاء..." : "إلغاء حالة الحضور الحالية"}</Text>
+                    <Text style={{ color: "#9F2638", fontSize: 8, marginTop: 3 }}>يمسح تسجيل اليوم بالكامل بما فيه الحالة وأوقات الدخول والخروج</Text>
+                  </Pressable>
                   <View style={styles.statusOptions}>
                     {(["حاضر","متأخر","غياب","إجازة","مأمورية"] as const).map(s=><Pressable key={s} onPress={()=>setDetailForm(f=>({...f,status:s}))} style={[styles.statusOption,detailForm.status===s&&styles.statusOptionActive]}><Text style={[styles.statusOptionText,detailForm.status===s&&styles.statusOptionTextActive]}>{s}</Text></Pressable>)}
                   </View>
