@@ -450,6 +450,17 @@ export async function updateAttendanceByManager(input: { staffAccountId: number;
   });
 }
 
+
+export async function clearAttendanceByManager(input: { staffAccountId: number; date: string }) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  await database.delete(attendanceRecords).where(and(
+    eq(attendanceRecords.staffAccountId, input.staffAccountId),
+    eq(attendanceRecords.date, input.date),
+  ));
+  return { success: true };
+}
+
 export async function listRequests(staffAccountId?: number) {
   const db = await getDb();
   if (!db) return [];
