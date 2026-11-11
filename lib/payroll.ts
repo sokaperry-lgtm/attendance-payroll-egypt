@@ -41,18 +41,20 @@ export function calculateAttendanceAccrual(
   today = todayKey(),
   paidLeaveDates: string[] = [],
   employmentStartedOn?: string | null,
+  unpaidLeaveDates: string[] = [],
 ) {
   const eligible = (date: string) => date.startsWith(`${month}-`) && date <= today && (!employmentStartedOn || date >= employmentStartedOn);
-  const worked = new Set(attendance.filter(r => eligible(r.date) && Boolean(r.checkIn) &&
+  const unpaid = new Set(unpaidLeaveDates.filter(eligible));
+  const worked = new Set(attendance.filter(r => eligible(r.date) && !unpaid.has(r.date) && Boolean(r.checkIn) &&
     ["حاضر", "متأخر"].includes(r.status)).map(r => r.date));
-  const rest = new Set(restDates.filter(eligible));
-  const leave = new Set(paidLeaveDates.filter(eligible));
-  const missions = attendance.filter(r => eligible(r.date) && r.status === "مأمورية").map(r => r.date);
+  const rest = new Set(restDates.filter(eligible).filter(date => !unpaid.has(date)));
+  const leave = new Set(paidLeaveDates.filter(eligible).filter(date => !unpaid.has(date)));
+  const missions = attendance.filter(r => eligible(r.date) && !unpaid.has(r.date) && r.status === "مأمورية").map(r => r.date);
   const paid = new Set([...worked, ...rest, ...leave, ...missions]);
   const workedRestDays = [...worked].filter(date => rest.has(date)).length;
   // An absent day's wage is already excluded from accrual. Only the additional
   // two days of the three-day penalty may be deducted from this basis.
-  const unpaidAbsence = new Set(attendance.filter(r => eligible(r.date) && r.status === "غياب" &&
+  const unpaidAbsence = new Set(attendance.filter(r => eligible(r.date) && !unpaid.has(r.date) && r.status === "غياب" &&
     !paid.has(r.date)).map(r => r.date));
   // Settle unused monthly rest only after the actual month ends. Extra worked
   // days above 26 prove work in lieu of rest; absence/leave cannot earn it.
@@ -79,11 +81,12 @@ export function calculateAttendancePenalties(
   records: Array<{date: string; status: string; lateMinutes?: number | null; note?: string | null}>,
   unpaidAbsenceDays: number,
   paidRestDates: string[] = [],
+  unpaidLeaveDates: string[] = [],
 ) {
   const daily = Math.max(0, baseSalary) / PAYROLL_RULES.calendarDays;
   let absence = 0, late = 0;
   for (const record of records) {
-    if (paidRestDates.includes(record.date)) continue;
+    if (paidRestDates.includes(record.date) || unpaidLeaveDates.includes(record.date)) continue;
     const note = record.note || "";
     if (record.status === "غياب") absence += getAbsencePenaltyDays(note.includes("بإذن")) * daily;
     if (note.includes("تم اعتماد التأخير")) {
