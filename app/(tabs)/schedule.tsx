@@ -175,8 +175,6 @@ export default function ScheduleScreen() {
       await updateAttendance.mutateAsync({
         staffAccountId: Number(selectedEmployee),
         date: selectedDay,
-        checkIn: detailForm.checkIn.trim() || null,
-        checkOut: detailForm.checkOut.trim() || null,
         status: detailForm.status,
         checkIn: detailForm.status === "إجازة بدون مرتب" ? null : (detailForm.checkIn.trim() || null),
         checkOut: detailForm.status === "إجازة بدون مرتب" ? null : (detailForm.checkOut.trim() || null),
