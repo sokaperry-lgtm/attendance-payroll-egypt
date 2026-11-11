@@ -78,6 +78,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const teamScheduleQuery = trpc.schedule.all.useQuery(undefined, { enabled: ["owner","manager","hr","supervisor"].includes(role), retry: false });
   const teamAttendanceQuery = trpc.attendance.team.useQuery(undefined, { enabled: ["owner","manager","hr","supervisor"].includes(role), retry: false });
   const saveScheduleMutation = trpc.schedule.save.useMutation();
+  const clearScheduleMutation = trpc.schedule.clear.useMutation();
 
   const employee = meQuery.data ? mapEmployee(meQuery.data) : { id: "", name: "", title: "", department: "", baseSalary: 0, initials: "" };
   const branch: Branch = companyQuery.data ? { name: companyQuery.data.name, address: companyQuery.data.address, latitude: Number(companyQuery.data.latitude), longitude: Number(companyQuery.data.longitude), radiusMeters: companyQuery.data.radiusMeters } : defaultBranch;
@@ -131,6 +132,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     deleteStaffAccount: async (id, employmentEndedOn) => { await deleteStaffMutation.mutateAsync({ id, employmentEndedOn }); await invalidateAll(); },
     updateBranch: async (input) => { await updateCompanyMutation.mutateAsync(input); await invalidateAll(); },
     saveSchedule: async (input) => { await saveScheduleMutation.mutateAsync(input); await invalidateAll(); },
+    clearSchedule: async (input) => { await clearScheduleMutation.mutateAsync(input); await invalidateAll(); },
   }), [role, employee, branch, meQuery.data?.shiftStart, meQuery.data?.shiftEnd, records, requests, staffMembers, payrollInputs, payroll, todayRecord, activeAttendanceRecord, previousRecord, previousSchedule, meQuery.isLoading, attendanceQuery.isLoading, teamAttendanceQuery.isLoading, shiftTemplates, schedules, teamSchedules, teamAttendance, activeShift, checkInMutation, checkOutMutation, requestMutation, reviewMutation, createStaffMutation, updateStaffMutation, deleteStaffMutation, updateCompanyMutation, saveScheduleMutation, clearScheduleMutation]);
   return <AppData.Provider value={value}>{children}</AppData.Provider>;
 }
