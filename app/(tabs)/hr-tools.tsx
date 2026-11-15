@@ -57,11 +57,14 @@ function HrToolsContent({ role }: { role: string }) {
   const togglePenaltyPolicy = trpc.hrTools.togglePenaltyPolicy.useMutation({ onSuccess: () => penaltyPolicies.refetch() });
 
   const [doc, setDoc] = useState({ type: "بطاقة شخصية", title: "", number: "", expiry: "", note: "" });
-  const [money, setMoney] = useState({ type: "incentive" as "incentive" | "bonus" | "penalty" | "deduction", title: "", amount: "" });
+  const [money, setMoney] = useState({ type: "incentive" as "incentive" | "bonus" | "penalty" | "deduction", title: "", amount: "", deductionDays: "1" });
   const [advance, setAdvance] = useState({ amount: "", installment: "" });
   const [penalty, setPenalty] = useState({ title: "", category: "حضور وانصراف", deductionType: "fixed" as "fixed"|"percentage"|"days"|"hours", value: "" });
 
-  const selectedName = employees.find((x: any) => Number(x.id) === selectedId)?.name || "الموظف المحدد";
+  const selectedEmployee = employees.find((x: any) => Number(x.id) === selectedId);
+  const selectedName = selectedEmployee?.name || "الموظف المحدد";
+  const isDayBasedDeduction = money.type === "penalty" || money.type === "deduction";
+  const dayBasedDeductionValue = Math.round((Math.max(0, Number((selectedEmployee as any)?.baseSalary) || 0) / 30) * Number(money.deductionDays));
   const docRows = Array.isArray(docs.data) ? docs.data : [];
   const adjustmentRows = Array.isArray(adjustments.data) ? adjustments.data : [];
   const advanceRows = Array.isArray(advances.data) ? advances.data : [];
@@ -76,10 +79,10 @@ function HrToolsContent({ role }: { role: string }) {
   }
 
   async function saveAdjustment() {
-    if (!hasSelected || !money.title.trim() || !money.amount) return Alert.alert("بيانات ناقصة", "اختار موظف واكتب المبلغ والوصف.");
+    if (!hasSelected || !money.title.trim() || (isDayBasedDeduction ? !money.deductionDays : !money.amount)) return Alert.alert("بيانات ناقصة", isDayBasedDeduction ? "اختار عدد أيام الخصم واكتب الوصف." : "اكتب قيمة التعديل والوصف.");
     try {
-      await addAdjustment.mutateAsync({ staffAccountId: selectedId, month, type: money.type, title: money.title.trim(), amount: Number(money.amount) });
-      setMoney(x => ({ ...x, title: "", amount: "" }));
+      await addAdjustment.mutateAsync({ staffAccountId: selectedId, month, type: money.type, title: money.title.trim(), ...(isDayBasedDeduction ? { deductionDays: Number(money.deductionDays) as 0.25 | 0.5 | 1 | 2 | 3 } : { amount: Number(money.amount) }) });
+      setMoney(x => ({ ...x, title: "", amount: "", deductionDays: "1" }));
       Alert.alert("تم", "تم تسجيل التعديل المالي.");
     } catch (e) { Alert.alert("خطأ", e instanceof Error ? e.message : "تعذر الحفظ."); }
   }
@@ -143,13 +146,17 @@ function HrToolsContent({ role }: { role: string }) {
         {canManageMoney && <Section title={`تعديلات الرواتب · ${month}`} hint="حوافز ومكافآت وخصومات وجزاءات قبل اعتماد المسير.">
           <View style={styles.types}>{[["incentive","حافز"],["bonus","مكافأة"],["penalty","جزاء"],["deduction","خصم"]].map(([v,l]) => <Pressable key={v} onPress={() => setMoney(x => ({ ...x, type: v as any }))} style={[styles.type, money.type === v && styles.typeActive]}><Text style={[styles.typeText, money.type === v && styles.typeTextActive]}>{l}</Text></Pressable>)}</View>
           <TextInput style={styles.input} value={money.title} onChangeText={v => setMoney(x => ({ ...x, title: v }))} placeholder="وصف التعديل" placeholderTextColor="#8A98AA" textAlign="right" />
-          <TextInput style={styles.input} value={money.amount} onChangeText={v => setMoney(x => ({ ...x, amount: v }))} placeholder="المبلغ بالجنيه" placeholderTextColor="#8A98AA" keyboardType="numeric" textAlign="right" />
+          {isDayBasedDeduction ? <>
+            <Text style={styles.hint}>اختار مقدار الخصم بأيام التشغيل:</Text>
+            <View style={styles.types}>{[["0.25","ربع يوم"],["0.5","نص يوم"],["1","يوم كامل"],["2","يومان"],["3","3 أيام"]].map(([v,l]) => <Pressable key={v} onPress={() => setMoney(x => ({ ...x, deductionDays: v }))} style={[styles.type, money.deductionDays === v && styles.typeActive]}><Text style={[styles.typeText, money.deductionDays === v && styles.typeTextActive]}>{l}</Text></Pressable>)}</View>
+            <View style={styles.item}><View style={styles.itemCopy}><Text style={styles.itemTitle}>قيمة الخصم المحسوبة</Text><Text style={styles.itemSub}>المرتب الأساسي ÷ 30 × {money.deductionDays} يوم</Text></View><Text style={styles.money}>{formatMoney(dayBasedDeductionValue)}</Text></View>
+          </> : <TextInput style={styles.input} value={money.amount} onChangeText={v => setMoney(x => ({ ...x, amount: v }))} placeholder="المبلغ بالجنيه" placeholderTextColor="#8A98AA" keyboardType="numeric" textAlign="right" />}
           <Pressable style={styles.button} disabled={addAdjustment.isPending} onPress={saveAdjustment}><Text style={styles.buttonText}>{addAdjustment.isPending ? "جاري الحفظ..." : "حفظ التعديل"}</Text></Pressable>
           {adjustmentRows.length ? adjustmentRows.map((a: any) => {
             const adjustmentEmployee = employees.find((x: any) => Number(x.id) === Number(a.staffAccountId));
             return <View key={a.id} style={styles.item}>
               <View style={styles.amount}><Text style={styles.money}>{formatMoney(Number(a.amount) || 0)}</Text></View>
-              <View style={styles.itemCopy}><Text style={styles.itemTitle}>{a.title}</Text><Text style={styles.itemSub}>{adjustmentEmployee?.name || ("موظف " + a.staffAccountId)} · {a.type}</Text></View>
+              <View style={styles.itemCopy}><Text style={styles.itemTitle}>{a.title}</Text><Text style={styles.itemSub}>{adjustmentEmployee?.name || ("موظف " + a.staffAccountId)} · {a.type}{a.deductionDays ? ` · خصم ${Number(a.deductionDays)} يوم` : ""}</Text></View>
               <Pressable
                 disabled={cancelPenalty.isPending}
                 onPress={() => Alert.alert("إلغاء الخصم", "هل تريد إلغاء " + a.title + " بقيمة " + formatMoney(Number(a.amount) || 0) + "؟ لا يمكن الإلغاء بعد اعتماد مسير الموظف لهذا الشهر.", [
