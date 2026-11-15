@@ -29,6 +29,8 @@ async function ensureSalaryAdjustmentDaysColumn() {
     salaryAdjustmentDaysSchemaReady = (async () => {
       const database = await getDb();
       if (!database) throw new Error("Database not available");
+      // Unit-test database doubles may implement only select/insert/update; the real Drizzle connection exposes execute.
+      if (typeof (database as any).execute !== "function") return;
       const result = await database.execute(sql`SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'salary_adjustments' AND COLUMN_NAME = 'deductionDays'`);
       const count = Number((result as any)[0]?.[0]?.count ?? 0);
       if (count === 0) {
