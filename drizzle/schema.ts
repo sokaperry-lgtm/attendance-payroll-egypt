@@ -235,6 +235,7 @@ export const salaryAdjustments = mysqlTable("salary_adjustments", {
   type: varchar("type", { length: 24 }).notNull(),
   title: varchar("title", { length: 160 }).notNull(),
   amount: int("amount").notNull(),
+  deductionDays: decimal("deductionDays", { precision: 5, scale: 2 }),
   note: text("note"),
   createdBy: int("createdBy"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
