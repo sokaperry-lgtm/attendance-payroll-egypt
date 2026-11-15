@@ -23,6 +23,27 @@ const ROLE_DEFAULTS: Record<CompanyRole, PermissionMap> = {
   supervisor: Object.fromEntries(PERMISSION_KEYS.map((k) => [k, ["dashboard.view","attendance.view","attendance.manage","requests.view","requests.review","reports.view","reports.export"].includes(k)])) as PermissionMap,
   employee: Object.fromEntries(PERMISSION_KEYS.map((k) => [k, ["dashboard.view","attendance.view","requests.view","reports.view","notifications.manage"].includes(k)])) as PermissionMap,
 };
+let salaryAdjustmentDaysSchemaReady: Promise<void> | undefined;
+async function ensureSalaryAdjustmentDaysColumn() {
+  if (!salaryAdjustmentDaysSchemaReady) {
+    salaryAdjustmentDaysSchemaReady = (async () => {
+      const database = await getDb();
+      if (!database) throw new Error("Database not available");
+      const result = await database.execute(sql`SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'salary_adjustments' AND COLUMN_NAME = 'deductionDays'`);
+      const count = Number((result as any)[0]?.[0]?.count ?? 0);
+      if (count === 0) {
+        await database.execute(sql.raw("ALTER TABLE salary_adjustments ADD COLUMN deductionDays DECIMAL(5,2) NULL AFTER amount"));
+      }
+    })();
+  }
+  try {
+    await salaryAdjustmentDaysSchemaReady;
+  } catch (error) {
+    salaryAdjustmentDaysSchemaReady = undefined;
+    throw error;
+  }
+}
+
 async function ensurePermissionStore() {
   const db = await getDb(); if (!db) return;
   await db.execute(sql.raw("CREATE TABLE IF NOT EXISTS member_permissions (id INT AUTO_INCREMENT PRIMARY KEY, companyId INT NOT NULL, staffAccountId INT NOT NULL UNIQUE, permissions TEXT NOT NULL, updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)"));
@@ -910,6 +931,7 @@ function isUnpaidLeaveTemplate(shift: { kind?: unknown; name?: unknown } | undef
 }
 
 export async function generatePayroll(staffAccountId: number, month: string) {
+  await ensureSalaryAdjustmentDaysColumn();
   const db = await getDb(); if (!db) throw new Error("Database not available");
   if (!/^\d{4}-\d{2}$/.test(month)) throw new Error("صيغة الشهر غير صحيحة. استخدم YYYY-MM.");
   const m = await getCompanyForStaff(staffAccountId);
@@ -1662,6 +1684,7 @@ export async function togglePenaltyPolicy(staffAccountId: number, id: number, ac
 }
 
 export async function listCompanySalaryAdjustments(staffAccountId:number, month?:string) {
+  await ensureSalaryAdjustmentDaysColumn();
   const db=await getDb(); if(!db) return [];
   const m=await getCompanyForStaff(staffAccountId); if(!m) return [];
   if (!["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
@@ -1675,6 +1698,7 @@ export function calculateDayBasedDeduction(baseSalary:number, deductionDays:numb
 }
 
 export async function createSalaryAdjustment(actorId:number,input:{staffAccountId:number;month:string;type:"allowance"|"bonus"|"incentive"|"penalty"|"deduction";title:string;amount?:number;deductionDays?:0.25|0.5|1|2|3;note?:string}) {
+  await ensureSalaryAdjustmentDaysColumn();
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId); if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   if (!/^\d{4}-\d{2}$/.test(input.month)) throw new Error("صيغة الشهر غير صحيحة. استخدم YYYY-MM.");
