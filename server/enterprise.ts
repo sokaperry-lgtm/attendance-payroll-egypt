@@ -1668,16 +1668,37 @@ export async function listCompanySalaryAdjustments(staffAccountId:number, month?
   return month ? db.select().from(salaryAdjustments).where(and(eq(salaryAdjustments.companyId,m.companyId),eq(salaryAdjustments.month,month))).orderBy(desc(salaryAdjustments.createdAt))
     : db.select().from(salaryAdjustments).where(eq(salaryAdjustments.companyId,m.companyId)).orderBy(desc(salaryAdjustments.createdAt));
 }
-export async function createSalaryAdjustment(actorId:number,input:{staffAccountId:number;month:string;type:"allowance"|"bonus"|"incentive"|"penalty"|"deduction";title:string;amount:number;note?:string}) {
+export function calculateDayBasedDeduction(baseSalary:number, deductionDays:number):number {
+  if (!Number.isFinite(baseSalary) || baseSalary < 0) throw new Error("المرتب الأساسي غير صحيح.");
+  if (![0.25,0.5,1,2,3].includes(deductionDays)) throw new Error("اختار ربع يوم أو نصف يوم أو يوم أو يومين أو 3 أيام.");
+  return Math.round((baseSalary / 30) * deductionDays);
+}
+
+export async function createSalaryAdjustment(actorId:number,input:{staffAccountId:number;month:string;type:"allowance"|"bonus"|"incentive"|"penalty"|"deduction";title:string;amount?:number;deductionDays?:0.25|0.5|1|2|3;note?:string}) {
   const db=await getDb(); if(!db) throw new Error("Database not available");
   const m=await getCompanyForStaff(actorId); if(!m || !["owner","manager"].includes(m.role)) throw new Error("غير مصرح");
   if (!/^\d{4}-\d{2}$/.test(input.month)) throw new Error("صيغة الشهر غير صحيحة. استخدم YYYY-MM.");
-  if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("قيمة الإضافة أو الخصم يجب أن تكون أكبر من صفر.");
   await assertOperationalTarget(actorId,input.staffAccountId);
   await assertPayrollEditable(actorId,input.month,input.staffAccountId);
-  const result=await db.insert(salaryAdjustments).values({...input,companyId:m.companyId,createdBy:actorId});
-  await writeAudit(actorId,m.companyId,"salary_adjustment.created","salary_adjustment",String(result[0].insertId),input);
-  await createNotification(input.staffAccountId,"payroll","إضافة جديدة على راتبك",input.title+": "+input.amount.toLocaleString()+" جنيه.");
+  const isDeduction=input.type==="penalty" || input.type==="deduction";
+  let amount:number;
+  let deductionDays:string|null=null;
+  if(isDeduction) {
+    if(input.deductionDays===undefined) throw new Error("اختار عدد أيام الخصم.");
+    const employee=await getStaffAccountById(input.staffAccountId);
+    if(!employee) throw new Error("الموظف غير موجود.");
+    amount=calculateDayBasedDeduction(Number(employee.baseSalary)||0,input.deductionDays);
+    if(amount<=0) throw new Error("قيمة الخصم المحسوبة يجب أن تكون أكبر من صفر.");
+    deductionDays=String(input.deductionDays);
+  } else {
+    if(input.deductionDays!==undefined) throw new Error("اختيار أيام الخصم متاح للجزاءات والخصومات فقط.");
+    if(!Number.isFinite(input.amount) || Number(input.amount)<=0) throw new Error("قيمة الإضافة يجب أن تكون أكبر من صفر.");
+    amount=Number(input.amount);
+  }
+  const values={staffAccountId:input.staffAccountId,month:input.month,type:input.type,title:input.title,amount,deductionDays,note:input.note,companyId:m.companyId,createdBy:actorId};
+  const result=await db.insert(salaryAdjustments).values(values);
+  await writeAudit(actorId,m.companyId,"salary_adjustment.created","salary_adjustment",String(result[0].insertId),{...values,amount});
+  await createNotification(input.staffAccountId,"payroll","إضافة جديدة على راتبك",input.title+": "+amount.toLocaleString()+" جنيه.");
   return (await db.select().from(salaryAdjustments).where(eq(salaryAdjustments.id,Number(result[0].insertId))).limit(1))[0];
 }
 export async function createSalaryAdvance(actorId:number,input:{staffAccountId:number;amount:number;installmentAmount:number;startMonth:string;note?:string}) {
