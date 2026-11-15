@@ -64,7 +64,7 @@ function HrToolsContent({ role }: { role: string }) {
   const selectedEmployee = employees.find((x: any) => Number(x.id) === selectedId);
   const selectedName = selectedEmployee?.name || "الموظف المحدد";
   const isDayBasedDeduction = money.type === "penalty" || money.type === "deduction";
-  const dayBasedDeductionValue = Math.round((Math.max(0, Number(selectedEmployee?.baseSalary) || 0) / 30) * Number(money.deductionDays));
+  const dayBasedDeductionValue = Math.round((Math.max(0, Number((selectedEmployee as any)?.baseSalary) || 0) / 30) * Number(money.deductionDays));
   const docRows = Array.isArray(docs.data) ? docs.data : [];
   const adjustmentRows = Array.isArray(adjustments.data) ? adjustments.data : [];
   const advanceRows = Array.isArray(advances.data) ? advances.data : [];
